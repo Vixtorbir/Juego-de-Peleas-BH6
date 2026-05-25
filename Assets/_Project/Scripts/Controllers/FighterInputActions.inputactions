@@ -113,7 +113,7 @@
                     "id": "a83c360f-ba33-4b99-a3e8-b6052fe976d8",
                     "path": "<Gamepad>/leftStick",
                     "interactions": "",
-                    "processors": "StickDeadzone,NormalizeVector2",
+                    "processors": "NormalizeVector2",
                     "groups": "",
                     "action": "Movement",
                     "isComposite": false,
