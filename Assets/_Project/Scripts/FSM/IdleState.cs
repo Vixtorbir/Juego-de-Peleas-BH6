@@ -67,5 +67,15 @@ public class IdleState : RobotState
         {
             robot.ChangeState(new WalkState(robot));
         }
+
+        if (!robot.characterController.isGrounded)
+        {
+            robot.characterController.Move(new Vector3(0, -9.81f, 0) * Time.deltaTime);
+        }
+        else
+        {
+            // Incluso en el suelo, aplicamos una micro-fuerza para mantener la presión
+            robot.characterController.Move(new Vector3(0, -0.5f, 0) * Time.deltaTime);
+        }
     }
 }

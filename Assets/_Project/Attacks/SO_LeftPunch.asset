@@ -22,3 +22,9 @@ MonoBehaviour:
   comboBranches:
   - inputCommand: 2
     nextAttack: {fileID: 11400000, guid: 54b0d6d2482a8654ea817dcbe35905c1, type: 2}
+  isLauncher: 0
+  launchForce: 15
+  attackHeight: 0
+  blockstunDuration: 0.25
+  hitPushback: 20
+  blockPushback: 4

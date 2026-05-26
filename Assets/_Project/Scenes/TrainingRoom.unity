@@ -156,7 +156,16 @@ MonoBehaviour:
   inputReader: {fileID: 422962602}
   animator: {fileID: 422962608}
   characterController: {fileID: 422962609}
+  hitboxBase: {fileID: 533375029}
   opponentTarget: {fileID: 1793476819}
+  leftPunchBase: {fileID: 11400000, guid: 26e830ed391601f49a6d86892515cb0a, type: 2}
+  rightPunchBase: {fileID: 11400000, guid: 54b0d6d2482a8654ea817dcbe35905c1, type: 2}
+  leftKickBase: {fileID: 11400000, guid: 1cb996d478df3af45abde8f1f3fa1786, type: 2}
+  rightKickBase: {fileID: 11400000, guid: 35bb93de7e1d8b14d9bab44e05d023c1, type: 2}
+  crouchPunchBase: {fileID: 11400000, guid: 5319aec61d0fbfd4ab71d15ca485b4eb, type: 2}
+  crouchSweepBase: {fileID: 11400000, guid: a2564fd03854b10429ff79d37a130b5c, type: 2}
+  launcherBase: {fileID: 11400000, guid: a42be1ded81bc2a4b99b0d5525e846ad, type: 2}
+  bufferedCommand: 0
 --- !u!114 &422962602
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -238,7 +247,8 @@ Transform:
   m_LocalPosition: {x: -3.6, y: 0.984, z: 0.35356}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 533375031}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!95 &422962608
@@ -288,6 +298,72 @@ CharacterController:
   m_SkinWidth: 0.08
   m_MinMoveDistance: 0.001
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!1 &533375028
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 533375031}
+  - component: {fileID: 533375030}
+  - component: {fileID: 533375029}
+  m_Layer: 8
+  m_Name: Jab_Hitbox
+  m_TagString: Untagged
+  m_Icon: {fileID: -5442936267250999957, guid: 0000000000000000d000000000000000, type: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &533375029
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 533375028}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6079db86a731d7744a6ed559c6d17b63, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Hitbox
+--- !u!65 &533375030
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 533375028}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
+--- !u!4 &533375031
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 533375028}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 1}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 422962607}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &920029566
 GameObject:
   m_ObjectHideFlags: 0
@@ -567,7 +643,8 @@ GameObject:
   - component: {fileID: 1793476815}
   - component: {fileID: 1793476814}
   - component: {fileID: 1793476813}
-  m_Layer: 0
+  - component: {fileID: 1793476820}
+  m_Layer: 9
   m_Name: Player2
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -628,7 +705,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1793476812}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5d0195da890f18a4fac60f477fd2408d, type: 3}
   m_Name: 
@@ -636,7 +713,16 @@ MonoBehaviour:
   inputReader: {fileID: 1793476816}
   animator: {fileID: 1793476813}
   characterController: {fileID: 1793476814}
-  opponentTarget: {fileID: 0}
+  hitboxBase: {fileID: 0}
+  opponentTarget: {fileID: 422962607}
+  leftPunchBase: {fileID: 0}
+  rightPunchBase: {fileID: 0}
+  leftKickBase: {fileID: 0}
+  rightKickBase: {fileID: 0}
+  crouchPunchBase: {fileID: 0}
+  crouchSweepBase: {fileID: 0}
+  launcherBase: {fileID: 0}
+  bufferedCommand: 0
 --- !u!114 &1793476816
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -721,6 +807,18 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1793476820
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1793476812}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7c3f60eabdf90044dab19d7e45b92b62, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Hurtbox
 --- !u!1 &2131785154
 GameObject:
   m_ObjectHideFlags: 0

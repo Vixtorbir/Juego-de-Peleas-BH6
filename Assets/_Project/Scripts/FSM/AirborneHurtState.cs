@@ -12,8 +12,7 @@ public class AirborneHurtState : RobotState
 
     public override void Enter()
     {
-        Debug.Log("¡JUGGLE! El rival está en el aire.");
-
+        Debug.Log("¡JUGGLE! El rival está sufriendo en el aire.");
         robot.transform.localScale = new Vector3(0.8f, 1f, 0.8f);
     }
 
@@ -25,7 +24,6 @@ public class AirborneHurtState : RobotState
         if (robot.characterController.isGrounded && verticalVelocity < 0f)
         {
             robot.characterController.Move(new Vector3(0, -0.5f, 0));
-
             robot.ChangeState(new IdleState(robot));
         }
     }

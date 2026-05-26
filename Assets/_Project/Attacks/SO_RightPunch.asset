@@ -20,3 +20,9 @@ MonoBehaviour:
   damage: 15
   hitstunDuration: 0.6
   comboBranches: []
+  isLauncher: 0
+  launchForce: 15
+  attackHeight: 1
+  blockstunDuration: 0.25
+  hitPushback: 20
+  blockPushback: 4

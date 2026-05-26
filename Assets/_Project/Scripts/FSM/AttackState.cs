@@ -16,27 +16,29 @@ public class AttackState : RobotState
         stateTimer = 0f;
         hasActivatedHitbox = false;
 
+        robot.IsInAttackStartup = true;
+
         if (!string.IsNullOrEmpty(data.animationTrigger))
-        {
             robot.animator.SetTrigger(data.animationTrigger);
-        }
 
         robot.transform.localScale = data.visualScale;
-
-        Debug.Log($"Iniciando ataque: {data.name}");
     }
 
     public override void Tick()
     {
         stateTimer += Time.deltaTime;
 
-        // FASE 1: ACTIVE FRAMES (Encendemos la caja de daño)
+        if (stateTimer >= data.startupTime)
+        {
+            robot.IsInAttackStartup = false;
+        }
+
+        // FASE 1: ACTIVE FRAMES (Aquí se enciende la hitbox)
         if (stateTimer >= data.startupTime && stateTimer < (data.startupTime + data.activeTime) && !hasActivatedHitbox)
         {
             robot.hitboxBase.ActivarHitbox(data);
             hasActivatedHitbox = true;
         }
-        // FASE 2: RECOVERY Y VENTANA DE CANCELACIÓN
         else if (stateTimer >= (data.startupTime + data.activeTime))
         {
             if (hasActivatedHitbox)
@@ -45,7 +47,6 @@ public class AttackState : RobotState
                 hasActivatedHitbox = false;
             }
 
-            // --- ÁRBOL DE COMBOS RAMIFICADO ---
             if (data.comboBranches != null && data.comboBranches.Count > 0)
             {
                 foreach (ComboBranch branch in data.comboBranches)
@@ -53,12 +54,11 @@ public class AttackState : RobotState
                     if (robot.TryConsumeCommand(branch.inputCommand))
                     {
                         robot.ChangeState(new AttackState(robot, branch.nextAttack));
-                        return; 
+                        return;
                     }
                 }
             }
 
-            // FASE 3: FIN DEL ATAQUE
             if (stateTimer >= (data.startupTime + data.activeTime + data.recoveryTime))
             {
                 robot.ChangeState(new IdleState(robot));
@@ -68,6 +68,7 @@ public class AttackState : RobotState
 
     public override void Exit()
     {
+        robot.IsInAttackStartup = false;
         robot.hitboxBase.DesactivarHitbox();
         robot.transform.localScale = Vector3.one;
     }

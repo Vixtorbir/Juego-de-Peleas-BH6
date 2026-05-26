@@ -4,7 +4,7 @@ using UnityEngine;
 public class Hitbox : MonoBehaviour
 {
     private Collider hitboxCollider;
-    private AttackData currentAttackData; 
+    private AttackData currentAttackData;
 
     private void Awake()
     {
@@ -24,7 +24,6 @@ public class Hitbox : MonoBehaviour
     private void OnTriggerEnter(Collider other)
     {
         Hurtbox objetivo = other.GetComponent<Hurtbox>();
-
         if (objetivo != null && currentAttackData != null)
         {
             objetivo.RecibirImpacto(currentAttackData);

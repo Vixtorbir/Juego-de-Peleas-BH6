@@ -39,8 +39,15 @@ public class RobotController : MonoBehaviour
     [Header("Dash Detection Settings")]
     private float lastTapTime;
     private float doubleTapWindow = 0.25f;
-    private int lastTapDirection = 0;
+    private int lastTapDirection = 0; // 1 = Derecha, -1 = Izquierda
     private bool isDirectionPressed = false;
+
+    [Header("Physics & Grounding")]
+    public LayerMask groundLayer; 
+    public float groundCheckOffset = 0.1f; 
+    public bool IsGrounded { get; private set; }
+
+    public bool IsInAttackStartup { get; set; }
 
     public Vector2 MovementInput { get; private set; }
     private RobotState currentState;
@@ -69,6 +76,8 @@ public class RobotController : MonoBehaviour
 
     private void Update()
     {
+        CalcularSuelo();
+
         if (bufferTimer > 0f)
         {
             bufferTimer -= Time.deltaTime;
@@ -76,6 +85,12 @@ public class RobotController : MonoBehaviour
         }
 
         currentState?.Tick();
+    }
+
+    private void CalcularSuelo()
+    {
+        float distanciaAlSuelo = characterController.bounds.extents.y + groundCheckOffset;
+        IsGrounded = Physics.Raycast(transform.position, Vector3.down, distanciaAlSuelo, groundLayer);
     }
 
     public bool TryConsumeCommand(FighterCommand expectedCommand)
@@ -125,13 +140,9 @@ public class RobotController : MonoBehaviour
         float screenSide = Mathf.Sign(Vector3.Dot(directionToOpponent.normalized, cameraTransform.right));
 
         if (tapDirection == (int)screenSide)
-        {
             bufferedCommand = FighterCommand.DashForward;
-        }
         else
-        {
             bufferedCommand = FighterCommand.DashBackward;
-        }
 
         bufferTimer = bufferWindow;
         lastTapDirection = 0;
@@ -139,18 +150,8 @@ public class RobotController : MonoBehaviour
 
     private void HandleLeftPunch() { bufferedCommand = FighterCommand.LeftPunch; bufferTimer = bufferWindow; }
     private void HandleRightPunch() { bufferedCommand = FighterCommand.RightPunch; bufferTimer = bufferWindow; }
-
-    private void HandleLeftKick()
-    {
-        bufferedCommand = FighterCommand.LeftKick;
-        bufferTimer = bufferWindow;
-    }
-
-    private void HandleRightKick()
-    {
-        bufferedCommand = FighterCommand.RightKick;
-        bufferTimer = bufferWindow;
-    }
+    private void HandleLeftKick() { bufferedCommand = FighterCommand.LeftKick; bufferTimer = bufferWindow; }
+    private void HandleRightKick() { bufferedCommand = FighterCommand.RightKick; bufferTimer = bufferWindow; }
 
     public void ChangeState(RobotState newState) { currentState?.Exit(); currentState = newState; currentState?.Enter(); }
 

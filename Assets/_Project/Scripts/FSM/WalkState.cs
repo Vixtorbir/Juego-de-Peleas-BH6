@@ -106,5 +106,14 @@ public class WalkState : RobotState
         Vector3 moveDirection = robot.transform.forward * forwardMovement;
         float tempSpeed = 3f;
         robot.characterController.Move(moveDirection * tempSpeed * Time.deltaTime);
+
+        if (!robot.characterController.isGrounded)
+        {
+            robot.characterController.Move(new Vector3(0, -9.81f, 0) * Time.deltaTime);
+        }
+        else
+        {
+            robot.characterController.Move(new Vector3(0, -0.5f, 0) * Time.deltaTime);
+        }
     }
 }

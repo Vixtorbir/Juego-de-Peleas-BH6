@@ -5,8 +5,8 @@ public class DashState : RobotState
     private bool isForward;
     private float stateTimer;
 
-    private float dashDuration = 0.18f; 
-    private float dashSpeed = 14f;      
+    private float dashDuration = 0.18f;
+    private float dashSpeed = 14f;
     private Vector3 dashDirection;
 
     public DashState(RobotController robot, bool isForward) : base(robot)
@@ -18,7 +18,6 @@ public class DashState : RobotState
     {
         stateTimer = dashDuration;
 
-        // 1. Forzamos la mirada al rival antes de salir disparados
         Vector3 directionToOpponent = robot.opponentTarget.position - robot.transform.position;
         directionToOpponent.y = 0f;
         if (directionToOpponent != Vector3.zero)
@@ -26,7 +25,6 @@ public class DashState : RobotState
             robot.transform.rotation = Quaternion.LookRotation(directionToOpponent);
         }
 
-        // 2. Definimos la dirección del vector de movimiento
         dashDirection = isForward ? robot.transform.forward : -robot.transform.forward;
 
         if (isForward)

@@ -1,11 +1,18 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+public enum AttackHeight
+{
+    High,
+    Mid,
+    Low
+}
+
 [System.Serializable]
 public struct ComboBranch
 {
-    public FighterCommand inputCommand; 
-    public AttackData nextAttack;       
+    public FighterCommand inputCommand;
+    public AttackData nextAttack;
 }
 
 [CreateAssetMenu(fileName = "NewAttackData", menuName = "Fighting Game/Attack Data")]
@@ -24,10 +31,18 @@ public class AttackData : ScriptableObject
     public float damage = 10f;
     public float hitstunDuration = 0.4f;
 
-    [Header("Combo Routes")]
-    public List<ComboBranch> comboBranches;
+    [Header("Guard & Block Settings")]
+    public AttackHeight attackHeight = AttackHeight.Mid;
+    public float blockstunDuration = 0.25f;
+
+    [Header("Pushback Settings")]
+    public float hitPushback = 8f;
+    public float blockPushback = 4f;
 
     [Header("Launcher Settings")]
     public bool isLauncher = false;
     public float launchForce = 15f;
+
+    [Header("Combo Routes")]
+    public List<ComboBranch> comboBranches;
 }

@@ -14,11 +14,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AttackData
   animationTrigger: LeftPunch
   visualScale: {x: 1, y: 1, z: 1.2}
-  startupTime: 0.15
+  startupTime: 0.3
   activeTime: 0.1
   recoveryTime: 0.25
   damage: 10
   hitstunDuration: 0.4
   comboBranches: []
-  isLauncher: 0
+  isLauncher: 1
   launchForce: 15
+  attackHeight: 1
+  blockstunDuration: 0.25
+  hitPushback: 20
+  blockPushback: 4

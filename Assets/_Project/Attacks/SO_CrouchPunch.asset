@@ -12,11 +12,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4ad25b836ba4f7b45b83ab449c788887, type: 3}
   m_Name: SO_CrouchPunch
   m_EditorClassIdentifier: Assembly-CSharp::AttackData
-  animationTrigger: LeftPunch
-  visualScale: {x: 1, y: 1, z: 1.2}
-  startupTime: 0.15
+  animationTrigger: CrouchPunch
+  visualScale: {x: 1, y: 0.5, z: 1.2}
+  startupTime: 0.1
   activeTime: 0.1
-  recoveryTime: 0.25
+  recoveryTime: 0.2
   damage: 10
   hitstunDuration: 0.4
   comboBranches: []
+  isLauncher: 0
+  launchForce: 15
+  attackHeight: 1
+  blockstunDuration: 0.25
+  hitPushback: 8
+  blockPushback: 4
