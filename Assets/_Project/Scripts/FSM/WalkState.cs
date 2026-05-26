@@ -10,13 +10,62 @@ public class WalkState : RobotState
 
     public WalkState(RobotController robot) : base(robot)
     {
-        // Cacheamos la cámara al entrar para no buscarla cada frame
         cameraTransform = Camera.main.transform;
     }
 
     public override void Tick()
     {
-        // 1. GESTIÓN DE SALTO Y AGACHARSE (Eje Y del Joystick)
+        // --- LEER INPUT BUFFER PARA DASH ---
+        if (robot.TryConsumeCommand(FighterCommand.DashForward))
+        {
+            robot.ChangeState(new DashState(robot, true)); // true = Forward
+            return;
+        }
+
+        if (robot.TryConsumeCommand(FighterCommand.DashBackward))
+        {
+            robot.ChangeState(new DashState(robot, false)); // false = Backward
+            return;
+        }
+
+        // 1. LEER EL INPUT BUFFER AL CAMINAR (Cancela la caminata si atacamos)
+        if (robot.TryConsumeCommand(FighterCommand.LeftPunch))
+        {
+            robot.ChangeState(new AttackState(robot, robot.leftPunchBase));
+            return;
+        }
+
+        if (robot.TryConsumeCommand(FighterCommand.RightPunch))
+        {
+            Vector3 directionToOpponentAttack = robot.opponentTarget.position - robot.transform.position;
+            directionToOpponentAttack.y = 0f;
+            float screenSideAttack = Mathf.Sign(Vector3.Dot(directionToOpponentAttack.normalized, cameraTransform.right));
+            float forwardMovementAttack = robot.MovementInput.x * screenSideAttack;
+
+            if (forwardMovementAttack > 0.5f)
+            {
+                robot.ChangeState(new AttackState(robot, robot.launcherBase));
+            }
+            else
+            {
+                robot.ChangeState(new AttackState(robot, robot.rightPunchBase));
+            }
+            return;
+        }
+
+        if (robot.TryConsumeCommand(FighterCommand.LeftKick))
+        {
+            robot.ChangeState(new AttackState(robot, robot.leftKickBase));
+            return;
+        }
+
+        if (robot.TryConsumeCommand(FighterCommand.RightKick))
+        {
+            robot.ChangeState(new AttackState(robot, robot.rightKickBase));
+            return;
+        }
+
+        // 2. GESTIÓN DE SALTO Y AGACHARSE (Eje Y del Joystick)
         if (robot.MovementInput.y > 0.6f)
         {
             robot.ChangeState(new JumpState(robot));
@@ -28,6 +77,7 @@ public class WalkState : RobotState
             return;
         }
 
+        // 3. CONTROL DE PARADA (Si soltamos el joystick)
         if (Mathf.Abs(robot.MovementInput.x) <= 0.01f)
         {
             robot.ChangeState(new IdleState(robot));
@@ -49,7 +99,6 @@ public class WalkState : RobotState
 
         float forwardMovement = smoothInput.x * screenSide;
 
-        // Pasamos los valores al Animator
         robot.animator.SetFloat("InputY", forwardMovement);
         robot.animator.SetFloat("InputX", 0f);
 

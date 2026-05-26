@@ -2,33 +2,73 @@ using UnityEngine;
 
 public class AttackState : RobotState
 {
-    private float attackDuration = 0.5f;
+    private AttackData data;
     private float stateTimer;
+    private bool hasActivatedHitbox;
 
-    public AttackState(RobotController robot) : base(robot) { }
+    public AttackState(RobotController robot, AttackData attackData) : base(robot)
+    {
+        this.data = attackData;
+    }
 
     public override void Enter()
     {
-        Debug.Log("¡Gancho izquierdo! (Movimiento bloqueado)");
-        stateTimer = attackDuration;
+        stateTimer = 0f;
+        hasActivatedHitbox = false;
 
-        // TODO: robot.animator.SetTrigger("LeftPunch");
+        if (!string.IsNullOrEmpty(data.animationTrigger))
+        {
+            robot.animator.SetTrigger(data.animationTrigger);
+        }
 
-        robot.transform.localScale = new Vector3(1f, 1f, 1.2f);
+        robot.transform.localScale = data.visualScale;
+
+        Debug.Log($"Iniciando ataque: {data.name}");
     }
 
     public override void Tick()
     {
-        stateTimer -= Time.deltaTime;
+        stateTimer += Time.deltaTime;
 
-        if (stateTimer <= 0f)
+        // FASE 1: ACTIVE FRAMES (Encendemos la caja de daño)
+        if (stateTimer >= data.startupTime && stateTimer < (data.startupTime + data.activeTime) && !hasActivatedHitbox)
         {
-            robot.ChangeState(new IdleState(robot));
+            robot.hitboxBase.ActivarHitbox(data);
+            hasActivatedHitbox = true;
+        }
+        // FASE 2: RECOVERY Y VENTANA DE CANCELACIÓN
+        else if (stateTimer >= (data.startupTime + data.activeTime))
+        {
+            if (hasActivatedHitbox)
+            {
+                robot.hitboxBase.DesactivarHitbox();
+                hasActivatedHitbox = false;
+            }
+
+            // --- ÁRBOL DE COMBOS RAMIFICADO ---
+            if (data.comboBranches != null && data.comboBranches.Count > 0)
+            {
+                foreach (ComboBranch branch in data.comboBranches)
+                {
+                    if (robot.TryConsumeCommand(branch.inputCommand))
+                    {
+                        robot.ChangeState(new AttackState(robot, branch.nextAttack));
+                        return; 
+                    }
+                }
+            }
+
+            // FASE 3: FIN DEL ATAQUE
+            if (stateTimer >= (data.startupTime + data.activeTime + data.recoveryTime))
+            {
+                robot.ChangeState(new IdleState(robot));
+            }
         }
     }
 
     public override void Exit()
     {
+        robot.hitboxBase.DesactivarHitbox();
         robot.transform.localScale = Vector3.one;
     }
 }

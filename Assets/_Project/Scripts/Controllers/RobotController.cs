@@ -1,71 +1,168 @@
 using UnityEngine;
 
+public enum FighterCommand
+{
+    None,
+    LeftPunch,
+    RightPunch,
+    LeftKick,
+    RightKick,
+    DashForward,
+    DashBackward
+}
+
 public class RobotController : MonoBehaviour
 {
     [Header("Dependencies")]
     public InputReader inputReader;
     public Animator animator;
     public CharacterController characterController;
+    public Hitbox hitboxBase;
 
     [Header("Combat Settings")]
     public Transform opponentTarget;
 
-    // Propiedad pública para que los Estados puedan leer qué hace el mando
-    public Vector2 MovementInput { get; private set; }
+    [Header("Attack Data Assets")]
+    public AttackData leftPunchBase;
+    public AttackData rightPunchBase;
+    public AttackData leftKickBase;
+    public AttackData rightKickBase;
+    public AttackData crouchPunchBase;
+    public AttackData crouchSweepBase;
+    public AttackData launcherBase;
 
+    [Header("Input Buffer")]
+    public FighterCommand bufferedCommand = FighterCommand.None;
+    private float bufferTimer = 0f;
+    private float bufferWindow = 0.2f;
+
+    [Header("Dash Detection Settings")]
+    private float lastTapTime;
+    private float doubleTapWindow = 0.25f;
+    private int lastTapDirection = 0;
+    private bool isDirectionPressed = false;
+
+    public Vector2 MovementInput { get; private set; }
     private RobotState currentState;
+    private Transform cameraTransform;
 
     private void Awake()
     {
-        // Asignación automática por si olvidamos arrastrarlos en el inspector
         if (animator == null) animator = GetComponent<Animator>();
         if (characterController == null) characterController = GetComponent<CharacterController>();
+        cameraTransform = Camera.main.transform;
     }
 
     private void Start()
     {
-        // Nos suscribimos a los eventos del input
-        inputReader.MoveEvent += HandleMove;
-        inputReader.LeftPunchEvent += HandleLeftPunch;
+        if (inputReader != null)
+        {
+            inputReader.MoveEvent += HandleMove;
+            inputReader.LeftPunchEvent += HandleLeftPunch;
+            inputReader.RightPunchEvent += HandleRightPunch;
+            inputReader.LeftKickEvent += HandleLeftKick;
+            inputReader.RightKickEvent += HandleRightKick;
+        }
 
-        // Arrancamos la máquina de estados en reposo
         ChangeState(new IdleState(this));
     }
 
     private void Update()
     {
-        // Ejecutamos la lógica del estado actual constantemente
+        if (bufferTimer > 0f)
+        {
+            bufferTimer -= Time.deltaTime;
+            if (bufferTimer <= 0f) bufferedCommand = FighterCommand.None;
+        }
+
         currentState?.Tick();
     }
 
-    public void ChangeState(RobotState newState)
+    public bool TryConsumeCommand(FighterCommand expectedCommand)
     {
-        currentState?.Exit();
-        currentState = newState;
-        currentState?.Enter();
+        if (bufferedCommand == expectedCommand)
+        {
+            bufferedCommand = FighterCommand.None;
+            bufferTimer = 0f;
+            return true;
+        }
+        return false;
     }
-
-    // --- RESPUESTAS A LOS EVENTOS ---
 
     private void HandleMove(Vector2 input)
     {
-        // Guardamos el input para que los estados lo procesen
         MovementInput = input;
-    }
 
-    private void HandleLeftPunch()
-    {
-        // Regla de oro de los Fighting Games: Solo puedes atacar si estás en reposo o caminando.
-        if (currentState is IdleState || currentState is WalkState)
+        if (Mathf.Abs(input.x) < 0.2f)
         {
-            ChangeState(new AttackState(this));
+            isDirectionPressed = false;
+            return;
+        }
+
+        if (!isDirectionPressed && Mathf.Abs(input.x) > 0.6f)
+        {
+            isDirectionPressed = true;
+            int currentTapDirection = input.x > 0f ? 1 : -1;
+
+            if (currentTapDirection == lastTapDirection && (Time.time - lastTapTime) <= doubleTapWindow)
+            {
+                ProcesarDashRelativo(currentTapDirection);
+            }
+            else
+            {
+                lastTapDirection = currentTapDirection;
+                lastTapTime = Time.time;
+            }
         }
     }
 
+    private void ProcesarDashRelativo(int tapDirection)
+    {
+        if (opponentTarget == null) return;
+
+        Vector3 directionToOpponent = opponentTarget.position - transform.position;
+        directionToOpponent.y = 0f;
+        float screenSide = Mathf.Sign(Vector3.Dot(directionToOpponent.normalized, cameraTransform.right));
+
+        if (tapDirection == (int)screenSide)
+        {
+            bufferedCommand = FighterCommand.DashForward;
+        }
+        else
+        {
+            bufferedCommand = FighterCommand.DashBackward;
+        }
+
+        bufferTimer = bufferWindow;
+        lastTapDirection = 0;
+    }
+
+    private void HandleLeftPunch() { bufferedCommand = FighterCommand.LeftPunch; bufferTimer = bufferWindow; }
+    private void HandleRightPunch() { bufferedCommand = FighterCommand.RightPunch; bufferTimer = bufferWindow; }
+
+    private void HandleLeftKick()
+    {
+        bufferedCommand = FighterCommand.LeftKick;
+        bufferTimer = bufferWindow;
+    }
+
+    private void HandleRightKick()
+    {
+        bufferedCommand = FighterCommand.RightKick;
+        bufferTimer = bufferWindow;
+    }
+
+    public void ChangeState(RobotState newState) { currentState?.Exit(); currentState = newState; currentState?.Enter(); }
+
     private void OnDestroy()
     {
-        // Limpiamos las suscripciones al destruir el objeto
-        inputReader.MoveEvent -= HandleMove;
-        inputReader.LeftPunchEvent -= HandleLeftPunch;
+        if (inputReader != null)
+        {
+            inputReader.MoveEvent -= HandleMove;
+            inputReader.LeftPunchEvent -= HandleLeftPunch;
+            inputReader.RightPunchEvent -= HandleRightPunch;
+            inputReader.LeftKickEvent -= HandleLeftKick;
+            inputReader.RightKickEvent -= HandleRightKick;
+        }
     }
 }
