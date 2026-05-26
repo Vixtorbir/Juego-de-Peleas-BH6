@@ -358,6 +358,7 @@ GameObject:
   - component: {fileID: 422962601}
   - component: {fileID: 422962609}
   - component: {fileID: 422962608}
+  - component: {fileID: 422962610}
   m_Layer: 0
   m_Name: Player1
   m_TagString: Untagged
@@ -526,6 +527,19 @@ CharacterController:
   m_SkinWidth: 0.08
   m_MinMoveDistance: 0.001
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &422962610
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 422962600}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 726decc2bdad55d469104eacbd61af1f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::HealthComponent
+  maxHealth: 100
 --- !u!1 &436280555
 GameObject:
   m_ObjectHideFlags: 0
@@ -1119,6 +1133,7 @@ GameObject:
   - component: {fileID: 1793476814}
   - component: {fileID: 1793476813}
   - component: {fileID: 1793476820}
+  - component: {fileID: 1793476821}
   m_Layer: 9
   m_Name: Player2
   m_TagString: Untagged
@@ -1185,7 +1200,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5d0195da890f18a4fac60f477fd2408d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RobotController
-  inputReader: {fileID: 1793476816}
+  inputReader: {fileID: 0}
   animator: {fileID: 1793476813}
   characterController: {fileID: 1793476814}
   hitboxBase: {fileID: 0}
@@ -1298,6 +1313,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7c3f60eabdf90044dab19d7e45b92b62, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Hurtbox
+--- !u!114 &1793476821
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1793476812}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 726decc2bdad55d469104eacbd61af1f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::HealthComponent
+  maxHealth: 100
 --- !u!1 &1962987431
 GameObject:
   m_ObjectHideFlags: 0

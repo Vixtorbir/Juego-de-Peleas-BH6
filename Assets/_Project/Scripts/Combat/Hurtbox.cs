@@ -4,34 +4,34 @@ public class Hurtbox : MonoBehaviour
 {
     private RobotController controller;
     private Transform cameraTransform;
+    private HealthComponent health;
 
     private void Awake()
     {
         controller = GetComponent<RobotController>();
         cameraTransform = Camera.main.transform;
+
+        health = GetComponentInParent<HealthComponent>();
     }
 
-    // AHORA RECIBE AL ATACANTE
     public void RecibirImpacto(AttackData ataque, RobotController atacante)
     {
         if (controller == null) return;
 
-        // --- DETECTAR COUNTER HIT ---
+        if (health != null && health.IsDead) return;
+
         bool esCounterHit = controller.IsInAttackStartup;
 
         if (esCounterHit)
-        {
             Debug.Log("<color=yellow><b>¡COUNTER HIT!</b> Interrupción letal detectada.</color>");
-        }
         else
-        {
-            Debug.Log($"<color=red>¡IMPACTO RECIBIDO!</color> Ataque: {ataque.name}");
-        }
+            Debug.Log($"<color=red>¡IMPACTO RECIBIDO!</color> Ataque: {ataque.name} | Daño: {ataque.damage}");
 
-        // 1. REGLA DE ORO: Si está en el aire (usando la propiedad encapsulada profesional)
+        // 1. REGLA DE ORO: Impactos aéreos
         bool estaEnElAire = !controller.IsGrounded;
         if (estaEnElAire)
         {
+            ApplyDamage(ataque.damage);
             ProcesarDanoAereo(ataque, esCounterHit);
             return;
         }
@@ -39,7 +39,6 @@ public class Hurtbox : MonoBehaviour
         bool intentandoBloquear = EvaluarIntencionDeBloqueo();
         bool estaAgachado = controller.MovementInput.y < -0.5f;
 
-        // REGLA PROFESIONAL: El Counter Hit rompe cualquier intento de guardia
         if (intentandoBloquear && !esCounterHit)
         {
             // --- MATRICES DE GUARDIA TERRESTRE NORMAL ---
@@ -47,11 +46,12 @@ public class Hurtbox : MonoBehaviour
             {
                 if (estaAgachado)
                 {
-                    Debug.Log("<color=green>¡EVADIDO!</color> El ataque alto pasó por encima del robot agachado.");
+                    Debug.Log("<color=green>¡EVADIDO!</color> El ataque alto pasó por encima.");
                     return;
                 }
                 else
                 {
+                    ApplyChipDamage(ataque.damage);
                     controller.ChangeState(new BlockstunState(controller, ataque.blockstunDuration, false, ataque.blockPushback, atacante));
                     return;
                 }
@@ -61,11 +61,13 @@ public class Hurtbox : MonoBehaviour
                 if (estaAgachado)
                 {
                     Debug.Log("<color=orange>¡GUARDIA ROTA!</color> Impacto medio sufrido por estar agachado.");
+                    ApplyDamage(ataque.damage);
                     IrAHitstun(ataque, false, atacante);
                     return;
                 }
                 else
                 {
+                    ApplyChipDamage(ataque.damage); 
                     controller.ChangeState(new BlockstunState(controller, ataque.blockstunDuration, false, ataque.blockPushback, atacante));
                     return;
                 }
@@ -74,22 +76,58 @@ public class Hurtbox : MonoBehaviour
             {
                 if (estaAgachado)
                 {
+                    ApplyChipDamage(ataque.damage); 
                     controller.ChangeState(new BlockstunState(controller, ataque.blockstunDuration, true, ataque.blockPushback, atacante));
                     return;
                 }
                 else
                 {
                     Debug.Log("<color=orange>¡GUARDIA ROTA!</color> Impacto bajo sufrido por estar de pie.");
+                    ApplyDamage(ataque.damage);
                     IrAHitstun(ataque, false, atacante);
                     return;
                 }
             }
         }
 
+        ApplyDamage(ataque.damage);
         IrAHitstun(ataque, esCounterHit, atacante);
     }
+
+    private void ApplyDamage(float amount)
+    {
+        if (health == null) return;
+
+        health.TakeDamage(amount);
+
+        if (health.IsDead)
+        {
+            controller.ChangeState(new DeathState(controller));
+        }
+    }
+
+    private void ApplyChipDamage(float rawDamage)
+    {
+        if (health == null || health.IsDead) return;
+
+        float chipDamage = rawDamage * 0.15f;
+
+        if (health.CurrentHealth - chipDamage <= 0f)
+        {
+            chipDamage = health.CurrentHealth - 1f;
+        }
+
+        if (chipDamage > 0f)
+        {
+            health.TakeDamage(chipDamage);
+            Debug.Log($"<color=cyan>¡CHIP DAMAGE!</color> Daño absorbido por la guardia: {chipDamage}");
+        }
+    }
+
     private void IrAHitstun(AttackData ataque, bool esCounter, RobotController atacante)
     {
+        if (health != null && health.IsDead) return;
+
         float modDuration = esCounter ? 1.5f : 1f;
         float modPushback = esCounter ? 1.4f : 1f;
         float modLaunch = esCounter ? 1.3f : 1f;
@@ -125,6 +163,8 @@ public class Hurtbox : MonoBehaviour
 
     private void ProcesarDanoAereo(AttackData ataque, bool esCounter)
     {
+        if (health != null && health.IsDead) return;
+
         float modLaunch = esCounter ? 1.3f : 1f;
 
         if (ataque.isLauncher)
