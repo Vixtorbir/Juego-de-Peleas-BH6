@@ -3,7 +3,7 @@
     "name": "FighterInputActions",
     "maps": [
         {
-            "name": "Gameplay",
+            "name": "Player1",
             "id": "c2e78ea8-9821-4443-b4c4-6c448e9f9d0f",
             "actions": [
                 {
@@ -70,7 +70,7 @@
                     "path": "<Keyboard>/w",
                     "interactions": "",
                     "processors": "",
-                    "groups": "",
+                    "groups": ";Teclado_P1",
                     "action": "Movement",
                     "isComposite": false,
                     "isPartOfComposite": true
@@ -81,7 +81,7 @@
                     "path": "<Keyboard>/s",
                     "interactions": "",
                     "processors": "",
-                    "groups": "",
+                    "groups": ";Teclado_P1",
                     "action": "Movement",
                     "isComposite": false,
                     "isPartOfComposite": true
@@ -92,7 +92,7 @@
                     "path": "<Keyboard>/a",
                     "interactions": "",
                     "processors": "",
-                    "groups": "",
+                    "groups": ";Teclado_P1",
                     "action": "Movement",
                     "isComposite": false,
                     "isPartOfComposite": true
@@ -103,7 +103,7 @@
                     "path": "<Keyboard>/d",
                     "interactions": "",
                     "processors": "",
-                    "groups": "",
+                    "groups": ";Teclado_P1",
                     "action": "Movement",
                     "isComposite": false,
                     "isPartOfComposite": true
@@ -114,7 +114,7 @@
                     "path": "<Gamepad>/leftStick",
                     "interactions": "",
                     "processors": "NormalizeVector2",
-                    "groups": "",
+                    "groups": ";Mando",
                     "action": "Movement",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -125,7 +125,7 @@
                     "path": "<Gamepad>/dpad",
                     "interactions": "",
                     "processors": "",
-                    "groups": "",
+                    "groups": ";Mando",
                     "action": "Movement",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -133,10 +133,10 @@
                 {
                     "name": "",
                     "id": "84724e7d-24a6-4dd9-bdd2-bbb6eb88b8bb",
-                    "path": "<Keyboard>/j",
+                    "path": "<Keyboard>/t",
                     "interactions": "",
                     "processors": "",
-                    "groups": "",
+                    "groups": ";Teclado_P1",
                     "action": "LeftPunch",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -147,7 +147,7 @@
                     "path": "<Gamepad>/buttonWest",
                     "interactions": "",
                     "processors": "",
-                    "groups": "",
+                    "groups": ";Mando",
                     "action": "LeftPunch",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -155,10 +155,10 @@
                 {
                     "name": "",
                     "id": "315a61ea-8188-4007-92a5-15f0b290fade",
-                    "path": "<Keyboard>/i",
+                    "path": "<Keyboard>/y",
                     "interactions": "",
                     "processors": "",
-                    "groups": "",
+                    "groups": ";Teclado_P1",
                     "action": "RightPunch",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -169,7 +169,7 @@
                     "path": "<Gamepad>/buttonNorth",
                     "interactions": "",
                     "processors": "",
-                    "groups": "",
+                    "groups": ";Mando",
                     "action": "RightPunch",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -177,10 +177,10 @@
                 {
                     "name": "",
                     "id": "bd6b19b5-7daf-45cb-8d10-2c13c2569e11",
-                    "path": "<Keyboard>/k",
+                    "path": "<Keyboard>/g",
                     "interactions": "",
                     "processors": "",
-                    "groups": "",
+                    "groups": ";Teclado_P1",
                     "action": "LeftKick",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -191,7 +191,7 @@
                     "path": "<Gamepad>/buttonSouth",
                     "interactions": "",
                     "processors": "",
-                    "groups": "",
+                    "groups": ";Mando",
                     "action": "LeftKick",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -199,10 +199,10 @@
                 {
                     "name": "",
                     "id": "b0a1b751-907f-47e3-bf67-5999078899c2",
-                    "path": "<Keyboard>/o",
+                    "path": "<Keyboard>/h",
                     "interactions": "",
                     "processors": "",
-                    "groups": "",
+                    "groups": ";Teclado_P1",
                     "action": "RightKick",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -213,7 +213,225 @@
                     "path": "<Gamepad>/buttonEast",
                     "interactions": "",
                     "processors": "",
+                    "groups": ";Mando",
+                    "action": "RightKick",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                }
+            ]
+        },
+        {
+            "name": "Player2",
+            "id": "0b7b0e1b-9c4c-478c-87b7-2f22992a4d51",
+            "actions": [
+                {
+                    "name": "Movement",
+                    "type": "Value",
+                    "id": "dbbc9c8b-8c99-4867-a921-d7410d397140",
+                    "expectedControlType": "Vector2",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": true
+                },
+                {
+                    "name": "LeftPunch",
+                    "type": "Button",
+                    "id": "6845d30c-0904-44d7-abc6-66aba759a3d4",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "RightPunch",
+                    "type": "Button",
+                    "id": "0311c165-eb56-4f23-9175-ed311581361a",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "LeftKick",
+                    "type": "Button",
+                    "id": "39ec38b4-684e-4e20-8dd9-4cec84af2bbe",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "RightKick",
+                    "type": "Button",
+                    "id": "e3f9ae43-739e-49ab-8926-5cc0953071b8",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                }
+            ],
+            "bindings": [
+                {
+                    "name": "",
+                    "id": "1ad60204-42ab-4544-8fed-9cccee126404",
+                    "path": "<Gamepad>/leftStick",
+                    "interactions": "",
+                    "processors": "NormalizeVector2",
+                    "groups": ";Mando",
+                    "action": "Movement",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "5c3c0eea-a5ac-49ca-96d2-1651ea43f260",
+                    "path": "<Gamepad>/dpad",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Mando",
+                    "action": "Movement",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "Keyboard-Arrows",
+                    "id": "dd550b7a-c25f-434f-a495-3c011e2cd624",
+                    "path": "2DVector",
+                    "interactions": "",
+                    "processors": "",
                     "groups": "",
+                    "action": "Movement",
+                    "isComposite": true,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "up",
+                    "id": "f1108c4c-f240-4502-9324-42d6eb82e0ef",
+                    "path": "<Keyboard>/upArrow",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Teclado_P2",
+                    "action": "Movement",
+                    "isComposite": false,
+                    "isPartOfComposite": true
+                },
+                {
+                    "name": "down",
+                    "id": "aa6533bd-b593-453d-8f70-b4a994c14df9",
+                    "path": "<Keyboard>/downArrow",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Teclado_P2",
+                    "action": "Movement",
+                    "isComposite": false,
+                    "isPartOfComposite": true
+                },
+                {
+                    "name": "left",
+                    "id": "4bd51e13-9632-45c5-8bb5-a1a1cb7878ab",
+                    "path": "<Keyboard>/leftArrow",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Teclado_P2",
+                    "action": "Movement",
+                    "isComposite": false,
+                    "isPartOfComposite": true
+                },
+                {
+                    "name": "right",
+                    "id": "9bfaa95e-8e42-485d-a056-1a4a41b1af6c",
+                    "path": "<Keyboard>/rightArrow",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Teclado_P2",
+                    "action": "Movement",
+                    "isComposite": false,
+                    "isPartOfComposite": true
+                },
+                {
+                    "name": "",
+                    "id": "ae16a091-4888-4fbd-a2ff-96176176fee5",
+                    "path": "<Keyboard>/numpad7",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Teclado_P2",
+                    "action": "LeftPunch",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "57229d9c-d742-48a4-9053-e6b297e8271d",
+                    "path": "<Gamepad>/buttonWest",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Mando",
+                    "action": "LeftPunch",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "8c8380f3-acc2-455d-98cc-d384aebb9a80",
+                    "path": "<Keyboard>/numpad8",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Teclado_P2",
+                    "action": "RightPunch",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "9c7150b2-b4aa-49f5-ab71-5829f644039c",
+                    "path": "<Gamepad>/buttonNorth",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Mando",
+                    "action": "RightPunch",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "5397412f-df32-4f54-83b4-588d14b81ed2",
+                    "path": "<Keyboard>/numpad4",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Teclado_P2",
+                    "action": "LeftKick",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "8f332590-d281-44f8-b07b-8e86ae1a1e49",
+                    "path": "<Gamepad>/buttonSouth",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Mando",
+                    "action": "LeftKick",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "5071fc0d-8768-4dd1-999e-4ce7de264b81",
+                    "path": "<Keyboard>/numpad5",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Teclado_P2",
+                    "action": "RightKick",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "5372b3a6-1252-4aeb-80eb-13ab5a2d1f8d",
+                    "path": "<Gamepad>/buttonEast",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Mando",
                     "action": "RightKick",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -221,5 +439,27 @@
             ]
         }
     ],
-    "controlSchemes": []
+    "controlSchemes": [
+        {
+            "name": "Teclado_P1",
+            "bindingGroup": "Teclado_P1",
+            "devices": []
+        },
+        {
+            "name": "Teclado_P2",
+            "bindingGroup": "Teclado_P2",
+            "devices": []
+        },
+        {
+            "name": "Mando",
+            "bindingGroup": "Mando",
+            "devices": [
+                {
+                    "devicePath": "<Gamepad>",
+                    "isOptional": false,
+                    "isOR": false
+                }
+            ]
+        }
+    ]
 }

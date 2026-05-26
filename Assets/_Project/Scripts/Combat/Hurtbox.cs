@@ -17,15 +17,35 @@ public class Hurtbox : MonoBehaviour
     public void RecibirImpacto(AttackData ataque, RobotController atacante)
     {
         if (controller == null) return;
-
         if (health != null && health.IsDead) return;
 
         bool esCounterHit = controller.IsInAttackStartup;
 
+        // --- CÁLCULO DE EFECTOS (JUICINESS) ---
+        float freezeTime = ataque.damage * 0.005f;
+        float shakeMag = ataque.damage * 0.003f;
+        float shakeTime = 0.1f;
+
         if (esCounterHit)
-            Debug.Log("<color=yellow><b>¡COUNTER HIT!</b> Interrupción letal detectada.</color>");
+        {
+            Debug.Log("<color=yellow><b>¡COUNTER HIT!</b></color>");
+
+            if (CombatEffectsManager.Instance != null)
+                CombatEffectsManager.Instance.TriggerHitstop(freezeTime * 1.5f);
+
+            FightingCamera cam = Camera.main.GetComponent<FightingCamera>();
+            if (cam != null) cam.ShakeCamera(shakeTime * 1.5f, shakeMag * 1.5f);
+        }
         else
-            Debug.Log($"<color=red>¡IMPACTO RECIBIDO!</color> Ataque: {ataque.name} | Daño: {ataque.damage}");
+        {
+            Debug.Log($"<color=red>¡IMPACTO!</color> Ataque: {ataque.name}");
+
+            if (CombatEffectsManager.Instance != null)
+                CombatEffectsManager.Instance.TriggerHitstop(freezeTime);
+
+            FightingCamera cam = Camera.main.GetComponent<FightingCamera>();
+            if (cam != null) cam.ShakeCamera(shakeTime, shakeMag);
+        }
 
         // 1. REGLA DE ORO: Impactos aéreos
         bool estaEnElAire = !controller.IsGrounded;

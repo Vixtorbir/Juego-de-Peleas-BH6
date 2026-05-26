@@ -21,13 +21,22 @@ public class FightingCamera : MonoBehaviour
 
     [Header("Sensación y Fluidez")]
     public float smoothTime = 0.15f;
-    private Vector3 currentVelocity; 
+    private Vector3 currentVelocity;
+
+    [Header("Screen Shake")]
+    private float shakeTimer;
+    private float currentShakeMagnitude;
 
     private void Start()
     {
         transform.rotation = Quaternion.Euler(pitchAngle, 0f, 0f);
     }
 
+    public void ShakeCamera(float duration, float magnitude)
+    {
+        shakeTimer = duration;
+        currentShakeMagnitude = magnitude;
+    }
     private void LateUpdate()
     {
         if (player1 == null || player2 == null) return;
@@ -51,5 +60,14 @@ public class FightingCamera : MonoBehaviour
 
         // 6. MOVIMIENTO FLUIDO: Interpolamos la posición actual hacia la deseada
         transform.position = Vector3.SmoothDamp(transform.position, targetPosition, ref currentVelocity, smoothTime);
+
+        // 7. APLICAR SCREEN SHAKE (Se aplica al final del todo usando tiempo no escalado)
+        if (shakeTimer > 0f)
+        {
+            transform.position += Random.insideUnitSphere * currentShakeMagnitude;
+
+            shakeTimer -= Time.unscaledDeltaTime;
+        }
     }
+
 }
