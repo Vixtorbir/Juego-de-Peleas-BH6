@@ -88,19 +88,27 @@ public class Hurtbox : MonoBehaviour
 
         IrAHitstun(ataque, esCounterHit, atacante);
     }
-
     private void IrAHitstun(AttackData ataque, bool esCounter, RobotController atacante)
     {
         float modDuration = esCounter ? 1.5f : 1f;
         float modPushback = esCounter ? 1.4f : 1f;
+        float modLaunch = esCounter ? 1.3f : 1f;
 
-        controller.ChangeState(new HitstunState(
-            controller,
-            ataque.hitstunDuration * modDuration,
-            ataque.hitPushback * modPushback,
-            esCounter,
-            atacante
-        ));
+        if (ataque.isLauncher)
+        {
+            Debug.Log("<color=magenta>¡LAUNCHER CONECTADO!</color> Mandando al rival a las nubes.");
+            controller.ChangeState(new AirborneHurtState(controller, ataque.launchForce * modLaunch));
+        }
+        else
+        {
+            controller.ChangeState(new HitstunState(
+                controller,
+                ataque.hitstunDuration * modDuration,
+                ataque.hitPushback * modPushback,
+                esCounter,
+                atacante
+            ));
+        }
     }
 
     private bool EvaluarIntencionDeBloqueo()

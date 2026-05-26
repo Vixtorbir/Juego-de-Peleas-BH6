@@ -14,15 +14,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AttackData
   animationTrigger: RightKick
   visualScale: {x: 1.2, y: 1.2, z: 1.5}
-  startupTime: 0.35
+  startupTime: 0.25
   activeTime: 0.15
-  recoveryTime: 0.5
-  damage: 20
-  hitstunDuration: 0.7
-  comboBranches: []
+  recoveryTime: 0.4
+  damage: 22
+  hitstunDuration: 0.6
+  attackHeight: 1
+  blockstunDuration: 0.3
+  hitPushback: 15
+  blockPushback: 8
   isLauncher: 0
   launchForce: 15
-  attackHeight: 1
-  blockstunDuration: 0.25
-  hitPushback: 20
-  blockPushback: 4
+  comboBranches: []

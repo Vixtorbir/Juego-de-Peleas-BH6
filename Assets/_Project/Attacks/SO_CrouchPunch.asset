@@ -14,15 +14,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AttackData
   animationTrigger: CrouchPunch
   visualScale: {x: 1, y: 0.5, z: 1.2}
-  startupTime: 0.1
-  activeTime: 0.1
-  recoveryTime: 0.2
-  damage: 10
-  hitstunDuration: 0.4
-  comboBranches: []
+  startupTime: 0.08
+  activeTime: 0.05
+  recoveryTime: 0.15
+  damage: 6
+  hitstunDuration: 0.2
+  attackHeight: 2
+  blockstunDuration: 0.15
+  hitPushback: 2
+  blockPushback: 1
   isLauncher: 0
   launchForce: 15
-  attackHeight: 1
-  blockstunDuration: 0.25
-  hitPushback: 8
-  blockPushback: 4
+  comboBranches: []

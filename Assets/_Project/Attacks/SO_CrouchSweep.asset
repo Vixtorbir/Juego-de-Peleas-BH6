@@ -16,13 +16,13 @@ MonoBehaviour:
   visualScale: {x: 1, y: 0.5, z: 1.5}
   startupTime: 0.25
   activeTime: 0.15
-  recoveryTime: 0.4
-  damage: 10
-  hitstunDuration: 0.4
-  comboBranches: []
+  recoveryTime: 0.5
+  damage: 15
+  hitstunDuration: 0.5
+  attackHeight: 2
+  blockstunDuration: 0.2
+  hitPushback: 10
+  blockPushback: 5
   isLauncher: 0
   launchForce: 15
-  attackHeight: 2
-  blockstunDuration: 0.25
-  hitPushback: 8
-  blockPushback: 4
+  comboBranches: []
