@@ -11,7 +11,8 @@ public class Hurtbox : MonoBehaviour
         cameraTransform = Camera.main.transform;
     }
 
-    public void RecibirImpacto(AttackData ataque)
+    // AHORA RECIBE AL ATACANTE
+    public void RecibirImpacto(AttackData ataque, RobotController atacante)
     {
         if (controller == null) return;
 
@@ -22,8 +23,12 @@ public class Hurtbox : MonoBehaviour
         {
             Debug.Log("<color=yellow><b>¡COUNTER HIT!</b> Interrupción letal detectada.</color>");
         }
+        else
+        {
+            Debug.Log($"<color=red>¡IMPACTO RECIBIDO!</color> Ataque: {ataque.name}");
+        }
 
-        // 1. REGLA DE ORO: Si está en el aire, se traga el golpe automáticamente (Air Hit / Juggle)
+        // 1. REGLA DE ORO: Si está en el aire (usando la propiedad encapsulada profesional)
         bool estaEnElAire = !controller.IsGrounded;
         if (estaEnElAire)
         {
@@ -34,7 +39,7 @@ public class Hurtbox : MonoBehaviour
         bool intentandoBloquear = EvaluarIntencionDeBloqueo();
         bool estaAgachado = controller.MovementInput.y < -0.5f;
 
-        // REGLA PROFESIONAL: Si es Counter Hit, NO se puede bloquear. El counter rompe la guardia.
+        // REGLA PROFESIONAL: El Counter Hit rompe cualquier intento de guardia
         if (intentandoBloquear && !esCounterHit)
         {
             // --- MATRICES DE GUARDIA TERRESTRE NORMAL ---
@@ -47,7 +52,7 @@ public class Hurtbox : MonoBehaviour
                 }
                 else
                 {
-                    controller.ChangeState(new BlockstunState(controller, ataque.blockstunDuration, false, ataque.blockPushback));
+                    controller.ChangeState(new BlockstunState(controller, ataque.blockstunDuration, false, ataque.blockPushback, atacante));
                     return;
                 }
             }
@@ -56,12 +61,12 @@ public class Hurtbox : MonoBehaviour
                 if (estaAgachado)
                 {
                     Debug.Log("<color=orange>¡GUARDIA ROTA!</color> Impacto medio sufrido por estar agachado.");
-                    IrAHitstun(ataque, false);
+                    IrAHitstun(ataque, false, atacante);
                     return;
                 }
                 else
                 {
-                    controller.ChangeState(new BlockstunState(controller, ataque.blockstunDuration, false, ataque.blockPushback));
+                    controller.ChangeState(new BlockstunState(controller, ataque.blockstunDuration, false, ataque.blockPushback, atacante));
                     return;
                 }
             }
@@ -69,22 +74,22 @@ public class Hurtbox : MonoBehaviour
             {
                 if (estaAgachado)
                 {
-                    controller.ChangeState(new BlockstunState(controller, ataque.blockstunDuration, true, ataque.blockPushback));
+                    controller.ChangeState(new BlockstunState(controller, ataque.blockstunDuration, true, ataque.blockPushback, atacante));
                     return;
                 }
                 else
                 {
                     Debug.Log("<color=orange>¡GUARDIA ROTA!</color> Impacto bajo sufrido por estar de pie.");
-                    IrAHitstun(ataque, false);
+                    IrAHitstun(ataque, false, atacante);
                     return;
                 }
             }
         }
 
-        IrAHitstun(ataque, esCounterHit);
+        IrAHitstun(ataque, esCounterHit, atacante);
     }
 
-    private void IrAHitstun(AttackData ataque, bool esCounter)
+    private void IrAHitstun(AttackData ataque, bool esCounter, RobotController atacante)
     {
         float modDuration = esCounter ? 1.5f : 1f;
         float modPushback = esCounter ? 1.4f : 1f;
@@ -93,7 +98,8 @@ public class Hurtbox : MonoBehaviour
             controller,
             ataque.hitstunDuration * modDuration,
             ataque.hitPushback * modPushback,
-            esCounter
+            esCounter,
+            atacante
         ));
     }
 

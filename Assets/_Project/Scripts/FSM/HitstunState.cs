@@ -6,23 +6,22 @@ public class HitstunState : RobotState
     private float currentPushbackSpeed;
     private float friction = 25f;
     private bool isCounterHit;
+    private RobotController atacante;
+    private bool haChocadoPared = false;
 
-    public HitstunState(RobotController robot, float hitstunDuration, float pushbackForce, bool isCounterHit) : base(robot)
+    public HitstunState(RobotController robot, float hitstunDuration, float pushbackForce, bool isCounterHit, RobotController atacante) : base(robot)
     {
         this.timer = hitstunDuration;
         this.currentPushbackSpeed = pushbackForce;
         this.isCounterHit = isCounterHit;
+        this.atacante = atacante;
     }
 
     public override void Enter()
     {
+        haChocadoPared = false;
         Renderer renderer = robot.GetComponent<Renderer>();
-        if (renderer != null)
-        {
-            renderer.material.color = isCounterHit ? Color.yellow : Color.red;
-        }
-
-        Debug.Log($"<color=orange>¡HITSTUN!</color> Counter: {isCounterHit}. Pushback: {currentPushbackSpeed}");
+        if (renderer != null) renderer.material.color = isCounterHit ? Color.yellow : Color.red;
     }
 
     public override void Tick()
@@ -36,7 +35,28 @@ public class HitstunState : RobotState
             float direccionX = Mathf.Sign(robot.transform.position.x - robot.opponentTarget.position.x);
             Vector3 direccionPushback = new Vector3(direccionX, 0f, 0f);
 
+            if (haChocadoPared)
+            {
+                direccionPushback = -direccionPushback;
+            }
+
+            float posXAntes = robot.transform.position.x;
             robot.characterController.Move(direccionPushback * currentPushbackSpeed * Time.deltaTime);
+            float posXDespues = robot.transform.position.x;
+
+            float desplazamientoReal = Mathf.Abs(posXDespues - posXAntes);
+            float desplazamientoDeseado = currentPushbackSpeed * Time.deltaTime;
+
+            if (!haChocadoPared && desplazamientoReal < desplazamientoDeseado - 0.001f && atacante != null)
+            {
+                haChocadoPared = true;
+
+                atacante.characterController.Move(-direccionPushback * currentPushbackSpeed * 0.4f * Time.deltaTime);
+
+                currentPushbackSpeed *= 0.5f;
+
+                Debug.Log("<color=cyan>¡WALL BOUNCE!</color> El defensor choca y rebota contra la pared.");
+            }
         }
 
         if (timer <= 0f)

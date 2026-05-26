@@ -39,7 +39,7 @@ public class RobotController : MonoBehaviour
     [Header("Dash Detection Settings")]
     private float lastTapTime;
     private float doubleTapWindow = 0.25f;
-    private int lastTapDirection = 0; // 1 = Derecha, -1 = Izquierda
+    private int lastTapDirection = 0; 
     private bool isDirectionPressed = false;
 
     [Header("Physics & Grounding")]

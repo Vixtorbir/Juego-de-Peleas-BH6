@@ -6,11 +6,15 @@ public class Hitbox : MonoBehaviour
     private Collider hitboxCollider;
     private AttackData currentAttackData;
 
+    private RobotController attackerController;
+
     private void Awake()
     {
         hitboxCollider = GetComponent<Collider>();
         hitboxCollider.enabled = false;
         hitboxCollider.isTrigger = true;
+
+        attackerController = GetComponentInParent<RobotController>();
     }
 
     public void ActivarHitbox(AttackData data)
@@ -26,7 +30,7 @@ public class Hitbox : MonoBehaviour
         Hurtbox objetivo = other.GetComponent<Hurtbox>();
         if (objetivo != null && currentAttackData != null)
         {
-            objetivo.RecibirImpacto(currentAttackData);
+            objetivo.RecibirImpacto(currentAttackData, attackerController);
             DesactivarHitbox();
         }
     }

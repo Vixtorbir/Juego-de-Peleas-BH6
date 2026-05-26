@@ -15,13 +15,13 @@ public class IdleState : RobotState
         // --- LEER INPUT BUFFER PARA DASH ---
         if (robot.TryConsumeCommand(FighterCommand.DashForward))
         {
-            robot.ChangeState(new DashState(robot, true)); // true = Forward
+            robot.ChangeState(new DashState(robot, true));
             return;
         }
 
         if (robot.TryConsumeCommand(FighterCommand.DashBackward))
         {
-            robot.ChangeState(new DashState(robot, false)); // false = Backward
+            robot.ChangeState(new DashState(robot, false)); 
             return;
         }
 
@@ -74,7 +74,6 @@ public class IdleState : RobotState
         }
         else
         {
-            // Incluso en el suelo, aplicamos una micro-fuerza para mantener la presión
             robot.characterController.Move(new Vector3(0, -0.5f, 0) * Time.deltaTime);
         }
     }
