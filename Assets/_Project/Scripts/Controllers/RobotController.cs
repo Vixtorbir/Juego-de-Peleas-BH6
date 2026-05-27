@@ -10,7 +10,8 @@ public enum FighterCommand
     RightKick,
     DashForward,
     DashBackward,
-    Hadouken // <-- NUEVO COMANDO ESPECIAL
+    Hadouken,
+    Shoryuken
 }
 
 public class RobotController : MonoBehaviour
@@ -32,7 +33,8 @@ public class RobotController : MonoBehaviour
     public AttackData crouchPunchBase;
     public AttackData crouchSweepBase;
     public AttackData launcherBase;
-    // Opcional: public AttackData hadoukenBase; <-- Para cuando lo crees en Unity
+    public AttackData hadoukenBase;
+    public AttackData shoryukenData;
 
     [Header("Special Attack Settings")]
     public AttackData hadoukenData;        
@@ -94,6 +96,8 @@ public class RobotController : MonoBehaviour
             bufferTimer -= Time.deltaTime;
             if (bufferTimer <= 0f) bufferedCommand = FighterCommand.None;
         }
+
+        AplicarPushboxHorizontal();
 
         currentState?.Tick();
     }
@@ -173,22 +177,72 @@ public class RobotController : MonoBehaviour
         // 2. Le preguntamos al InputBuffer si esa secuencia está en el historial
         if (inputBuffer != null && inputBuffer.CheckMotionInput(hadoukenSequence))
         {
-            bufferedCommand = FighterCommand.Hadouken; // ¡Buffer especial!
+            bufferedCommand = FighterCommand.Hadouken; 
             Debug.Log("<color=magenta>COMANDO ESPECIAL DETECTADO: Hadouken guardado en el buffer.</color>");
         }
         else
         {
-            bufferedCommand = FighterCommand.LeftPunch; // Puñetazo normal
+            bufferedCommand = FighterCommand.LeftPunch; 
         }
 
         bufferTimer = bufferWindow;
     }
 
-    private void HandleRightPunch() { bufferedCommand = FighterCommand.RightPunch; bufferTimer = bufferWindow; }
+    private void HandleRightPunch()
+    {
+        // 1. Secuencia de la "Z" (Adelante -> Abajo -> AbajoAdelante)
+        CombatDirection[] dpSequence = new CombatDirection[]
+        {
+            CombatDirection.Forward,
+            CombatDirection.Down,
+            CombatDirection.DownForward
+        };
+
+        // 2. Comprobamos el buffer
+        if (inputBuffer != null && inputBuffer.CheckMotionInput(dpSequence))
+        {
+            bufferedCommand = FighterCommand.Shoryuken;
+            Debug.Log("<color=magenta>COMANDO ESPECIAL DETECTADO: Shoryuken.</color>");
+        }
+        else
+        {
+            bufferedCommand = FighterCommand.RightPunch;
+        }
+
+        bufferTimer = bufferWindow;
+    }
     private void HandleLeftKick() { bufferedCommand = FighterCommand.LeftKick; bufferTimer = bufferWindow; }
     private void HandleRightKick() { bufferedCommand = FighterCommand.RightKick; bufferTimer = bufferWindow; }
 
     public void ChangeState(RobotState newState) { currentState?.Exit(); currentState = newState; currentState?.Enter(); }
+
+    private void AplicarPushboxHorizontal()
+    {
+        if (opponentTarget == null) return;
+
+        // 1. Calculamos la distancia solo en horizontal (ignoramos la altura Y)
+        Vector3 distancia = transform.position - opponentTarget.position;
+        distancia.y = 0f;
+
+        // Si por algún bug matemático caen EXACTAMENTE en la misma coordenada X, forzamos un lado
+        if (distancia.magnitude < 0.01f)
+        {
+            distancia = transform.right;
+        }
+
+        // 2. La distancia mínima permitida entre los cuerpos (Ajusta esto entre 1.0f y 1.5f según tu modelo 3D)
+        float distanciaMinima = 1.2f;
+
+        // 3. Si están invadiendo su espacio vital, los repelemos magnéticamente
+        if (distancia.magnitude < distanciaMinima)
+        {
+            float invasion = distanciaMinima - distancia.magnitude;
+
+            // Empujamos a este robot hacia atrás
+            Vector3 fuerzaSeparacion = distancia.normalized * invasion * 10f * Time.deltaTime;
+            characterController.Move(fuerzaSeparacion);
+        }
+    }
 
     private void OnDestroy()
     {

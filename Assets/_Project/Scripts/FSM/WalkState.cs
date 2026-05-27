@@ -30,6 +30,12 @@ public class WalkState : RobotState
             return;
         }
 
+        if (robot.TryConsumeCommand(FighterCommand.Shoryuken))
+        {
+            robot.ChangeState(new ShoryukenState(robot, robot.shoryukenData));
+            return;
+        }
+
         // --- LEER INPUT BUFFER PARA DASH ---
         if (robot.TryConsumeCommand(FighterCommand.DashForward))
         {

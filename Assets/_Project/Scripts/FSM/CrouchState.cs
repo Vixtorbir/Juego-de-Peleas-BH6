@@ -26,8 +26,13 @@ public class CrouchState : RobotState
             return;
         }
 
+        if (robot.TryConsumeCommand(FighterCommand.Shoryuken))
+        {
+            robot.ChangeState(new ShoryukenState(robot, robot.shoryukenData));
+            return;
+        }
+
         // 1. LEER INPUT BUFFER (Prioridad de ataque)
-        // Agrupamos para que cualquier puñetazo agachado lance el ataque recto
         if (robot.TryConsumeCommand(FighterCommand.LeftPunch) || robot.TryConsumeCommand(FighterCommand.RightPunch))
         {
             robot.ChangeState(new CrouchAttackState(robot, robot.crouchPunchBase));
