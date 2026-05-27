@@ -8,6 +8,13 @@ public class IdleState : RobotState
     {
         robot.animator.SetFloat("InputX", 0f);
         robot.animator.SetFloat("InputY", 0f);
+
+        Hurtbox hurtbox = robot.GetComponentInChildren<Hurtbox>();
+        if (hurtbox != null)
+        {
+            hurtbox.ResetCombo();
+        }
+
     }
 
     public override void Tick()

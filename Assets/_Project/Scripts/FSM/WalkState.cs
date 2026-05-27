@@ -13,18 +13,27 @@ public class WalkState : RobotState
         cameraTransform = Camera.main.transform;
     }
 
+    public override void Enter()
+    {
+        Hurtbox hurtbox = robot.GetComponentInChildren<Hurtbox>();
+        if (hurtbox != null)
+        {
+            hurtbox.ResetCombo();
+        }
+    }
+
     public override void Tick()
     {
         // --- LEER INPUT BUFFER PARA DASH ---
         if (robot.TryConsumeCommand(FighterCommand.DashForward))
         {
-            robot.ChangeState(new DashState(robot, true)); // true = Forward
+            robot.ChangeState(new DashState(robot, true));
             return;
         }
 
         if (robot.TryConsumeCommand(FighterCommand.DashBackward))
         {
-            robot.ChangeState(new DashState(robot, false)); // false = Backward
+            robot.ChangeState(new DashState(robot, false));
             return;
         }
 

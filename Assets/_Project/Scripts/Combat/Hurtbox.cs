@@ -5,6 +5,7 @@ public class Hurtbox : MonoBehaviour
     private RobotController controller;
     private Transform cameraTransform;
     private HealthComponent health;
+    private int comboHitCount = 0;
 
     private void Awake()
     {
@@ -114,15 +115,34 @@ public class Hurtbox : MonoBehaviour
         IrAHitstun(ataque, esCounterHit, atacante);
     }
 
-    private void ApplyDamage(float amount)
+    private void ApplyDamage(float rawDamage)
     {
         if (health == null) return;
 
-        health.TakeDamage(amount);
+        comboHitCount++;
+
+        float multiplicadorEscalado = Mathf.Pow(0.85f, comboHitCount - 1);
+
+        multiplicadorEscalado = Mathf.Max(multiplicadorEscalado, 0.1f);
+
+        float finalDamage = rawDamage * multiplicadorEscalado;
+
+        health.TakeDamage(finalDamage);
+
+        Debug.Log($"<color=cyan>Combo x{comboHitCount}</color> | Daño Original: {rawDamage} | Daño Escalado: {finalDamage:F1}");
 
         if (health.IsDead)
         {
             controller.ChangeState(new DeathState(controller));
+        }
+    }
+
+    public void ResetCombo()
+    {
+        if (comboHitCount > 0)
+        {
+            Debug.Log($"<color=white>Combo finalizado. Total hits: {comboHitCount}</color>");
+            comboHitCount = 0;
         }
     }
 
