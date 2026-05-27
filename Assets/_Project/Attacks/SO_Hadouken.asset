@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4ad25b836ba4f7b45b83ab449c788887, type: 3}
+  m_Name: SO_Hadouken
+  m_EditorClassIdentifier: Assembly-CSharp::AttackData
+  animationTrigger: Hadouken
+  visualScale: {x: 1, y: 1, z: 1.2}
+  startupTime: 0
+  activeTime: 3
+  recoveryTime: 0
+  damage: 10
+  hitstunDuration: 0.4
+  attackHeight: 1
+  blockstunDuration: 0.2
+  hitPushback: 3
+  blockPushback: 5
+  isLauncher: 0
+  launchForce: 15
+  comboBranches: []

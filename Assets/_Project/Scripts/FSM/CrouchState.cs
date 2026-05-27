@@ -20,6 +20,12 @@ public class CrouchState : RobotState
 
     public override void Tick()
     {
+        if (robot.TryConsumeCommand(FighterCommand.Hadouken))
+        {
+            robot.ChangeState(new SpecialAttackState(robot, robot.hadoukenData, robot.hadoukenPrefab, robot.hadoukenSpawnPoint));
+            return;
+        }
+
         // 1. LEER INPUT BUFFER (Prioridad de ataque)
         // Agrupamos para que cualquier puñetazo agachado lance el ataque recto
         if (robot.TryConsumeCommand(FighterCommand.LeftPunch) || robot.TryConsumeCommand(FighterCommand.RightPunch))

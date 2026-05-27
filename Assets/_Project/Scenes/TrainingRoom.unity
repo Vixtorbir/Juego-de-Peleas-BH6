@@ -359,6 +359,7 @@ GameObject:
   - component: {fileID: 422962609}
   - component: {fileID: 422962608}
   - component: {fileID: 422962610}
+  - component: {fileID: 422962611}
   m_Layer: 0
   m_Name: Player1
   m_TagString: Untagged
@@ -390,6 +391,9 @@ MonoBehaviour:
   crouchPunchBase: {fileID: 11400000, guid: 5319aec61d0fbfd4ab71d15ca485b4eb, type: 2}
   crouchSweepBase: {fileID: 11400000, guid: a2564fd03854b10429ff79d37a130b5c, type: 2}
   launcherBase: {fileID: 11400000, guid: a42be1ded81bc2a4b99b0d5525e846ad, type: 2}
+  hadoukenData: {fileID: 11400000, guid: de6b19264baf7da47aff89576f61881f, type: 2}
+  hadoukenPrefab: {fileID: 977442768426397397, guid: 419c7bd03de1a8b419c3c9cf363a0945, type: 3}
+  hadoukenSpawnPoint: {fileID: 1147387385}
   bufferedCommand: 0
   groundLayer:
     serializedVersion: 2
@@ -479,6 +483,7 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 533375031}
+  - {fileID: 1147387385}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!95 &422962608
@@ -541,6 +546,19 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::HealthComponent
   maxHealth: 100
+--- !u!114 &422962611
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 422962600}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 81bc9b0fe7310a44fa869e534f5ed467, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::InputBuffer
+  inputLifeTime: 0.35
 --- !u!1 &436280555
 GameObject:
   m_ObjectHideFlags: 0
@@ -879,6 +897,37 @@ MonoBehaviour:
   leftBound: -10
   rightBound: 10
   smoothTime: 0.15
+--- !u!1 &1147387384
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1147387385}
+  m_Layer: 0
+  m_Name: SpawnPoint
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1147387385
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1147387384}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0.39}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 422962607}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1270548871
 GameObject:
   m_ObjectHideFlags: 0
@@ -1257,6 +1306,9 @@ MonoBehaviour:
   crouchPunchBase: {fileID: 11400000, guid: 5319aec61d0fbfd4ab71d15ca485b4eb, type: 2}
   crouchSweepBase: {fileID: 11400000, guid: a2564fd03854b10429ff79d37a130b5c, type: 2}
   launcherBase: {fileID: 11400000, guid: a42be1ded81bc2a4b99b0d5525e846ad, type: 2}
+  hadoukenData: {fileID: 0}
+  hadoukenPrefab: {fileID: 0}
+  hadoukenSpawnPoint: {fileID: 0}
   bufferedCommand: 0
   groundLayer:
     serializedVersion: 2

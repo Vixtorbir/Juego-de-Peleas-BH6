@@ -1,5 +1,6 @@
 using UnityEngine;
 
+// 1. AÑADIMOS EL NUEVO COMANDO AL ENUMERADO
 public enum FighterCommand
 {
     None,
@@ -8,7 +9,8 @@ public enum FighterCommand
     LeftKick,
     RightKick,
     DashForward,
-    DashBackward
+    DashBackward,
+    Hadouken // <-- NUEVO COMANDO ESPECIAL
 }
 
 public class RobotController : MonoBehaviour
@@ -30,6 +32,12 @@ public class RobotController : MonoBehaviour
     public AttackData crouchPunchBase;
     public AttackData crouchSweepBase;
     public AttackData launcherBase;
+    // Opcional: public AttackData hadoukenBase; <-- Para cuando lo crees en Unity
+
+    [Header("Special Attack Settings")]
+    public AttackData hadoukenData;        
+    public GameObject hadoukenPrefab;     
+    public Transform hadoukenSpawnPoint;
 
     [Header("Input Buffer")]
     public FighterCommand bufferedCommand = FighterCommand.None;
@@ -39,12 +47,12 @@ public class RobotController : MonoBehaviour
     [Header("Dash Detection Settings")]
     private float lastTapTime;
     private float doubleTapWindow = 0.25f;
-    private int lastTapDirection = 0; 
+    private int lastTapDirection = 0;
     private bool isDirectionPressed = false;
 
     [Header("Physics & Grounding")]
-    public LayerMask groundLayer; 
-    public float groundCheckOffset = 0.1f; 
+    public LayerMask groundLayer;
+    public float groundCheckOffset = 0.1f;
     public bool IsGrounded { get; private set; }
 
     public bool IsInAttackStartup { get; set; }
@@ -53,11 +61,14 @@ public class RobotController : MonoBehaviour
     private RobotState currentState;
     private Transform cameraTransform;
 
+    private InputBuffer inputBuffer;
+
     private void Awake()
     {
         if (animator == null) animator = GetComponent<Animator>();
         if (characterController == null) characterController = GetComponent<CharacterController>();
         cameraTransform = Camera.main.transform;
+        inputBuffer = GetComponent<InputBuffer>();
     }
 
     private void Start()
@@ -148,7 +159,31 @@ public class RobotController : MonoBehaviour
         lastTapDirection = 0;
     }
 
-    private void HandleLeftPunch() { bufferedCommand = FighterCommand.LeftPunch; bufferTimer = bufferWindow; }
+    // --- LA MAGIA DEL INPUT BUFFER ESTÁ AQUÍ ---
+    private void HandleLeftPunch()
+    {
+        // 1. Definimos el movimiento a buscar (Cuarto de luna hacia adelante)
+        CombatDirection[] hadoukenSequence = new CombatDirection[]
+        {
+            CombatDirection.Down,
+            CombatDirection.DownForward,
+            CombatDirection.Forward
+        };
+
+        // 2. Le preguntamos al InputBuffer si esa secuencia está en el historial
+        if (inputBuffer != null && inputBuffer.CheckMotionInput(hadoukenSequence))
+        {
+            bufferedCommand = FighterCommand.Hadouken; // ¡Buffer especial!
+            Debug.Log("<color=magenta>COMANDO ESPECIAL DETECTADO: Hadouken guardado en el buffer.</color>");
+        }
+        else
+        {
+            bufferedCommand = FighterCommand.LeftPunch; // Puñetazo normal
+        }
+
+        bufferTimer = bufferWindow;
+    }
+
     private void HandleRightPunch() { bufferedCommand = FighterCommand.RightPunch; bufferTimer = bufferWindow; }
     private void HandleLeftKick() { bufferedCommand = FighterCommand.LeftKick; bufferTimer = bufferWindow; }
     private void HandleRightKick() { bufferedCommand = FighterCommand.RightKick; bufferTimer = bufferWindow; }

@@ -19,6 +19,12 @@ public class IdleState : RobotState
 
     public override void Tick()
     {
+        if (robot.TryConsumeCommand(FighterCommand.Hadouken))
+        {
+            robot.ChangeState(new SpecialAttackState(robot, robot.hadoukenData, robot.hadoukenPrefab, robot.hadoukenSpawnPoint));
+            return;
+        }
+
         // --- LEER INPUT BUFFER PARA DASH ---
         if (robot.TryConsumeCommand(FighterCommand.DashForward))
         {
