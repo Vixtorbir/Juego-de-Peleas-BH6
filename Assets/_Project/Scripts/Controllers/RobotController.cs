@@ -244,6 +244,31 @@ public class RobotController : MonoBehaviour
         }
     }
 
+    // HELPER: Activa o desactiva la lectura de controles
+    public void SetControlsActive(bool active)
+    {
+        if (inputReader != null) inputReader.enabled = active;
+    }
+
+    // HELPER: Reinicia al personaje para un nuevo Round
+    public void ResetForNewRound(Vector3 startPosition)
+    {
+        // 1. Desactivamos el CharacterController un milisegundo para poder teletransportarlo
+        characterController.enabled = false;
+        transform.position = startPosition;
+        characterController.enabled = true;
+
+        // 2. Curamos al robot
+        HealthComponent health = GetComponent<HealthComponent>();
+        if (health != null) health.ResetHealth();
+
+        // 3. Limpiamos cualquier ataque guardado en la recámara
+        bufferedCommand = FighterCommand.None;
+
+        // 4. Lo devolvemos al estado inicial
+        ChangeState(new IdleState(this));
+    }
+
     private void OnDestroy()
     {
         if (inputReader != null)

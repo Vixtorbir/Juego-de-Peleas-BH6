@@ -5,7 +5,6 @@ public class ShoryukenState : RobotState
     private AttackData attackData;
     private float timer;
 
-    // Variables físicas del salto
     private float verticalVelocity;
     private float gravity = -25f;
     private float forwardSpeed = 4f;
@@ -18,9 +17,8 @@ public class ShoryukenState : RobotState
     public override void Enter()
     {
         timer = 0f;
-        verticalVelocity = 14f; // Fuerza explosiva hacia arriba
+        verticalVelocity = 14f; 
 
-        // Encendemos la hitbox al instante
         if (robot.hitboxBase != null && attackData != null)
         {
             robot.hitboxBase.ActivarHitbox(attackData);
@@ -28,7 +26,6 @@ public class ShoryukenState : RobotState
 
         // TODO: robot.animator.SetTrigger("Shoryuken");
 
-        // EFECTO VISUAL: El robot se vuelve naranja fuego
         Renderer renderer = robot.GetComponent<Renderer>();
         if (renderer != null) renderer.material.color = new Color(1f, 0.5f, 0f);
     }
@@ -62,7 +59,6 @@ public class ShoryukenState : RobotState
 
     public override void Exit()
     {
-        // Seguridad por si el estado se interrumpe
         if (robot.hitboxBase != null) robot.hitboxBase.DesactivarHitbox();
 
         Renderer renderer = robot.GetComponent<Renderer>();
