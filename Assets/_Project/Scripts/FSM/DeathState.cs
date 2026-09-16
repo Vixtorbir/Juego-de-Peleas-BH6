@@ -1,33 +1,28 @@
 using UnityEngine;
 
+/// <summary>
+/// Terminal state for a knocked-out fighter. Disables offense and lets the body settle on the
+/// ground; <see cref="MatchManager"/> is responsible for leaving this state via a round reset.
+/// </summary>
 public class DeathState : RobotState
 {
+    private const string DeathTrigger = "Death";
+
     public DeathState(RobotController robot) : base(robot) { }
 
     public override void Enter()
     {
-        Debug.Log($"<color=black><b>[K.O.]</b></color> {robot.gameObject.name} ha caído.");
+        robot.IsInAttackStartup = false;
 
-        if (robot.hitboxBase != null) robot.hitboxBase.DesactivarHitbox();
-
-        if (robot.animator != null) robot.animator.SetTrigger("Death");
-
-        Renderer renderer = robot.GetComponent<Renderer>();
-        if (renderer != null) renderer.material.color = new Color(0.2f, 0.2f, 0.2f);
+        if (robot.hitboxBase != null) robot.hitboxBase.Deactivate();
+        if (robot.animator != null) robot.animator.SetTrigger(DeathTrigger);
     }
 
     public override void Tick()
     {
-
         if (!robot.IsGrounded)
         {
-            robot.characterController.Move(new Vector3(0, -9.81f, 0) * Time.deltaTime);
+            robot.characterController.Move(Vector3.up * (FallVelocity * Time.deltaTime));
         }
-    }
-
-    public override void Exit()
-    {
-        Renderer renderer = robot.GetComponent<Renderer>();
-        if (renderer != null) renderer.material.color = Color.white;
     }
 }

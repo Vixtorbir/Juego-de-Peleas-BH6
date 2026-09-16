@@ -1,118 +1,142 @@
 using UnityEngine;
 
+/// <summary>
+/// Damage receiver for a fighter. Resolves the guard matrix (attack height versus stance),
+/// counter hits, aerial juggles, chip damage and combo damage scaling, then hands the
+/// resulting reaction to the owner's state machine.
+/// </summary>
 public class Hurtbox : MonoBehaviour
 {
+    private enum GuardResult { Hit, Blocked, Whiffed, GuardBroken }
+
+    private const float ComboScalingFactor = 0.85f;
+    private const float MinComboScaling = 0.1f;
+    private const float ChipDamageRatio = 0.15f;
+    private const float CounterHitstunMultiplier = 1.5f;
+    private const float CounterPushbackMultiplier = 1.4f;
+    private const float CounterLaunchMultiplier = 1.3f;
+    private const float CounterEffectsMultiplier = 1.5f;
+    private const float AirResetLaunchForce = 5f;
+    private const float HitstopPerDamagePoint = 0.005f;
+    private const float ShakePerDamagePoint = 0.003f;
+    private const float ShakeDuration = 0.1f;
+    private const float CrouchInputThreshold = -0.5f;
+    private const float BlockInputThreshold = -0.3f;
+
+    private static readonly Color GizmoColor = new Color(0f, 1f, 0f, 0.2f);
+
     private RobotController controller;
-    private Transform cameraTransform;
     private HealthComponent health;
-    private int comboHitCount = 0;
+    private FightingCamera fightingCamera;
+    private Collider hurtCollider;
+    private int comboHitCount;
+
+    public RobotController Owner => controller;
 
     private void Awake()
     {
-        controller = GetComponent<RobotController>();
-        cameraTransform = Camera.main.transform;
-
+        controller = GetComponentInParent<RobotController>();
         health = GetComponentInParent<HealthComponent>();
+        hurtCollider = GetComponent<Collider>();
+
+        Camera mainCamera = Camera.main;
+        if (mainCamera != null)
+        {
+            fightingCamera = mainCamera.GetComponent<FightingCamera>();
+        }
     }
 
-    public void RecibirImpacto(AttackData ataque, RobotController atacante)
+    /// <summary>
+    /// Entry point for every incoming attack, whether from a melee <see cref="Hitbox"/> or a projectile.
+    /// </summary>
+    public void ReceiveHit(AttackData attack, RobotController attacker)
     {
-        if (controller == null) return;
+        if (controller == null || attack == null) return;
         if (health != null && health.IsDead) return;
 
-        bool esCounterHit = controller.IsInAttackStartup;
+        bool counterHit = controller.IsInAttackStartup;
+        PlayImpactFeedback(attack.damage, counterHit);
 
-        // --- CÁLCULO DE EFECTOS (JUICINESS) ---
-        float freezeTime = ataque.damage * 0.005f;
-        float shakeMag = ataque.damage * 0.003f;
-        float shakeTime = 0.1f;
-
-        if (esCounterHit)
+        if (!controller.IsGrounded)
         {
-            Debug.Log("<color=yellow><b>¡COUNTER HIT!</b></color>");
-
-            if (CombatEffectsManager.Instance != null)
-                CombatEffectsManager.Instance.TriggerHitstop(freezeTime * 1.5f);
-
-            FightingCamera cam = Camera.main.GetComponent<FightingCamera>();
-            if (cam != null) cam.ShakeCamera(shakeTime * 1.5f, shakeMag * 1.5f);
-        }
-        else
-        {
-            Debug.Log($"<color=red>¡IMPACTO!</color> Ataque: {ataque.name}");
-
-            if (CombatEffectsManager.Instance != null)
-                CombatEffectsManager.Instance.TriggerHitstop(freezeTime);
-
-            FightingCamera cam = Camera.main.GetComponent<FightingCamera>();
-            if (cam != null) cam.ShakeCamera(shakeTime, shakeMag);
-        }
-
-        // 1. REGLA DE ORO: Impactos aéreos
-        bool estaEnElAire = !controller.IsGrounded;
-        if (estaEnElAire)
-        {
-            ApplyDamage(ataque.damage);
-            ProcesarDanoAereo(ataque, esCounterHit);
+            ApplyDamage(attack.damage);
+            ApplyAirborneReaction(attack, counterHit);
             return;
         }
 
-        bool intentandoBloquear = EvaluarIntencionDeBloqueo();
-        bool estaAgachado = controller.MovementInput.y < -0.5f;
+        bool crouching = controller.MovementInput.y < CrouchInputThreshold;
+        bool blocking = !counterHit && IsHoldingBack();
+        GuardResult result = blocking ? ResolveGuard(attack.attackHeight, crouching) : GuardResult.Hit;
 
-        if (intentandoBloquear && !esCounterHit)
+        switch (result)
         {
-            // --- MATRICES DE GUARDIA TERRESTRE NORMAL ---
-            if (ataque.attackHeight == AttackHeight.High)
-            {
-                if (estaAgachado)
-                {
-                    Debug.Log("<color=green>¡EVADIDO!</color> El ataque alto pasó por encima.");
-                    return;
-                }
-                else
-                {
-                    ApplyChipDamage(ataque.damage);
-                    controller.ChangeState(new BlockstunState(controller, ataque.blockstunDuration, false, ataque.blockPushback, atacante));
-                    return;
-                }
-            }
-            else if (ataque.attackHeight == AttackHeight.Mid)
-            {
-                if (estaAgachado)
-                {
-                    Debug.Log("<color=orange>¡GUARDIA ROTA!</color> Impacto medio sufrido por estar agachado.");
-                    ApplyDamage(ataque.damage);
-                    IrAHitstun(ataque, false, atacante);
-                    return;
-                }
-                else
-                {
-                    ApplyChipDamage(ataque.damage); 
-                    controller.ChangeState(new BlockstunState(controller, ataque.blockstunDuration, false, ataque.blockPushback, atacante));
-                    return;
-                }
-            }
-            else if (ataque.attackHeight == AttackHeight.Low)
-            {
-                if (estaAgachado)
-                {
-                    ApplyChipDamage(ataque.damage); 
-                    controller.ChangeState(new BlockstunState(controller, ataque.blockstunDuration, true, ataque.blockPushback, atacante));
-                    return;
-                }
-                else
-                {
-                    Debug.Log("<color=orange>¡GUARDIA ROTA!</color> Impacto bajo sufrido por estar de pie.");
-                    ApplyDamage(ataque.damage);
-                    IrAHitstun(ataque, false, atacante);
-                    return;
-                }
-            }
+            case GuardResult.Whiffed:
+                return;
+
+            case GuardResult.Blocked:
+                ApplyChipDamage(attack.damage);
+                controller.ChangeState(new BlockstunState(controller, attack.blockstunDuration, crouching, attack.blockPushback, attacker));
+                return;
+
+            case GuardResult.GuardBroken:
+                ApplyDamage(attack.damage);
+                ApplyGroundedReaction(attack, false, attacker);
+                return;
+
+            default:
+                ApplyDamage(attack.damage);
+                ApplyGroundedReaction(attack, counterHit, attacker);
+                return;
+        }
+    }
+
+    public void ResetCombo()
+    {
+        comboHitCount = 0;
+    }
+
+    /// <summary>
+    /// High attacks pass over a crouching guard, Mid attacks require a standing guard and
+    /// Low attacks require a crouching guard.
+    /// </summary>
+    private static GuardResult ResolveGuard(AttackHeight height, bool crouching)
+    {
+        switch (height)
+        {
+            case AttackHeight.High:
+                return crouching ? GuardResult.Whiffed : GuardResult.Blocked;
+            case AttackHeight.Mid:
+                return crouching ? GuardResult.GuardBroken : GuardResult.Blocked;
+            case AttackHeight.Low:
+                return crouching ? GuardResult.Blocked : GuardResult.GuardBroken;
+            default:
+                return GuardResult.Hit;
+        }
+    }
+
+    private bool IsHoldingBack()
+    {
+        if (controller.opponentTarget == null) return false;
+
+        float towardsOpponent = controller.MovementInput.x * controller.GetScreenFacingSign();
+        return towardsOpponent < BlockInputThreshold;
+    }
+
+    private void PlayImpactFeedback(float damage, bool counterHit)
+    {
+        float multiplier = counterHit ? CounterEffectsMultiplier : 1f;
+        float hitstop = damage * HitstopPerDamagePoint * multiplier;
+        float shakeMagnitude = damage * ShakePerDamagePoint * multiplier;
+
+        if (CombatEffectsManager.Instance != null)
+        {
+            CombatEffectsManager.Instance.TriggerHitstop(hitstop);
         }
 
-        ApplyDamage(ataque.damage);
-        IrAHitstun(ataque, esCounterHit, atacante);
+        if (fightingCamera != null)
+        {
+            fightingCamera.ShakeCamera(ShakeDuration * multiplier, shakeMagnitude);
+        }
     }
 
     private void ApplyDamage(float rawDamage)
@@ -121,15 +145,8 @@ public class Hurtbox : MonoBehaviour
 
         comboHitCount++;
 
-        float multiplicadorEscalado = Mathf.Pow(0.85f, comboHitCount - 1);
-
-        multiplicadorEscalado = Mathf.Max(multiplicadorEscalado, 0.1f);
-
-        float finalDamage = rawDamage * multiplicadorEscalado;
-
-        health.TakeDamage(finalDamage);
-
-        Debug.Log($"<color=cyan>Combo x{comboHitCount}</color> | Daño Original: {rawDamage} | Daño Escalado: {finalDamage:F1}");
+        float scaling = Mathf.Max(Mathf.Pow(ComboScalingFactor, comboHitCount - 1), MinComboScaling);
+        health.TakeDamage(rawDamage * scaling);
 
         if (health.IsDead)
         {
@@ -137,20 +154,14 @@ public class Hurtbox : MonoBehaviour
         }
     }
 
-    public void ResetCombo()
-    {
-        if (comboHitCount > 0)
-        {
-            Debug.Log($"<color=white>Combo finalizado. Total hits: {comboHitCount}</color>");
-            comboHitCount = 0;
-        }
-    }
-
+    /// <summary>
+    /// Blocked attacks still deal a fraction of their damage, but chip can never finish a round.
+    /// </summary>
     private void ApplyChipDamage(float rawDamage)
     {
         if (health == null || health.IsDead) return;
 
-        float chipDamage = rawDamage * 0.15f;
+        float chipDamage = rawDamage * ChipDamageRatio;
 
         if (health.CurrentHealth - chipDamage <= 0f)
         {
@@ -160,61 +171,45 @@ public class Hurtbox : MonoBehaviour
         if (chipDamage > 0f)
         {
             health.TakeDamage(chipDamage);
-            Debug.Log($"<color=cyan>¡CHIP DAMAGE!</color> Daño absorbido por la guardia: {chipDamage}");
         }
     }
 
-    private void IrAHitstun(AttackData ataque, bool esCounter, RobotController atacante)
+    private void ApplyGroundedReaction(AttackData attack, bool counterHit, RobotController attacker)
     {
         if (health != null && health.IsDead) return;
 
-        float modDuration = esCounter ? 1.5f : 1f;
-        float modPushback = esCounter ? 1.4f : 1f;
-        float modLaunch = esCounter ? 1.3f : 1f;
+        if (attack.isLauncher)
+        {
+            float launchMultiplier = counterHit ? CounterLaunchMultiplier : 1f;
+            controller.ChangeState(new AirborneHurtState(controller, attack.launchForce * launchMultiplier));
+            return;
+        }
 
-        if (ataque.isLauncher)
-        {
-            Debug.Log("<color=magenta>¡LAUNCHER CONECTADO!</color> Mandando al rival a las nubes.");
-            controller.ChangeState(new AirborneHurtState(controller, ataque.launchForce * modLaunch));
-        }
-        else
-        {
-            controller.ChangeState(new HitstunState(
-                controller,
-                ataque.hitstunDuration * modDuration,
-                ataque.hitPushback * modPushback,
-                esCounter,
-                atacante
-            ));
-        }
+        float hitstunMultiplier = counterHit ? CounterHitstunMultiplier : 1f;
+        float pushbackMultiplier = counterHit ? CounterPushbackMultiplier : 1f;
+
+        controller.ChangeState(new HitstunState(
+            controller,
+            attack.hitstunDuration * hitstunMultiplier,
+            attack.hitPushback * pushbackMultiplier,
+            attacker));
     }
 
-    private bool EvaluarIntencionDeBloqueo()
-    {
-        if (controller.opponentTarget == null) return false;
-
-        Vector3 directionToOpponent = controller.opponentTarget.position - transform.position;
-        directionToOpponent.y = 0f;
-        float screenSide = Mathf.Sign(Vector3.Dot(directionToOpponent.normalized, cameraTransform.right));
-        float horizontalInput = controller.MovementInput.x;
-
-        return (horizontalInput * screenSide) < -0.3f;
-    }
-
-    private void ProcesarDanoAereo(AttackData ataque, bool esCounter)
+    private void ApplyAirborneReaction(AttackData attack, bool counterHit)
     {
         if (health != null && health.IsDead) return;
 
-        float modLaunch = esCounter ? 1.3f : 1f;
+        float launchMultiplier = counterHit ? CounterLaunchMultiplier : 1f;
+        float launchForce = attack.isLauncher ? attack.launchForce : AirResetLaunchForce;
 
-        if (ataque.isLauncher)
-        {
-            controller.ChangeState(new AirborneHurtState(controller, ataque.launchForce * modLaunch));
-        }
-        else
-        {
-            float fuerzaReboteAereo = 5f;
-            controller.ChangeState(new AirborneHurtState(controller, fuerzaReboteAereo * modLaunch));
-        }
+        controller.ChangeState(new AirborneHurtState(controller, launchForce * launchMultiplier));
+    }
+
+    private void OnDrawGizmos()
+    {
+        Collider volume = hurtCollider != null ? hurtCollider : GetComponent<Collider>();
+        if (volume == null) return;
+
+        CombatGizmos.DrawCollider(volume, GizmoColor);
     }
 }

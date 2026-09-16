@@ -1,56 +1,57 @@
 using UnityEngine;
 
+/// <summary>
+/// Rising uppercut special. The hitbox is live from the first frame for the attack's active
+/// window while the fighter climbs and drifts towards the opponent; the move ends on landing,
+/// leaving a long punishable recovery on whiff.
+/// </summary>
 public class ShoryukenState : RobotState
 {
-    private AttackData attackData;
-    private float timer;
+    private const float RiseVelocity = 14f;
+    private const float RiseGravity = -25f;
+    private const float ForwardSpeed = 4f;
 
+    private readonly AttackData attackData;
+    private float timer;
     private float verticalVelocity;
-    private float gravity = -25f;
-    private float forwardSpeed = 4f;
+    private bool hitboxActive;
 
     public ShoryukenState(RobotController robot, AttackData data) : base(robot)
     {
-        this.attackData = data;
+        attackData = data;
     }
 
     public override void Enter()
     {
         timer = 0f;
-        verticalVelocity = 14f; 
+        verticalVelocity = RiseVelocity;
+        hitboxActive = false;
 
         if (robot.hitboxBase != null && attackData != null)
         {
-            robot.hitboxBase.ActivarHitbox(attackData);
+            robot.hitboxBase.Activate(attackData);
+            hitboxActive = true;
         }
-
-        // TODO: robot.animator.SetTrigger("Shoryuken");
-
-        Renderer renderer = robot.GetComponent<Renderer>();
-        if (renderer != null) renderer.material.color = new Color(1f, 0.5f, 0f);
     }
 
     public override void Tick()
     {
         timer += Time.deltaTime;
+        verticalVelocity += RiseGravity * Time.deltaTime;
 
-        // 1. Matemáticas del salto (Gravedad)
-        verticalVelocity += gravity * Time.deltaTime;
+        float forwardSign = robot.opponentTarget != null
+            ? Mathf.Sign(robot.opponentTarget.position.x - robot.transform.position.x)
+            : 0f;
 
-        // 2. Dirección hacia el oponente para avanzar en el aire
-        float dirX = Mathf.Sign(robot.opponentTarget.position.x - robot.transform.position.x);
-        Vector3 moveDir = new Vector3(dirX * forwardSpeed, verticalVelocity, 0f);
+        Vector3 velocity = new Vector3(forwardSign * ForwardSpeed, verticalVelocity, 0f);
+        robot.characterController.Move(velocity * Time.deltaTime);
 
-        // 3. Movemos el robot
-        robot.characterController.Move(moveDir * Time.deltaTime);
-
-        // 4. Apagamos el daño cuando se acaba el "Active Time" del ataque
-        if (attackData != null && timer > attackData.activeTime && robot.hitboxBase != null)
+        if (hitboxActive && attackData != null && timer > attackData.activeTime)
         {
-            robot.hitboxBase.DesactivarHitbox();
+            robot.hitboxBase.Deactivate();
+            hitboxActive = false;
         }
 
-        // 5. Condición de salida: Si estamos cayendo (velocidad negativa) y tocamos el suelo
         if (verticalVelocity < 0f && (robot.IsGrounded || robot.characterController.isGrounded))
         {
             robot.ChangeState(new IdleState(robot));
@@ -59,9 +60,6 @@ public class ShoryukenState : RobotState
 
     public override void Exit()
     {
-        if (robot.hitboxBase != null) robot.hitboxBase.DesactivarHitbox();
-
-        Renderer renderer = robot.GetComponent<Renderer>();
-        if (renderer != null) renderer.material.color = Color.white;
+        if (robot.hitboxBase != null) robot.hitboxBase.Deactivate();
     }
 }

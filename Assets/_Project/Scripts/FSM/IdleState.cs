@@ -1,99 +1,76 @@
 using UnityEngine;
 
+/// <summary>
+/// Neutral standing state. Resets combo scaling on the defender side and dispatches buffered
+/// commands with the priority specials > dashes > normals > jump/crouch > walk.
+/// </summary>
 public class IdleState : RobotState
 {
+    private const float VerticalInputThreshold = 0.6f;
+    private const float WalkInputThreshold = 0.01f;
+
     public IdleState(RobotController robot) : base(robot) { }
 
     public override void Enter()
     {
         robot.animator.SetFloat("InputX", 0f);
         robot.animator.SetFloat("InputY", 0f);
-
-        Hurtbox hurtbox = robot.GetComponentInChildren<Hurtbox>();
-        if (hurtbox != null)
-        {
-            hurtbox.ResetCombo();
-        }
-
+        if (robot.Hurtbox != null) robot.Hurtbox.ResetCombo();
     }
 
     public override void Tick()
     {
-        if (robot.TryConsumeCommand(FighterCommand.Hadouken))
-        {
-            robot.ChangeState(new SpecialAttackState(robot, robot.hadoukenData, robot.hadoukenPrefab, robot.hadoukenSpawnPoint));
-            return;
-        }
+        if (TryConsumeSpecialCommands()) return;
+        if (TryConsumeDashCommands()) return;
+        if (TryConsumeNormalCommands()) return;
 
-        if (robot.TryConsumeCommand(FighterCommand.Shoryuken))
-        {
-            robot.ChangeState(new ShoryukenState(robot, robot.shoryukenData));
-            return;
-        }
-
-        // --- LEER INPUT BUFFER PARA DASH ---
-        if (robot.TryConsumeCommand(FighterCommand.DashForward))
-        {
-            robot.ChangeState(new DashState(robot, true));
-            return;
-        }
-
-        if (robot.TryConsumeCommand(FighterCommand.DashBackward))
-        {
-            robot.ChangeState(new DashState(robot, false)); 
-            return;
-        }
-
-        // 1. LEER EL INPUT BUFFER PRIMERO (Prioridad de ataque)
-        if (robot.TryConsumeCommand(FighterCommand.LeftPunch))
-        {
-            robot.ChangeState(new AttackState(robot, robot.leftPunchBase));
-            return;
-        }
-
-        if (robot.TryConsumeCommand(FighterCommand.RightPunch))
-        {
-            robot.ChangeState(new AttackState(robot, robot.rightPunchBase));
-            return;
-        }
-
-        if (robot.TryConsumeCommand(FighterCommand.LeftKick))
-        {
-            robot.ChangeState(new AttackState(robot, robot.leftKickBase));
-            return;
-        }
-
-        if (robot.TryConsumeCommand(FighterCommand.RightKick))
-        {
-            robot.ChangeState(new AttackState(robot, robot.rightKickBase));
-            return;
-        }
-
-        // 2. PRIORIDAD VERTICAL: Salto y Agacharse
-        if (robot.MovementInput.y > 0.6f)
+        if (robot.MovementInput.y > VerticalInputThreshold)
         {
             robot.ChangeState(new JumpState(robot));
             return;
         }
-        else if (robot.MovementInput.y < -0.6f)
+
+        if (robot.MovementInput.y < -VerticalInputThreshold)
         {
             robot.ChangeState(new CrouchState(robot));
             return;
         }
 
-        // 3. MOVIMIENTO HORIZONTAL: Caminar
-        if (Mathf.Abs(robot.MovementInput.x) > 0.01f)
+        if (Mathf.Abs(robot.MovementInput.x) > WalkInputThreshold)
         {
             robot.ChangeState(new WalkState(robot));
+            return;
         }
 
-        if (!robot.characterController.isGrounded)
+        ApplyGroundingForce();
+    }
+
+    private bool TryConsumeNormalCommands()
+    {
+        if (robot.TryConsumeCommand(FighterCommand.LeftPunch))
         {
-            robot.characterController.Move(new Vector3(0, -9.81f, 0) * Time.deltaTime);
+            robot.ChangeState(new AttackState(robot, robot.leftPunchBase));
+            return true;
         }
-        else
+
+        if (robot.TryConsumeCommand(FighterCommand.RightPunch))
         {
-            robot.characterController.Move(new Vector3(0, -0.5f, 0) * Time.deltaTime);
+            robot.ChangeState(new AttackState(robot, robot.rightPunchBase));
+            return true;
         }
+
+        if (robot.TryConsumeCommand(FighterCommand.LeftKick))
+        {
+            robot.ChangeState(new AttackState(robot, robot.leftKickBase));
+            return true;
+        }
+
+        if (robot.TryConsumeCommand(FighterCommand.RightKick))
+        {
+            robot.ChangeState(new AttackState(robot, robot.rightKickBase));
+            return true;
+        }
+
+        return false;
     }
 }

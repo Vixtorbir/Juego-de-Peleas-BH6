@@ -1,10 +1,15 @@
 using System;
 using UnityEngine;
 
+/// <summary>
+/// Health pool for a fighter. Broadcasts changes for UI binding and raises <see cref="OnDeath"/>
+/// once when health reaches zero; further damage is ignored until the next round resets it.
+/// </summary>
 public class HealthComponent : MonoBehaviour
 {
     [Header("Health Settings")]
     [SerializeField] private float maxHealth = 100f;
+
     private float currentHealth;
 
     public event Action<float, float> OnHealthChanged;
@@ -12,6 +17,7 @@ public class HealthComponent : MonoBehaviour
 
     public bool IsDead { get; private set; }
     public float CurrentHealth => currentHealth;
+    public float MaxHealth => maxHealth;
 
     private void Awake()
     {
@@ -28,21 +34,14 @@ public class HealthComponent : MonoBehaviour
     {
         if (IsDead) return;
 
-        currentHealth -= amount;
-        currentHealth = Mathf.Clamp(currentHealth, 0f, maxHealth);
-
+        currentHealth = Mathf.Clamp(currentHealth - amount, 0f, maxHealth);
         OnHealthChanged?.Invoke(currentHealth, maxHealth);
 
-        if (currentHealth <= 0f && !IsDead)
+        if (currentHealth <= 0f)
         {
-            Die();
+            IsDead = true;
+            OnDeath?.Invoke();
         }
-    }
-
-    private void Die()
-    {
-        IsDead = true;
-        OnDeath?.Invoke();
     }
 
     public void ResetHealth()

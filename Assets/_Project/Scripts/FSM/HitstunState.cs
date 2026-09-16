@@ -1,73 +1,31 @@
 using UnityEngine;
 
+/// <summary>
+/// Reaction to a clean hit. The fighter is locked out of input for the attack's hitstun
+/// duration while knockback (with wall bounce) is integrated by <see cref="PushbackSolver"/>.
+/// </summary>
 public class HitstunState : RobotState
 {
+    private const float WallTransferRatio = 0.4f;
+    private const float WallDampening = 0.5f;
+
     private float timer;
-    private float currentPushbackSpeed;
-    private float friction = 25f;
-    private bool isCounterHit;
-    private RobotController atacante;
-    private bool haChocadoPared = false;
+    private PushbackSolver pushback;
 
-    public HitstunState(RobotController robot, float hitstunDuration, float pushbackForce, bool isCounterHit, RobotController atacante) : base(robot)
+    public HitstunState(RobotController robot, float hitstunDuration, float pushbackForce, RobotController attacker) : base(robot)
     {
-        this.timer = hitstunDuration;
-        this.currentPushbackSpeed = pushbackForce;
-        this.isCounterHit = isCounterHit;
-        this.atacante = atacante;
-    }
-
-    public override void Enter()
-    {
-        haChocadoPared = false;
-        Renderer renderer = robot.GetComponent<Renderer>();
-        if (renderer != null) renderer.material.color = isCounterHit ? Color.yellow : Color.red;
+        timer = hitstunDuration;
+        pushback = new PushbackSolver(pushbackForce, attacker, WallTransferRatio, WallDampening);
     }
 
     public override void Tick()
     {
         timer -= Time.deltaTime;
-
-        if (currentPushbackSpeed > 0f)
-        {
-            currentPushbackSpeed = Mathf.MoveTowards(currentPushbackSpeed, 0f, friction * Time.deltaTime);
-
-            float direccionX = Mathf.Sign(robot.transform.position.x - robot.opponentTarget.position.x);
-            Vector3 direccionPushback = new Vector3(direccionX, 0f, 0f);
-
-            if (haChocadoPared)
-            {
-                direccionPushback = -direccionPushback;
-            }
-
-            float posXAntes = robot.transform.position.x;
-            robot.characterController.Move(direccionPushback * currentPushbackSpeed * Time.deltaTime);
-            float posXDespues = robot.transform.position.x;
-
-            float desplazamientoReal = Mathf.Abs(posXDespues - posXAntes);
-            float desplazamientoDeseado = currentPushbackSpeed * Time.deltaTime;
-
-            if (!haChocadoPared && desplazamientoReal < desplazamientoDeseado - 0.001f && atacante != null)
-            {
-                haChocadoPared = true;
-
-                atacante.characterController.Move(-direccionPushback * currentPushbackSpeed * 0.4f * Time.deltaTime);
-
-                currentPushbackSpeed *= 0.5f;
-
-                Debug.Log("<color=cyan>¡WALL BOUNCE!</color> El defensor choca y rebota contra la pared.");
-            }
-        }
+        pushback.Tick(robot);
 
         if (timer <= 0f)
         {
             robot.ChangeState(new IdleState(robot));
         }
-    }
-
-    public override void Exit()
-    {
-        Renderer renderer = robot.GetComponent<Renderer>();
-        if (renderer != null) renderer.material.color = Color.white;
     }
 }

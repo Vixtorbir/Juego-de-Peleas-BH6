@@ -1,7 +1,14 @@
 using UnityEngine;
 
+/// <summary>
+/// Straight-line projectile spawned by <see cref="SpecialAttackState"/>. Carries the attack data
+/// of the move that fired it and applies it to the first opposing <see cref="Hurtbox"/> it overlaps.
+/// </summary>
+[RequireComponent(typeof(Collider))]
 public class HadoukenProjectile : MonoBehaviour
 {
+    private const float Lifetime = 3f;
+
     private float speed;
     private Vector3 moveDirection;
     private AttackData attackData;
@@ -14,29 +21,22 @@ public class HadoukenProjectile : MonoBehaviour
         attackData = data;
         owner = creator;
 
-        Destroy(gameObject, 3f);
+        Destroy(gameObject, Lifetime);
     }
 
     private void Update()
     {
-        transform.Translate(moveDirection * speed * Time.deltaTime, Space.World);
+        transform.Translate(moveDirection * (speed * Time.deltaTime), Space.World);
     }
 
     private void OnTriggerEnter(Collider other)
     {
-        Hurtbox objetivo = other.GetComponent<Hurtbox>();
+        if (owner == null || attackData == null) return;
 
-        if (objetivo != null && owner != null)
-        {
-            // Regla de oro: No podemos dispararnos a nosotros mismos
-            if (objetivo.transform != owner.transform)
-            {
-                Debug.Log($"<color=orange><b>[PROJECTILE HIT]</b></color> Hadouken impacta a {other.gameObject.name}");
+        Hurtbox target = other.GetComponent<Hurtbox>();
+        if (target == null || target.Owner == owner) return;
 
-                objetivo.RecibirImpacto(attackData, owner);
-
-                Destroy(gameObject);
-            }
-        }
+        target.ReceiveHit(attackData, owner);
+        Destroy(gameObject);
     }
 }

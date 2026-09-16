@@ -1,75 +1,84 @@
 using UnityEngine;
 
+/// <summary>
+/// Standing normal attack driven by <see cref="AttackData"/> frame data: startup (counter-hit
+/// vulnerable), active (hitbox enabled) and recovery, during which buffered commands can cancel
+/// into any configured <see cref="ComboBranch"/>.
+/// </summary>
 public class AttackState : RobotState
 {
-    private AttackData data;
+    private readonly AttackData data;
     private float stateTimer;
-    private bool hasActivatedHitbox;
+    private bool hitboxActive;
 
     public AttackState(RobotController robot, AttackData attackData) : base(robot)
     {
-        this.data = attackData;
+        data = attackData;
     }
 
     public override void Enter()
     {
         stateTimer = 0f;
-        hasActivatedHitbox = false;
-
+        hitboxActive = false;
         robot.IsInAttackStartup = true;
 
         if (!string.IsNullOrEmpty(data.animationTrigger))
+        {
             robot.animator.SetTrigger(data.animationTrigger);
-
-        robot.transform.localScale = data.visualScale;
+        }
     }
 
     public override void Tick()
     {
         stateTimer += Time.deltaTime;
 
-        if (stateTimer >= data.startupTime)
+        if (stateTimer < data.startupTime) return;
+
+        robot.IsInAttackStartup = false;
+
+        if (stateTimer < data.ActiveEndTime)
         {
-            robot.IsInAttackStartup = false;
+            if (!hitboxActive)
+            {
+                robot.hitboxBase.Activate(data);
+                hitboxActive = true;
+            }
+            return;
         }
 
-        // FASE 1: ACTIVE FRAMES (Aquí se enciende la hitbox)
-        if (stateTimer >= data.startupTime && stateTimer < (data.startupTime + data.activeTime) && !hasActivatedHitbox)
+        if (hitboxActive)
         {
-            robot.hitboxBase.ActivarHitbox(data);
-            hasActivatedHitbox = true;
+            robot.hitboxBase.Deactivate();
+            hitboxActive = false;
         }
-        else if (stateTimer >= (data.startupTime + data.activeTime))
+
+        if (TryCancelIntoComboBranch()) return;
+
+        if (stateTimer >= data.TotalDuration)
         {
-            if (hasActivatedHitbox)
-            {
-                robot.hitboxBase.DesactivarHitbox();
-                hasActivatedHitbox = false;
-            }
-
-            if (data.comboBranches != null && data.comboBranches.Count > 0)
-            {
-                foreach (ComboBranch branch in data.comboBranches)
-                {
-                    if (robot.TryConsumeCommand(branch.inputCommand))
-                    {
-                        robot.ChangeState(new AttackState(robot, branch.nextAttack));
-                        return;
-                    }
-                }
-            }
-
-            if (stateTimer >= (data.startupTime + data.activeTime + data.recoveryTime))
-            {
-                robot.ChangeState(new IdleState(robot));
-            }
+            robot.ChangeState(new IdleState(robot));
         }
     }
 
     public override void Exit()
     {
         robot.IsInAttackStartup = false;
-        robot.hitboxBase.DesactivarHitbox();
-        robot.transform.localScale = Vector3.one;
+        robot.hitboxBase.Deactivate();
+    }
+
+    private bool TryCancelIntoComboBranch()
+    {
+        if (data.comboBranches == null) return false;
+
+        for (int i = 0; i < data.comboBranches.Count; i++)
+        {
+            ComboBranch branch = data.comboBranches[i];
+            if (branch.nextAttack == null || !robot.TryConsumeCommand(branch.inputCommand)) continue;
+
+            robot.ChangeState(new AttackState(robot, branch.nextAttack));
+            return true;
+        }
+
+        return false;
     }
 }

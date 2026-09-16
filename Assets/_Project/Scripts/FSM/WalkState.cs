@@ -1,140 +1,98 @@
 using UnityEngine;
 
+/// <summary>
+/// Grounded horizontal locomotion. Movement is interpreted relative to the camera so pressing
+/// towards the opponent always advances, and forward + RightPunch is routed to the launcher.
+/// </summary>
 public class WalkState : RobotState
 {
-    private float smoothTime = 0.1f;
-    private Vector2 currentVelocity;
+    private const float WalkSpeed = 3f;
+    private const float SmoothTime = 0.1f;
+    private const float VerticalInputThreshold = 0.6f;
+    private const float StopInputThreshold = 0.01f;
+    private const float LauncherForwardThreshold = 0.5f;
+
     private Vector2 smoothInput;
+    private Vector2 smoothVelocity;
 
-    private Transform cameraTransform;
-
-    public WalkState(RobotController robot) : base(robot)
-    {
-        cameraTransform = Camera.main.transform;
-    }
+    public WalkState(RobotController robot) : base(robot) { }
 
     public override void Enter()
     {
-        Hurtbox hurtbox = robot.GetComponentInChildren<Hurtbox>();
-        if (hurtbox != null)
-        {
-            hurtbox.ResetCombo();
-        }
+        if (robot.Hurtbox != null) robot.Hurtbox.ResetCombo();
     }
 
     public override void Tick()
     {
-        if (robot.TryConsumeCommand(FighterCommand.Hadouken))
-        {
-            robot.ChangeState(new SpecialAttackState(robot, robot.hadoukenData, robot.hadoukenPrefab, robot.hadoukenSpawnPoint));
-            return;
-        }
+        if (TryConsumeSpecialCommands()) return;
+        if (TryConsumeDashCommands()) return;
+        if (TryConsumeNormalCommands()) return;
 
-        if (robot.TryConsumeCommand(FighterCommand.Shoryuken))
-        {
-            robot.ChangeState(new ShoryukenState(robot, robot.shoryukenData));
-            return;
-        }
-
-        // --- LEER INPUT BUFFER PARA DASH ---
-        if (robot.TryConsumeCommand(FighterCommand.DashForward))
-        {
-            robot.ChangeState(new DashState(robot, true));
-            return;
-        }
-
-        if (robot.TryConsumeCommand(FighterCommand.DashBackward))
-        {
-            robot.ChangeState(new DashState(robot, false));
-            return;
-        }
-
-        // 1. LEER EL INPUT BUFFER AL CAMINAR (Cancela la caminata si atacamos)
-        if (robot.TryConsumeCommand(FighterCommand.LeftPunch))
-        {
-            robot.ChangeState(new AttackState(robot, robot.leftPunchBase));
-            return;
-        }
-
-        if (robot.TryConsumeCommand(FighterCommand.RightPunch))
-        {
-            Vector3 directionToOpponentAttack = robot.opponentTarget.position - robot.transform.position;
-            directionToOpponentAttack.y = 0f;
-            float screenSideAttack = Mathf.Sign(Vector3.Dot(directionToOpponentAttack.normalized, cameraTransform.right));
-            float forwardMovementAttack = robot.MovementInput.x * screenSideAttack;
-
-            if (forwardMovementAttack > 0.5f)
-            {
-                robot.ChangeState(new AttackState(robot, robot.launcherBase));
-            }
-            else
-            {
-                robot.ChangeState(new AttackState(robot, robot.rightPunchBase));
-            }
-            return;
-        }
-
-        if (robot.TryConsumeCommand(FighterCommand.LeftKick))
-        {
-            robot.ChangeState(new AttackState(robot, robot.leftKickBase));
-            return;
-        }
-
-        if (robot.TryConsumeCommand(FighterCommand.RightKick))
-        {
-            robot.ChangeState(new AttackState(robot, robot.rightKickBase));
-            return;
-        }
-
-        // 2. GESTIÓN DE SALTO Y AGACHARSE (Eje Y del Joystick)
-        if (robot.MovementInput.y > 0.6f)
+        if (robot.MovementInput.y > VerticalInputThreshold)
         {
             robot.ChangeState(new JumpState(robot));
             return;
         }
-        else if (robot.MovementInput.y < -0.6f)
+
+        if (robot.MovementInput.y < -VerticalInputThreshold)
         {
             robot.ChangeState(new CrouchState(robot));
             return;
         }
 
-        // 3. CONTROL DE PARADA (Si soltamos el joystick)
-        if (Mathf.Abs(robot.MovementInput.x) <= 0.01f)
+        if (Mathf.Abs(robot.MovementInput.x) <= StopInputThreshold)
         {
             robot.ChangeState(new IdleState(robot));
             return;
         }
 
-        smoothInput = Vector2.SmoothDamp(smoothInput, robot.MovementInput, ref currentVelocity, smoothTime);
+        Move();
+    }
 
-        Vector3 directionToOpponent = robot.opponentTarget.position - robot.transform.position;
-        directionToOpponent.y = 0f;
+    private void Move()
+    {
+        smoothInput = Vector2.SmoothDamp(smoothInput, robot.MovementInput, ref smoothVelocity, SmoothTime);
 
-        if (directionToOpponent != Vector3.zero)
-        {
-            robot.transform.rotation = Quaternion.LookRotation(directionToOpponent);
-        }
+        robot.FaceOpponent();
 
-        // 4. LA MAGIA DEL INPUT RELATIVO A LA CÁMARA
-        float screenSide = Mathf.Sign(Vector3.Dot(directionToOpponent.normalized, cameraTransform.right));
+        float forwardAmount = smoothInput.x * robot.GetScreenFacingSign();
 
-        float forwardMovement = smoothInput.x * screenSide;
-
-        robot.animator.SetFloat("InputY", forwardMovement);
+        robot.animator.SetFloat("InputY", forwardAmount);
         robot.animator.SetFloat("InputX", 0f);
 
-        // 5. APLICAR EL MOVIMIENTO FÍSICO
-        Vector3 moveDirection = robot.transform.forward * forwardMovement;
-        float tempSpeed = 3f;
-        robot.characterController.Move(moveDirection * tempSpeed * Time.deltaTime);
+        Vector3 velocity = robot.transform.forward * (forwardAmount * WalkSpeed);
+        robot.characterController.Move(velocity * Time.deltaTime);
 
-        if (!robot.characterController.isGrounded)
+        ApplyGroundingForce();
+    }
+
+    private bool TryConsumeNormalCommands()
+    {
+        if (robot.TryConsumeCommand(FighterCommand.LeftPunch))
         {
-            robot.characterController.Move(new Vector3(0, -9.81f, 0) * Time.deltaTime);
+            robot.ChangeState(new AttackState(robot, robot.leftPunchBase));
+            return true;
         }
-        else
+
+        if (robot.TryConsumeCommand(FighterCommand.RightPunch))
         {
-            robot.characterController.Move(new Vector3(0, -0.5f, 0) * Time.deltaTime);
+            bool advancing = robot.MovementInput.x * robot.GetScreenFacingSign() > LauncherForwardThreshold;
+            robot.ChangeState(new AttackState(robot, advancing ? robot.launcherBase : robot.rightPunchBase));
+            return true;
         }
+
+        if (robot.TryConsumeCommand(FighterCommand.LeftKick))
+        {
+            robot.ChangeState(new AttackState(robot, robot.leftKickBase));
+            return true;
+        }
+
+        if (robot.TryConsumeCommand(FighterCommand.RightKick))
+        {
+            robot.ChangeState(new AttackState(robot, robot.rightKickBase));
+            return true;
+        }
+
+        return false;
     }
 }

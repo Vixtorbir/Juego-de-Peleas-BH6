@@ -1,109 +1,121 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+/// <summary>
+/// Records discrete directional inputs relative to the opponent and matches them against
+/// motion sequences (quarter-circle, dragon punch) using reverse sequence matching.
+/// Inputs older than <see cref="inputLifeTime"/> are pruned every frame without allocating.
+/// </summary>
+[RequireComponent(typeof(RobotController))]
 public class InputBuffer : MonoBehaviour
 {
-    private RobotController robot;
-    private InputReader inputReader;
+    private const float VerticalDeadzone = 0.4f;
+    private const float HorizontalDeadzone = 0.4f;
 
-    private List<BufferedDirection> directionHistory = new List<BufferedDirection>();
+    [Header("Buffer Settings")]
+    [SerializeField] private float inputLifeTime = 0.35f;
 
+    private readonly List<BufferedDirection> directionHistory = new List<BufferedDirection>(16);
     private CombatDirection lastDiscreteDirection = CombatDirection.Neutral;
-
-    [Header("Configuración del Buffer")]
-    [SerializeField] private float inputLifeTime = 0.35f; 
+    private RobotController robot;
 
     private void Awake()
     {
         robot = GetComponent<RobotController>();
-        inputReader = GetComponent<InputReader>();
     }
 
     private void Update()
     {
-        LimpiarInputViejo();
-        ProcesarDireccionActual();
+        PruneExpiredInputs();
+        RecordCurrentDirection();
     }
 
-    private void ProcesarDireccionActual()
+    /// <summary>
+    /// Returns true if the most recent inputs contain <paramref name="sequence"/> in order,
+    /// allowing intermediate noise between steps. On success the history is cleared so the
+    /// same motion cannot trigger twice.
+    /// </summary>
+    public bool CheckMotionInput(CombatDirection[] sequence)
     {
-        if (robot.opponentTarget == null) return;
+        if (directionHistory.Count < sequence.Length) return false;
 
-        // 1. Leer el input vectorial crudo
-        Vector2 rawInput = robot.MovementInput; 
-
-        // 2. Determinar hacia dónde está mirando el robot respecto al rival
-        float direccionHaciaRival = Mathf.Sign(robot.opponentTarget.position.x - transform.position.x);
-
-        // 3. Traducir los ejes x e y a direcciones relativas de combate
-        CombatDirection currentDir = TraducirACombatDirection(rawInput, direccionHaciaRival);
-
-        // 4. Registrar solo cuando la dirección CAMBIA (para no llenar el buffer con duplicados)
-        if (currentDir != lastDiscreteDirection)
-        {
-            lastDiscreteDirection = currentDir;
-            directionHistory.Add(new BufferedDirection(currentDir, Time.time));
-        }
-    }
-
-    private CombatDirection TraducirACombatDirection(Vector2 input, float ladoEnPantalla)
-    {
-        float x = input.x;
-        float y = input.y;
-
-        bool dePie = y > -0.4f && y < 0.4f;
-        bool agachado = y <= -0.4f;
-        bool saltando = y >= 0.4f;
-
-        bool neutralHorizontal = x > -0.4f && x < 0.4f;
-        bool moviendoAdelante = !neutralHorizontal && Mathf.Sign(x) == ladoEnPantalla;
-        bool moviendoAtras = !neutralHorizontal && Mathf.Sign(x) != ladoEnPantalla;
-
-        if (agachado)
-        {
-            if (moviendoAdelante) return CombatDirection.DownForward;
-            if (moviendoAtras) return CombatDirection.DownBack;
-            return CombatDirection.Down;
-        }
-        if (saltando)
-        {
-            if (moviendoAdelante) return CombatDirection.UpForward;
-            if (moviendoAtras) return CombatDirection.UpBack;
-            return CombatDirection.Up;
-        }
-
-        if (moviendoAdelante) return CombatDirection.Forward;
-        if (moviendoAtras) return CombatDirection.Back;
-
-        return CombatDirection.Neutral;
-    }
-
-    private void LimpiarInputViejo()
-    {
-        directionHistory.RemoveAll(input => Time.time - input.timestamp > inputLifeTime);
-    }
-
-    // EL ALGORITMO CLAVE: Comprobación en orden inverso (Reverse Sequence Matching)
-    public bool CheckMotionInput(CombatDirection[] sequenceRequired)
-    {
-        if (directionHistory.Count < sequenceRequired.Length) return false;
-
-        int indexParaBuscar = sequenceRequired.Length - 1; 
+        int sequenceIndex = sequence.Length - 1;
 
         for (int i = directionHistory.Count - 1; i >= 0; i--)
         {
-            if (directionHistory[i].direction == sequenceRequired[indexParaBuscar])
-            {
-                indexParaBuscar--; 
+            if (directionHistory[i].Direction != sequence[sequenceIndex]) continue;
 
-                if (indexParaBuscar < 0)
-                {
-                    directionHistory.Clear();
-                    return true;
-                }
+            sequenceIndex--;
+
+            if (sequenceIndex < 0)
+            {
+                directionHistory.Clear();
+                return true;
             }
         }
 
         return false;
+    }
+
+    private void RecordCurrentDirection()
+    {
+        if (robot.opponentTarget == null) return;
+
+        float facingSign = Mathf.Sign(robot.opponentTarget.position.x - transform.position.x);
+        CombatDirection currentDirection = ToCombatDirection(robot.MovementInput, facingSign);
+
+        if (currentDirection == lastDiscreteDirection) return;
+
+        lastDiscreteDirection = currentDirection;
+        directionHistory.Add(new BufferedDirection(currentDirection, Time.time));
+    }
+
+    /// <summary>
+    /// The history is chronological, so expired entries always form a contiguous prefix.
+    /// A single RemoveRange keeps this Zero-GC, unlike RemoveAll with a predicate.
+    /// </summary>
+    private void PruneExpiredInputs()
+    {
+        float expirationTime = Time.time - inputLifeTime;
+        int expiredCount = 0;
+
+        while (expiredCount < directionHistory.Count && directionHistory[expiredCount].Timestamp < expirationTime)
+        {
+            expiredCount++;
+        }
+
+        if (expiredCount > 0)
+        {
+            directionHistory.RemoveRange(0, expiredCount);
+        }
+    }
+
+    private static CombatDirection ToCombatDirection(Vector2 input, float facingSign)
+    {
+        bool crouching = input.y <= -VerticalDeadzone;
+        bool jumping = input.y >= VerticalDeadzone;
+
+        bool horizontalNeutral = Mathf.Abs(input.x) < HorizontalDeadzone;
+        bool movingForward = !horizontalNeutral && Mathf.Sign(input.x) == facingSign;
+        bool movingBack = !horizontalNeutral && !movingForward;
+
+        if (crouching)
+        {
+            if (movingForward) return CombatDirection.DownForward;
+            if (movingBack) return CombatDirection.DownBack;
+            return CombatDirection.Down;
+        }
+
+        if (jumping)
+        {
+            if (movingForward) return CombatDirection.UpForward;
+            if (movingBack) return CombatDirection.UpBack;
+            return CombatDirection.Up;
+        }
+
+        if (movingForward) return CombatDirection.Forward;
+        if (movingBack) return CombatDirection.Back;
+
+        return CombatDirection.Neutral;
     }
 }

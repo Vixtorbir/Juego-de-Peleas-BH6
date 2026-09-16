@@ -1,43 +1,44 @@
 using UnityEngine;
 
+/// <summary>
+/// Projectile special (quarter-circle forward + punch). The fighter is rooted for the full
+/// duration and the projectile is released at the midpoint, mirroring the release frame of
+/// the throwing animation.
+/// </summary>
 public class SpecialAttackState : RobotState
 {
-    private float totalDuration = 0.6f; 
+    private const float TotalDuration = 0.6f;
+    private const float ReleaseNormalizedTime = 0.5f;
+    private const float ProjectileSpeed = 12f;
+
+    private readonly AttackData attackData;
+    private readonly GameObject projectilePrefab;
+    private readonly Transform spawnPoint;
+
     private float timer;
     private bool projectileSpawned;
 
-    private AttackData attackData;
-    private GameObject prefabProyectil;
-    private Transform puntoSpawn;
-
     public SpecialAttackState(RobotController robot, AttackData data, GameObject prefab, Transform spawn) : base(robot)
     {
-        this.attackData = data;
-        this.prefabProyectil = prefab;
-        this.puntoSpawn = spawn;
+        attackData = data;
+        projectilePrefab = prefab;
+        spawnPoint = spawn;
     }
 
     public override void Enter()
     {
-        timer = totalDuration;
+        timer = TotalDuration;
         projectileSpawned = false;
-
-        robot.characterController.Move(Vector3.zero);
-
-        // TODO: robot.animator.SetTrigger("Hadouken");
-
-        Renderer renderer = robot.GetComponent<Renderer>();
-        if (renderer != null) renderer.material.color = Color.magenta;
+        robot.FaceOpponent();
     }
 
     public override void Tick()
     {
         timer -= Time.deltaTime;
 
-        // SINCRONIZACIÓN DE FRAME: Spawneamos la bola a mitad del ataque (a los 0.3 segundos)
-        if (!projectileSpawned && timer <= totalDuration * 0.5f)
+        if (!projectileSpawned && timer <= TotalDuration * ReleaseNormalizedTime)
         {
-            SpawnHadouken();
+            SpawnProjectile();
         }
 
         if (timer <= 0f)
@@ -46,30 +47,21 @@ public class SpecialAttackState : RobotState
         }
     }
 
-    private void SpawnHadouken()
+    private void SpawnProjectile()
     {
         projectileSpawned = true;
 
-        if (prefabProyectil == null || puntoSpawn == null) return;
+        if (projectilePrefab == null || spawnPoint == null || robot.opponentTarget == null) return;
 
-        // 1. Instanciamos el Prefab en la posición del punto de spawn
-        GameObject clon = Object.Instantiate(prefabProyectil, puntoSpawn.position, Quaternion.identity);
+        float forwardSign = Mathf.Sign(robot.opponentTarget.position.x - robot.transform.position.x);
+        Vector3 fireDirection = new Vector3(forwardSign, 0f, 0f);
 
-        // 2. Calculamos hacia dónde mira el robot en este milisegundo exacto respecto a su rival
-        float dirX = Mathf.Sign(robot.opponentTarget.position.x - robot.transform.position.x);
-        Vector3 direccionDisparo = new Vector3(dirX, 0f, 0f);
+        GameObject instance = Object.Instantiate(projectilePrefab, spawnPoint.position, Quaternion.identity);
+        HadoukenProjectile projectile = instance.GetComponent<HadoukenProjectile>();
 
-        // 3. Inicializamos el proyectil pasándole sus datos y quién es su dueño
-        HadoukenProjectile proyectilScript = clon.GetComponent<HadoukenProjectile>();
-        if (proyectilScript != null)
+        if (projectile != null)
         {
-            proyectilScript.Initialize(direccionDisparo, 12f, attackData, robot);
+            projectile.Initialize(fireDirection, ProjectileSpeed, attackData, robot);
         }
-    }
-
-    public override void Exit()
-    {
-        Renderer renderer = robot.GetComponent<Renderer>();
-        if (renderer != null) renderer.material.color = Color.white;
     }
 }

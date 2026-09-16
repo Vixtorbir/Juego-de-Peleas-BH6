@@ -1,57 +1,39 @@
 using UnityEngine;
 
+/// <summary>
+/// Ballistic jump. The horizontal component is locked at takeoff from the stick direction
+/// relative to the opponent, so the arc cannot be steered mid-air.
+/// </summary>
 public class JumpState : RobotState
 {
+    private const float JumpForce = 12f;
+    private const float HorizontalAirSpeed = 4f;
+
     private float verticalVelocity;
     private Vector3 horizontalVelocity;
 
-    private float jumpForce = 12f;
-    private float gravity = -35f;
-    private float horizontalAirSpeed = 4f; 
-
-    private Transform cameraTransform;
-
-    public JumpState(RobotController robot) : base(robot)
-    {
-        cameraTransform = Camera.main.transform;
-    }
+    public JumpState(RobotController robot) : base(robot) { }
 
     public override void Enter()
     {
-        // 1. APLICAMOS LA FUERZA VERTICAL INICIAL
-        verticalVelocity = jumpForce;
+        verticalVelocity = JumpForce;
 
-        // 2. CALCULAMOS LA TRAYECTORIA HORIZONTAL (Diagonal)
-        Vector3 directionToOpponent = robot.opponentTarget.position - robot.transform.position;
-        directionToOpponent.y = 0f;
+        robot.FaceOpponent();
 
-        if (directionToOpponent != Vector3.zero)
-        {
-            robot.transform.rotation = Quaternion.LookRotation(directionToOpponent);
-        }
-
-        float screenSide = Mathf.Sign(Vector3.Dot(directionToOpponent.normalized, cameraTransform.right));
-
-        float forwardMovement = robot.MovementInput.x * screenSide;
-
-        horizontalVelocity = robot.transform.forward * (forwardMovement * horizontalAirSpeed);
-
-        Debug.Log(forwardMovement == 0 ? "Salto Neutro" : forwardMovement > 0 ? "Salto hacia Adelante" : "Salto hacia Atrás");
+        float forwardAmount = robot.MovementInput.x * robot.GetScreenFacingSign();
+        horizontalVelocity = robot.transform.forward * (forwardAmount * HorizontalAirSpeed);
     }
 
     public override void Tick()
     {
-        // 1. MATEMÁTICAS DE GRAVEDAD
-        verticalVelocity += gravity * Time.deltaTime;
+        verticalVelocity += Gravity * Time.deltaTime;
 
-        // 2. MOVIMIENTO FÍSICO COMBINADO (Diagonal)
-        Vector3 finalMove = horizontalVelocity + new Vector3(0, verticalVelocity, 0);
-        robot.characterController.Move(finalMove * Time.deltaTime);
+        Vector3 velocity = horizontalVelocity + Vector3.up * verticalVelocity;
+        robot.characterController.Move(velocity * Time.deltaTime);
 
-        // 3. DETECCIÓN DE ATERRIZAJE
         if (robot.characterController.isGrounded && verticalVelocity < 0f)
         {
-            robot.characterController.Move(new Vector3(0, -0.5f, 0));
+            robot.characterController.Move(Vector3.up * GroundSnapVelocity);
             robot.ChangeState(new IdleState(robot));
         }
     }

@@ -1,76 +1,71 @@
 using UnityEngine;
 
+/// <summary>
+/// Crouching normal attack. Shares the startup/active/recovery timeline of <see cref="AttackState"/>
+/// but keeps the collision capsule in its crouched configuration for the whole duration.
+/// </summary>
 public class CrouchAttackState : RobotState
 {
-    private AttackData data;
-    private float stateTimer;
-    private bool hasActivatedHitbox;
+    private const float StayCrouchedInputThreshold = -0.2f;
 
-    private float originalHeight;
-    private Vector3 originalCenter;
+    private readonly AttackData data;
+    private float stateTimer;
+    private bool hitboxActive;
 
     public CrouchAttackState(RobotController robot, AttackData attackData) : base(robot)
     {
-        this.data = attackData;
+        data = attackData;
     }
 
     public override void Enter()
     {
         stateTimer = 0f;
-        hasActivatedHitbox = false;
-
+        hitboxActive = false;
         robot.IsInAttackStartup = true;
-
-        originalHeight = robot.characterController.height;
-        originalCenter = robot.characterController.center;
-
-        robot.characterController.height = originalHeight / 2f;
-        robot.characterController.center = new Vector3(originalCenter.x, originalCenter.y / 2f, originalCenter.z);
+        robot.SetCrouchingPosture(true);
 
         if (!string.IsNullOrEmpty(data.animationTrigger))
+        {
             robot.animator.SetTrigger(data.animationTrigger);
-
-        robot.transform.localScale = data.visualScale;
+        }
     }
 
     public override void Tick()
     {
         stateTimer += Time.deltaTime;
 
-        if (stateTimer >= data.startupTime)
+        if (stateTimer < data.startupTime) return;
+
+        robot.IsInAttackStartup = false;
+
+        if (stateTimer < data.ActiveEndTime)
         {
-            robot.IsInAttackStartup = false;
+            if (!hitboxActive)
+            {
+                robot.hitboxBase.Activate(data);
+                hitboxActive = true;
+            }
+            return;
         }
 
-        if (stateTimer >= data.startupTime && stateTimer < (data.startupTime + data.activeTime) && !hasActivatedHitbox)
+        if (hitboxActive)
         {
-            robot.hitboxBase.ActivarHitbox(data);
-            hasActivatedHitbox = true;
+            robot.hitboxBase.Deactivate();
+            hitboxActive = false;
         }
-        else if (stateTimer >= (data.startupTime + data.activeTime))
-        {
-            if (hasActivatedHitbox)
-            {
-                robot.hitboxBase.DesactivarHitbox();
-                hasActivatedHitbox = false;
-            }
 
-            if (stateTimer >= (data.startupTime + data.activeTime + data.recoveryTime))
-            {
-                if (robot.MovementInput.y < -0.2f)
-                    robot.ChangeState(new CrouchState(robot));
-                else
-                    robot.ChangeState(new IdleState(robot));
-            }
-        }
+        if (stateTimer < data.TotalDuration) return;
+
+        if (robot.MovementInput.y < StayCrouchedInputThreshold)
+            robot.ChangeState(new CrouchState(robot));
+        else
+            robot.ChangeState(new IdleState(robot));
     }
 
     public override void Exit()
     {
         robot.IsInAttackStartup = false;
-        robot.hitboxBase.DesactivarHitbox();
-        robot.characterController.height = originalHeight;
-        robot.characterController.center = originalCenter;
-        robot.transform.localScale = Vector3.one;
+        robot.hitboxBase.Deactivate();
+        robot.SetCrouchingPosture(false);
     }
 }

@@ -1,6 +1,10 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+/// <summary>
+/// Guard height an attack must be blocked at. High attacks whiff on crouching opponents,
+/// Mid attacks are blocked standing only, Low attacks are blocked crouching only.
+/// </summary>
 public enum AttackHeight
 {
     High,
@@ -8,6 +12,9 @@ public enum AttackHeight
     Low
 }
 
+/// <summary>
+/// Link from one attack to the next when the given command is buffered during recovery.
+/// </summary>
 [System.Serializable]
 public struct ComboBranch
 {
@@ -15,14 +22,17 @@ public struct ComboBranch
     public AttackData nextAttack;
 }
 
+/// <summary>
+/// Designer-authored frame data and hit properties for a single attack.
+/// Timings are expressed in seconds so they remain frame-rate independent.
+/// </summary>
 [CreateAssetMenu(fileName = "NewAttackData", menuName = "Fighting Game/Attack Data")]
 public class AttackData : ScriptableObject
 {
-    [Header("Animation & Visuals")]
+    [Header("Animation")]
     public string animationTrigger = "LeftPunch";
-    public Vector3 visualScale = new Vector3(1f, 1f, 1.2f);
 
-    [Header("Frame Data (en segundos)")]
+    [Header("Frame Data (seconds)")]
     public float startupTime = 0.15f;
     public float activeTime = 0.1f;
     public float recoveryTime = 0.25f;
@@ -45,4 +55,7 @@ public class AttackData : ScriptableObject
 
     [Header("Combo Routes")]
     public List<ComboBranch> comboBranches;
+
+    public float ActiveEndTime => startupTime + activeTime;
+    public float TotalDuration => startupTime + activeTime + recoveryTime;
 }
