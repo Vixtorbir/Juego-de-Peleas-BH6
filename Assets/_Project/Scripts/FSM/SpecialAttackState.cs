@@ -1,14 +1,12 @@
 using UnityEngine;
 
 /// <summary>
-/// Projectile special (quarter-circle forward + punch). The fighter is rooted for the full
-/// duration and the projectile is released at the midpoint, mirroring the release frame of
-/// the throwing animation.
+/// Projectile special (quarter-circle forward + punch). The fighter is rooted for the attack's
+/// full frame data: the projectile is released once the startup frames elapse, mirroring the
+/// throw frame of the animation, and the recovery frames leave the move punishable up close.
 /// </summary>
 public class SpecialAttackState : RobotState
 {
-    private const float TotalDuration = 0.6f;
-    private const float ReleaseNormalizedTime = 0.5f;
     private const float ProjectileSpeed = 12f;
 
     private readonly AttackData attackData;
@@ -27,21 +25,33 @@ public class SpecialAttackState : RobotState
 
     public override void Enter()
     {
-        timer = TotalDuration;
+        timer = 0f;
         projectileSpawned = false;
+
+        robot.AttackConnected = false;
         robot.FaceOpponent();
+        PlayAttackAnimation(attackData);
+
+        if (AudioManager.Instance != null) AudioManager.Instance.PlayHadoukenCast();
     }
 
     public override void Tick()
     {
-        timer -= Time.deltaTime;
+        timer += Time.deltaTime;
+        ApplyGroundingForce();
 
-        if (!projectileSpawned && timer <= TotalDuration * ReleaseNormalizedTime)
+        if (attackData == null)
+        {
+            robot.ChangeState(new IdleState(robot));
+            return;
+        }
+
+        if (!projectileSpawned && timer >= attackData.startupTime)
         {
             SpawnProjectile();
         }
 
-        if (timer <= 0f)
+        if (timer >= attackData.TotalDuration)
         {
             robot.ChangeState(new IdleState(robot));
         }
@@ -52,6 +62,7 @@ public class SpecialAttackState : RobotState
         projectileSpawned = true;
 
         if (projectilePrefab == null || spawnPoint == null || robot.opponentTarget == null) return;
+        if (AudioManager.Instance != null) AudioManager.Instance.PlayHadoukenShot();
 
         float forwardSign = Mathf.Sign(robot.opponentTarget.position.x - robot.transform.position.x);
         Vector3 fireDirection = new Vector3(forwardSign, 0f, 0f);

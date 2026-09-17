@@ -9,13 +9,20 @@ public class HitstunState : RobotState
     private const float WallTransferRatio = 0.4f;
     private const float WallDampening = 0.5f;
 
+    private readonly float duration;
     private float timer;
     private PushbackSolver pushback;
 
     public HitstunState(RobotController robot, float hitstunDuration, float pushbackForce, RobotController attacker) : base(robot)
     {
+        duration = hitstunDuration;
         timer = hitstunDuration;
         pushback = new PushbackSolver(pushbackForce, attacker, WallTransferRatio, WallDampening);
+    }
+
+    public override void Enter()
+    {
+        PlayTimedAnimation(FighterAnimatorParameters.Hitstun, robot.hitReactionClip, duration);
     }
 
     public override void Tick()

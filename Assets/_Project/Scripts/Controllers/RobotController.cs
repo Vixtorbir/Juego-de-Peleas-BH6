@@ -38,6 +38,7 @@ public class RobotController : MonoBehaviour
     private const float DirectionPressThreshold = 0.6f;
     private const float DirectionReleaseThreshold = 0.2f;
     private const float CrouchHeightRatio = 0.5f;
+    private const float FacingDeadZone = 0.001f;
 
     [Header("Dependencies")]
     public InputReader inputReader;
@@ -47,6 +48,13 @@ public class RobotController : MonoBehaviour
 
     [Header("Combat Settings")]
     public Transform opponentTarget;
+
+    [Header("Timed Animation Clips")]
+    [Tooltip("Clips whose playback speed is rescaled at runtime to match the gameplay window they cover.")]
+    public AnimationClip hitReactionClip;
+    public AnimationClip blockReactionClip;
+    public AnimationClip dashForwardClip;
+    public AnimationClip dashBackwardClip;
 
     [Header("Attack Data Assets")]
     public AttackData leftPunchBase;
@@ -76,10 +84,13 @@ public class RobotController : MonoBehaviour
 
     public bool IsGrounded { get; private set; }
     public bool IsInAttackStartup { get; set; }
+    public bool IsInvincible { get; set; }
+    public bool AttackConnected { get; set; }
     public Vector2 MovementInput { get; private set; }
     public Transform CameraTransform { get; private set; }
     public Hurtbox Hurtbox { get; private set; }
     public HealthComponent Health { get; private set; }
+    public RobotState CurrentState => currentState;
 
     private RobotState currentState;
     private InputBuffer inputBuffer;
@@ -96,6 +107,7 @@ public class RobotController : MonoBehaviour
     {
         if (animator == null) animator = GetComponent<Animator>();
         if (characterController == null) characterController = GetComponent<CharacterController>();
+        animator.applyRootMotion = false;
 
         CameraTransform = Camera.main.transform;
         inputBuffer = GetComponent<InputBuffer>();
@@ -134,6 +146,7 @@ public class RobotController : MonoBehaviour
     private void Update()
     {
         UpdateGroundedState();
+        animator.SetBool(FighterAnimatorParameters.IsGrounded, IsGrounded);
         TickCommandBuffer();
         ResolvePushboxSeparation();
 
@@ -145,6 +158,15 @@ public class RobotController : MonoBehaviour
         currentState?.Exit();
         currentState = newState;
         currentState?.Enter();
+    }
+
+    /// <summary>
+    /// Called by the owner's hitbox or projectile when an attack lands or is blocked. Attack states
+    /// read the flag to open their special-cancel window.
+    /// </summary>
+    public void NotifyAttackConnected()
+    {
+        AttackConnected = true;
     }
 
     /// <summary>
@@ -172,17 +194,20 @@ public class RobotController : MonoBehaviour
         return Mathf.Sign(Vector3.Dot(toOpponent, CameraTransform.right));
     }
 
+    /// <summary>
+    /// Snaps the fighter to face the opponent along the combat axis only. The match is played on
+    /// the world X axis, so the look direction is clamped to +X or -X and any depth offset between
+    /// the two fighters can never tilt them towards or away from the camera.
+    /// </summary>
     public void FaceOpponent()
     {
         if (opponentTarget == null) return;
 
-        Vector3 toOpponent = opponentTarget.position - transform.position;
-        toOpponent.y = 0f;
+        float deltaX = opponentTarget.position.x - transform.position.x;
+        if (Mathf.Abs(deltaX) < FacingDeadZone) return;
 
-        if (toOpponent.sqrMagnitude > 0.0001f)
-        {
-            transform.rotation = Quaternion.LookRotation(toOpponent);
-        }
+        Vector3 facing = deltaX > 0f ? Vector3.right : Vector3.left;
+        transform.rotation = Quaternion.LookRotation(facing, Vector3.up);
     }
 
     /// <summary>
@@ -191,6 +216,8 @@ public class RobotController : MonoBehaviour
     /// </summary>
     public void SetCrouchingPosture(bool crouching)
     {
+        animator.SetBool(FighterAnimatorParameters.IsCrouching, crouching);
+
         if (crouching)
         {
             characterController.height = standingHeight * CrouchHeightRatio;
@@ -222,19 +249,28 @@ public class RobotController : MonoBehaviour
 
         bufferedCommand = FighterCommand.None;
         bufferTimer = 0f;
+        IsInvincible = false;
+        AttackConnected = false;
 
+        animator.Play(FighterAnimatorParameters.LocomotionState, 0, 0f);
         ChangeState(new IdleState(this));
     }
 
     private void UpdateGroundedState()
     {
+        Vector3 capsuleCenter = transform.TransformPoint(characterController.center);
         float rayLength = characterController.bounds.extents.y + groundCheckOffset;
-        IsGrounded = Physics.Raycast(transform.position, Vector3.down, rayLength, groundLayer);
+        IsGrounded = Physics.Raycast(capsuleCenter, Vector3.down, rayLength, groundLayer);
     }
 
+    /// <summary>
+    /// The buffer only ages while the fighter can act on it. During an attack's startup the
+    /// window is held open, so a follow-up pressed early in a jab is still waiting when the
+    /// chain window opens on contact instead of expiring mid-swing.
+    /// </summary>
     private void TickCommandBuffer()
     {
-        if (bufferTimer <= 0f) return;
+        if (bufferTimer <= 0f || IsInAttackStartup) return;
 
         bufferTimer -= Time.deltaTime;
         if (bufferTimer <= 0f) bufferedCommand = FighterCommand.None;

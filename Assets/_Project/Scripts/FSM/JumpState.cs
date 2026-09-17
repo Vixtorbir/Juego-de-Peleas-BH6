@@ -19,6 +19,7 @@ public class JumpState : RobotState
         verticalVelocity = JumpForce;
 
         robot.FaceOpponent();
+        PlayAnimationState(FighterAnimatorParameters.Jump);
 
         float forwardAmount = robot.MovementInput.x * robot.GetScreenFacingSign();
         horizontalVelocity = robot.transform.forward * (forwardAmount * HorizontalAirSpeed);

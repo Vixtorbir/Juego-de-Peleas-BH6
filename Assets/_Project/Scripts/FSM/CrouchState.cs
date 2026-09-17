@@ -11,6 +11,7 @@ public class CrouchState : RobotState
     public override void Enter()
     {
         robot.SetCrouchingPosture(true);
+        ReturnToStance(FighterAnimatorParameters.CrouchState);
     }
 
     public override void Tick()

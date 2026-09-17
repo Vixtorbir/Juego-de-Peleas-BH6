@@ -1,0 +1,6 @@
+space_city_loop.ogg
+  Title:   Space City (115 BPM)
+  Author:  MintoDog
+  Source:  https://opengameart.org/content/space-city
+  License: CC0 1.0 Universal (Public Domain Dedication)
+  Notes:   Laid-back synthwave; 56 bars at 115 BPM (116.87 s), authored as a seamless loop.

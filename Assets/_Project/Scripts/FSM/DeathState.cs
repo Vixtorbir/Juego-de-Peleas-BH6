@@ -6,7 +6,6 @@ using UnityEngine;
 /// </summary>
 public class DeathState : RobotState
 {
-    private const string DeathTrigger = "Death";
 
     public DeathState(RobotController robot) : base(robot) { }
 
@@ -15,7 +14,7 @@ public class DeathState : RobotState
         robot.IsInAttackStartup = false;
 
         if (robot.hitboxBase != null) robot.hitboxBase.Deactivate();
-        if (robot.animator != null) robot.animator.SetTrigger(DeathTrigger);
+        PlayAnimationState(FighterAnimatorParameters.Death);
     }
 
     public override void Tick()

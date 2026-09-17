@@ -1,8 +1,9 @@
 using UnityEngine;
 
 /// <summary>
-/// Crouching normal attack. Shares the startup/active/recovery timeline of <see cref="AttackState"/>
-/// but keeps the collision capsule in its crouched configuration for the whole duration.
+/// Crouching normal attack. Shares the startup/active/recovery timeline and the on-connect special
+/// and chain cancel rules of <see cref="AttackState"/>, but keeps the collision capsule crouched
+/// for the whole duration.
 /// </summary>
 public class CrouchAttackState : RobotState
 {
@@ -22,12 +23,9 @@ public class CrouchAttackState : RobotState
         stateTimer = 0f;
         hitboxActive = false;
         robot.IsInAttackStartup = true;
+        robot.AttackConnected = false;
         robot.SetCrouchingPosture(true);
-
-        if (!string.IsNullOrEmpty(data.animationTrigger))
-        {
-            robot.animator.SetTrigger(data.animationTrigger);
-        }
+        PlayAttackAnimation(data);
     }
 
     public override void Tick()
@@ -37,6 +35,8 @@ public class CrouchAttackState : RobotState
         if (stateTimer < data.startupTime) return;
 
         robot.IsInAttackStartup = false;
+        if (TrySpecialCancel(data)) return;
+        if (TryChainCancel(data)) return;
 
         if (stateTimer < data.ActiveEndTime)
         {
@@ -52,6 +52,8 @@ public class CrouchAttackState : RobotState
         {
             robot.hitboxBase.Deactivate();
             hitboxActive = false;
+
+            if (!robot.AttackConnected && AudioManager.Instance != null) AudioManager.Instance.PlayWhiff();
         }
 
         if (stateTimer < data.TotalDuration) return;

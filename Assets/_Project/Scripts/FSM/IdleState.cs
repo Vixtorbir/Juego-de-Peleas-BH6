@@ -13,13 +13,17 @@ public class IdleState : RobotState
 
     public override void Enter()
     {
-        robot.animator.SetFloat("InputX", 0f);
-        robot.animator.SetFloat("InputY", 0f);
+        robot.animator.SetFloat(FighterAnimatorParameters.InputX, 0f);
+        robot.animator.SetFloat(FighterAnimatorParameters.InputY, 0f);
         if (robot.Hurtbox != null) robot.Hurtbox.ResetCombo();
+        robot.FaceOpponent();
+        ReturnToStance(FighterAnimatorParameters.LocomotionState);
     }
 
     public override void Tick()
     {
+        robot.FaceOpponent();
+
         if (TryConsumeSpecialCommands()) return;
         if (TryConsumeDashCommands()) return;
         if (TryConsumeNormalCommands()) return;

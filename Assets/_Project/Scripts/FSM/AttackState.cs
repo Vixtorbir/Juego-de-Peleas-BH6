@@ -2,8 +2,10 @@ using UnityEngine;
 
 /// <summary>
 /// Standing normal attack driven by <see cref="AttackData"/> frame data: startup (counter-hit
-/// vulnerable), active (hitbox enabled) and recovery, during which buffered commands can cancel
-/// into any configured <see cref="ComboBranch"/>.
+/// vulnerable), active (hitbox enabled) and recovery. The moment the attack connects, hit or
+/// block, the cancel window opens: a buffered special interrupts into the special, and a buffered
+/// chain command interrupts into the matching <see cref="ComboBranch"/>. Both windows stay open
+/// through the rest of the active and recovery frames, so a slightly late press still chains.
 /// </summary>
 public class AttackState : RobotState
 {
@@ -21,11 +23,8 @@ public class AttackState : RobotState
         stateTimer = 0f;
         hitboxActive = false;
         robot.IsInAttackStartup = true;
-
-        if (!string.IsNullOrEmpty(data.animationTrigger))
-        {
-            robot.animator.SetTrigger(data.animationTrigger);
-        }
+        robot.AttackConnected = false;
+        PlayAttackAnimation(data);
     }
 
     public override void Tick()
@@ -35,6 +34,8 @@ public class AttackState : RobotState
         if (stateTimer < data.startupTime) return;
 
         robot.IsInAttackStartup = false;
+        if (TrySpecialCancel(data)) return;
+        if (TryChainCancel(data)) return;
 
         if (stateTimer < data.ActiveEndTime)
         {
@@ -50,9 +51,9 @@ public class AttackState : RobotState
         {
             robot.hitboxBase.Deactivate();
             hitboxActive = false;
-        }
 
-        if (TryCancelIntoComboBranch()) return;
+            if (!robot.AttackConnected && AudioManager.Instance != null) AudioManager.Instance.PlayWhiff();
+        }
 
         if (stateTimer >= data.TotalDuration)
         {
@@ -64,21 +65,5 @@ public class AttackState : RobotState
     {
         robot.IsInAttackStartup = false;
         robot.hitboxBase.Deactivate();
-    }
-
-    private bool TryCancelIntoComboBranch()
-    {
-        if (data.comboBranches == null) return false;
-
-        for (int i = 0; i < data.comboBranches.Count; i++)
-        {
-            ComboBranch branch = data.comboBranches[i];
-            if (branch.nextAttack == null || !robot.TryConsumeCommand(branch.inputCommand)) continue;
-
-            robot.ChangeState(new AttackState(robot, branch.nextAttack));
-            return true;
-        }
-
-        return false;
     }
 }

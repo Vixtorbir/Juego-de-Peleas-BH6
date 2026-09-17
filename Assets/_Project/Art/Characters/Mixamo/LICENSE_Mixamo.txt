@@ -1,0 +1,7 @@
+Y_Bot.fbx, X_Bot.fbx and the clips under Assets/_Project/Art/Animations
+  Source:  Adobe Mixamo (https://www.mixamo.com)
+  License: Adobe General Terms of Use / Mixamo FAQ. Characters and animations may be used
+           royalty-free in personal, commercial and non-profit projects. They must not be
+           redistributed or sold as standalone assets outside of a project.
+  Rig:     65-joint "mixamorig" skeleton, imported as Unity Humanoid so every clip retargets
+           onto both fighters.

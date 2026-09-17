@@ -3,6 +3,7 @@ using UnityEngine;
 /// <summary>
 /// Straight-line projectile spawned by <see cref="SpecialAttackState"/>. Carries the attack data
 /// of the move that fired it and applies it to the first opposing <see cref="Hurtbox"/> it overlaps.
+/// A projectile that is dodged (invincible frames, height mismatch) keeps flying.
 /// </summary>
 [RequireComponent(typeof(Collider))]
 public class HadoukenProjectile : MonoBehaviour
@@ -36,7 +37,9 @@ public class HadoukenProjectile : MonoBehaviour
         Hurtbox target = other.GetComponent<Hurtbox>();
         if (target == null || target.Owner == owner) return;
 
-        target.ReceiveHit(attackData, owner);
+        if (!target.ReceiveHit(attackData, owner, other.bounds.ClosestPoint(transform.position))) return;
+
+        owner.NotifyAttackConnected();
         Destroy(gameObject);
     }
 }

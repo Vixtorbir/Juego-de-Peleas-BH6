@@ -1,9 +1,9 @@
-using System.Collections;
 using UnityEngine;
 
 /// <summary>
-/// Scene-wide hitstop service. Freezes gameplay time for a few frames on impact while UI and
-/// camera shake keep running on unscaled time. A new hitstop always replaces the previous one.
+/// Scene-wide hitstop service. Freezes gameplay time on impact while UI and camera shake keep
+/// running on unscaled time. The freeze is tracked with an unscaled timer instead of a coroutine
+/// so triggering it every hit never allocates. A longer hitstop always extends a shorter one.
 /// </summary>
 public class CombatEffectsManager : MonoBehaviour
 {
@@ -11,7 +11,9 @@ public class CombatEffectsManager : MonoBehaviour
 
     public static CombatEffectsManager Instance { get; private set; }
 
-    private Coroutine activeHitstop;
+    public bool IsHitstopActive => hitstopRemaining > 0f;
+
+    private float hitstopRemaining;
 
     private void Awake()
     {
@@ -33,21 +35,23 @@ public class CombatEffectsManager : MonoBehaviour
         }
     }
 
-    public void TriggerHitstop(float duration)
+    private void Update()
     {
-        if (activeHitstop != null)
-        {
-            StopCoroutine(activeHitstop);
-        }
+        if (hitstopRemaining <= 0f) return;
 
-        activeHitstop = StartCoroutine(HitstopRoutine(duration));
+        hitstopRemaining -= Time.unscaledDeltaTime;
+        if (hitstopRemaining <= 0f)
+        {
+            hitstopRemaining = 0f;
+            Time.timeScale = 1f;
+        }
     }
 
-    private IEnumerator HitstopRoutine(float duration)
+    public void TriggerHitstop(float duration)
     {
+        if (duration <= 0f) return;
+
+        hitstopRemaining = Mathf.Max(hitstopRemaining, duration);
         Time.timeScale = HitstopTimeScale;
-        yield return new WaitForSecondsRealtime(duration);
-        Time.timeScale = 1f;
-        activeHitstop = null;
     }
 }

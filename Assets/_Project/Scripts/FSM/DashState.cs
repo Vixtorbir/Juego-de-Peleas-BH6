@@ -24,6 +24,11 @@ public class DashState : RobotState
 
         robot.FaceOpponent();
         dashDirection = isForward ? robot.transform.forward : -robot.transform.forward;
+
+        if (isForward)
+            PlayTimedAnimation(FighterAnimatorParameters.DashForward, robot.dashForwardClip, DashDuration);
+        else
+            PlayTimedAnimation(FighterAnimatorParameters.DashBackward, robot.dashBackwardClip, DashDuration);
     }
 
     public override void Tick()

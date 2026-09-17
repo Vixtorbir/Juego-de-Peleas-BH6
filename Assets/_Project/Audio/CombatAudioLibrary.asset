@@ -1,0 +1,102 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0892438883c70684fb7b7b526fe90e47, type: 3}
+  m_Name: CombatAudioLibrary
+  m_EditorClassIdentifier: Assembly-CSharp::CombatAudioLibrary
+  whiff:
+    variations:
+    - {fileID: 8300000, guid: 09a2c1e742dcbd341af65f400905faf6, type: 3}
+    - {fileID: 8300000, guid: a007ff0e0aea08b4b93820a5dc3d62cb, type: 3}
+    - {fileID: 8300000, guid: 30c31577c0049ed44a1d9fc6894f64e9, type: 3}
+    volume: 0.55
+    pitchSpread: 0.12
+  lightHit:
+    variations:
+    - {fileID: 8300000, guid: acebe9bf695b9084894119902c5f0291, type: 3}
+    - {fileID: 8300000, guid: 82f2aa5015876a1428c7dd219207be7d, type: 3}
+    - {fileID: 8300000, guid: d0db4df4c13c18d4a8635c8aa76c7c13, type: 3}
+    - {fileID: 8300000, guid: 0c054cb6dfb837f4fafee6847846d29f, type: 3}
+    - {fileID: 8300000, guid: 0494f4cb702aaf045b218a59efa6bb83, type: 3}
+    volume: 0.85
+    pitchSpread: 0.08
+  heavyHit:
+    variations:
+    - {fileID: 8300000, guid: 3a869e7e5a907e948a30a6ac709fe069, type: 3}
+    - {fileID: 8300000, guid: ab0253fde22dc4c439cdf8f3dae9a0ab, type: 3}
+    - {fileID: 8300000, guid: ecfffa7398c112e46b24d1f9463a7e02, type: 3}
+    - {fileID: 8300000, guid: 415394dde4d7e71489b9ab754b6e1e40, type: 3}
+    - {fileID: 8300000, guid: 8c45c395d45779a4bb66033a7754406e, type: 3}
+    volume: 1
+    pitchSpread: 0.06
+  kickHit:
+    variations:
+    - {fileID: 8300000, guid: 7339912cfe91a274ea7c9f486b33956b, type: 3}
+    - {fileID: 8300000, guid: 6ee2487aa21a1e9489a430c7f54d8aff, type: 3}
+    - {fileID: 8300000, guid: 1a1068d21f5047143a8beadf3189bfd9, type: 3}
+    - {fileID: 8300000, guid: 18d3232fbaf811f43846d65a3360d8d0, type: 3}
+    - {fileID: 8300000, guid: 84459e3f511a27549ab2c2e1e38d74cc, type: 3}
+    volume: 0.95
+    pitchSpread: 0.08
+  block:
+    variations:
+    - {fileID: 8300000, guid: 445cb145e72fba24d8a35882d50a7506, type: 3}
+    - {fileID: 8300000, guid: db518b48ef37f0647bfdf9519ae8bc5c, type: 3}
+    - {fileID: 8300000, guid: 16558c8ff73e44c4caf446930a34dc70, type: 3}
+    - {fileID: 8300000, guid: 17afa3c4b0c3f264f80c0c6ee5eb4da9, type: 3}
+    - {fileID: 8300000, guid: f417567c3e728814ea3ac470850a782d, type: 3}
+    volume: 0.7
+    pitchSpread: 0.1
+  hadoukenCast:
+    variations:
+    - {fileID: 8300000, guid: df620c8aed6de5f4782129583fca5a08, type: 3}
+    - {fileID: 8300000, guid: 1fbe80a0ed4caaf47a8ec749d62c4082, type: 3}
+    volume: 0.6
+    pitchSpread: 0.05
+  hadoukenShot:
+    variations:
+    - {fileID: 8300000, guid: caf92e65069f55744ab2f6558b2fed15, type: 3}
+    - {fileID: 8300000, guid: ad60984cc30b612479171929f2f7503a, type: 3}
+    - {fileID: 8300000, guid: 5241915c28bc7ce4ab593248ebf03a19, type: 3}
+    volume: 0.8
+    pitchSpread: 0.05
+  hadoukenImpact:
+    variations:
+    - {fileID: 8300000, guid: 5f1c52b0632fb02469aeeef98dd39fd4, type: 3}
+    - {fileID: 8300000, guid: f72719931dae2d046bcfcaeb28d673dd, type: 3}
+    - {fileID: 8300000, guid: b439329d52ba14443997e5a79ea43bba, type: 3}
+    volume: 0.9
+    pitchSpread: 0.06
+  shoryukenRise:
+    variations:
+    - {fileID: 8300000, guid: 7c35df39536d65d489f2bb4659188ca4, type: 3}
+    volume: 0.85
+    pitchSpread: 0.03
+  counterHit:
+    variations:
+    - {fileID: 8300000, guid: 0ffad82c48ce62141a5591483845ac30, type: 3}
+    - {fileID: 8300000, guid: dd8bffa1d1349b74ba1457c71b1ed1f8, type: 3}
+    - {fileID: 8300000, guid: f7a689a93b721c94ba812551849e5645, type: 3}
+    volume: 0.75
+    pitchSpread: 0.04
+  knockoutImpact:
+    variations:
+    - {fileID: 8300000, guid: 39fc0b41b9f4af84a97276e86da58293, type: 3}
+    - {fileID: 8300000, guid: 3df123f4537fc6a4b8715fa130573213, type: 3}
+    volume: 1
+    pitchSpread: 0.02
+  knockoutSting:
+    variations:
+    - {fileID: 8300000, guid: 52566956ea03bb94484212db06c538b0, type: 3}
+    volume: 0.9
+    pitchSpread: 0
+  battleTheme: {fileID: 8300000, guid: 11da138b545157849866247e62b99815, type: 3}
+  musicVolume: 1

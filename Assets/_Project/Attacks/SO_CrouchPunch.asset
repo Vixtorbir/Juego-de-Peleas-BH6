@@ -13,16 +13,24 @@ MonoBehaviour:
   m_Name: SO_CrouchPunch
   m_EditorClassIdentifier: Assembly-CSharp::AttackData
   animationTrigger: CrouchPunch
-  visualScale: {x: 1, y: 0.5, z: 1.2}
-  startupTime: 0.08
-  activeTime: 0.05
-  recoveryTime: 0.15
-  damage: 6
-  hitstunDuration: 0.2
+  animationClip: {fileID: -203655887218126122, guid: 55c30df89e39ad74eaa21dac9da75311, type: 3}
+  animationSpeed: 1.1
+  strikeTiming: 0
+  startupTime: 0.137
+  activeTime: 0.083
+  recoveryTime: 0.2
+  hitboxOffset: {x: 0, y: 0.95, z: 0.85}
+  hitboxSize: {x: 0.5, y: 0.5, z: 0.7}
+  damage: 5
+  hitstunDuration: 0.2833
+  weight: 0
+  impactSound: 0
+  specialCancelable: 1
+  invincibleStartup: 0
   attackHeight: 2
   blockstunDuration: 0.15
-  hitPushback: 2
-  blockPushback: 1
+  hitPushback: 1
+  blockPushback: 1.5
   isLauncher: 0
   launchForce: 15
   comboBranches: []

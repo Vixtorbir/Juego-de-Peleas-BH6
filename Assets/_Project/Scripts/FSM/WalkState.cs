@@ -57,8 +57,8 @@ public class WalkState : RobotState
 
         float forwardAmount = smoothInput.x * robot.GetScreenFacingSign();
 
-        robot.animator.SetFloat("InputY", forwardAmount);
-        robot.animator.SetFloat("InputX", 0f);
+        robot.animator.SetFloat(FighterAnimatorParameters.InputY, forwardAmount);
+        robot.animator.SetFloat(FighterAnimatorParameters.InputX, 0f);
 
         Vector3 velocity = robot.transform.forward * (forwardAmount * WalkSpeed);
         robot.characterController.Move(velocity * Time.deltaTime);

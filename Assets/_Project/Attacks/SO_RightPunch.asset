@@ -13,16 +13,28 @@ MonoBehaviour:
   m_Name: SO_RightPunch
   m_EditorClassIdentifier: Assembly-CSharp::AttackData
   animationTrigger: RightPunch
-  visualScale: {x: 1.2, y: 1, z: 1.5}
-  startupTime: 0.15
-  activeTime: 0.1
-  recoveryTime: 0.25
+  animationClip: {fileID: -203655887218126122, guid: ecb6e072ddfccc04da0377c4a6f59fe1, type: 3}
+  animationSpeed: 1.1
+  strikeTiming: 0
+  startupTime: 0.152
+  activeTime: 0.091
+  recoveryTime: 0.2
+  hitboxOffset: {x: 0, y: 1.45, z: 1.05}
+  hitboxSize: {x: 0.5, y: 0.4, z: 0.9}
   damage: 14
-  hitstunDuration: 0.4
+  hitstunDuration: 0.45
+  weight: 2
+  impactSound: 0
+  specialCancelable: 1
+  invincibleStartup: 0
   attackHeight: 1
-  blockstunDuration: 0.2
-  hitPushback: 8
-  blockPushback: 4
+  blockstunDuration: 0.2667
+  hitPushback: 1.2
+  blockPushback: 3
   isLauncher: 0
   launchForce: 15
-  comboBranches: []
+  comboBranches:
+  - inputCommand: 3
+    nextAttack: {fileID: 11400000, guid: 1cb996d478df3af45abde8f1f3fa1786, type: 2}
+  - inputCommand: 4
+    nextAttack: {fileID: 11400000, guid: 35bb93de7e1d8b14d9bab44e05d023c1, type: 2}
