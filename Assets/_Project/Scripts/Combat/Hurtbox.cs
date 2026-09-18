@@ -1,9 +1,11 @@
+using System;
 using UnityEngine;
 
 /// <summary>
 /// Damage receiver for a fighter. Resolves the guard matrix (attack height versus stance),
 /// counter hits, aerial juggles, chip damage and combo damage scaling, then hands the
-/// resulting reaction to the owner's state machine.
+/// resulting reaction to the owner's state machine. Combo progress is broadcast so the HUD can
+/// present the hit count and accumulated damage without polling.
 /// </summary>
 public class Hurtbox : MonoBehaviour
 {
@@ -41,8 +43,17 @@ public class Hurtbox : MonoBehaviour
     private FightingCamera fightingCamera;
     private Collider hurtCollider;
     private int comboHitCount;
+    private float totalComboDamage;
+
+    /// <summary>Raised after every clean hit of a combo with the running hit count and scaled damage total.</summary>
+    public event Action<int, float> OnComboHit;
+
+    /// <summary>Raised once when a combo in progress ends because the defender regained control.</summary>
+    public event Action OnComboEnd;
 
     public RobotController Owner => controller;
+    public int ComboHitCount => comboHitCount;
+    public float TotalComboDamage => totalComboDamage;
 
     private void Awake()
     {
@@ -119,7 +130,11 @@ public class Hurtbox : MonoBehaviour
 
     public void ResetCombo()
     {
+        if (comboHitCount == 0) return;
+
         comboHitCount = 0;
+        totalComboDamage = 0f;
+        OnComboEnd?.Invoke();
     }
 
     /// <summary>
@@ -231,7 +246,10 @@ public class Hurtbox : MonoBehaviour
         comboHitCount++;
 
         float scaling = Mathf.Max(Mathf.Pow(ComboScalingFactor, comboHitCount - 1), MinComboScaling);
-        health.TakeDamage(rawDamage * scaling);
+        float scaledDamage = rawDamage * scaling;
+        totalComboDamage += scaledDamage;
+        health.TakeDamage(scaledDamage);
+        OnComboHit?.Invoke(comboHitCount, totalComboDamage);
 
         if (health.IsDead)
         {
