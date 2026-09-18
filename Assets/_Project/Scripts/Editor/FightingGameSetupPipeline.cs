@@ -3,9 +3,9 @@ using UnityEngine;
 
 /// <summary>
 /// Runs the full scene integration in order: model import settings, attack timing calibration,
-/// animator graph, fighter wiring, training room with lighting and post-processing, combat audio
-/// and impact VFX. Exposed as a menu item and as a batch-mode entry point
-/// (-executeMethod FightingGameSetupPipeline.RunAll).
+/// animator graph, fighter wiring, training room with lighting and post-processing, combat audio,
+/// impact VFX and finally the performance profile (shadows, physics layers, frame pacing).
+/// Exposed as a menu item and as a batch-mode entry point (-executeMethod FightingGameSetupPipeline.RunAll).
 /// </summary>
 public static class FightingGameSetupPipeline
 {
@@ -19,6 +19,7 @@ public static class FightingGameSetupPipeline
         ArenaSceneSetup.BuildTrainingRoom();
         AudioSceneSetup.SetupCombatAudio();
         CombatVfxSceneSetup.SetupCombatVfx();
+        PerformanceOptimizer.OptimizePerformanceSettings();
         AssetDatabase.SaveAssets();
 
         Debug.Log("[FightingGameSetupPipeline] Scene setup complete.");

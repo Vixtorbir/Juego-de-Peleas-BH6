@@ -24,12 +24,15 @@ public static class ArenaSceneSetup
     private const string LitShaderName = "Universal Render Pipeline/Lit";
     private const string UnlitShaderName = "Universal Render Pipeline/Unlit";
     private const string EmissionKeyword = "_EMISSION";
+    private const int MaxTextureSize = 1024;
+    private const int TextureAnisoLevel = 8;
 
     private const string ArenaRootName = "Arena";
     private const string KeyLightName = "Directional Light";
     private const string FillLightName = "Fill Light";
     private const string RimLightName = "Rim Light";
     private const string GlobalVolumeName = "Global Volume";
+    private const string OuterFloorName = "Outer Floor";
 
     private const float BackDecorZ = 4.6f;
     private const float PillarSpacing = 5.5f;
@@ -90,6 +93,10 @@ public static class ArenaSceneSetup
 
     // ------------------------------------------------------------------ assets
 
+    /// <summary>
+    /// Tiling surfaces are clamped to 1024 and block-compressed at high quality (BC7 on desktop),
+    /// with mipmaps so the floor grid stays stable at the far end of the shadow range.
+    /// </summary>
     private static void ConfigureTextureImports()
     {
         foreach (string guid in AssetDatabase.FindAssets("t:Texture2D", new[] { TexturesRoot }))
@@ -100,8 +107,12 @@ public static class ArenaSceneSetup
             importer.textureType = TextureImporterType.Default;
             importer.sRGBTexture = true;
             importer.wrapMode = TextureWrapMode.Repeat;
-            importer.anisoLevel = 8;
+            importer.anisoLevel = TextureAnisoLevel;
             importer.mipmapEnabled = true;
+            importer.streamingMipmaps = false;
+            importer.maxTextureSize = MaxTextureSize;
+            importer.textureCompression = TextureImporterCompression.CompressedHQ;
+            importer.crunchedCompression = false;
             importer.SaveAndReimport();
         }
     }
@@ -177,6 +188,7 @@ public static class ArenaSceneSetup
             material.shader = shader;
         }
 
+        material.enableInstancing = true;
         return material;
     }
 
@@ -213,6 +225,7 @@ public static class ArenaSceneSetup
             if (target.TryGetComponent(out MeshCollider _))
             {
                 renderer.sharedMaterial = materials.Floor;
+                renderer.shadowCastingMode = ShadowCastingMode.Off;
                 continue;
             }
 
@@ -233,13 +246,30 @@ public static class ArenaSceneSetup
 
         Transform root = new GameObject(ArenaRootName).transform;
 
-        GameObject outerFloor = CreatePrimitive(PrimitiveType.Plane, "Outer Floor", root, new Vector3(0f, -0.02f, 0f), Vector3.zero, new Vector3(8f, 1f, 6f), materials.Pillar);
+        GameObject outerFloor = CreatePrimitive(PrimitiveType.Plane, OuterFloorName, root, new Vector3(0f, -0.02f, 0f), Vector3.zero, new Vector3(8f, 1f, 6f), materials.Pillar);
         Object.DestroyImmediate(outerFloor.GetComponent<Collider>());
 
         BuildPlatformFrame(root, materials.Pillar);
         BuildRingBoundary(root, materials.Accent);
         BuildBackWallDecor(root, materials);
         BuildDepthLayers(root, materials);
+        ConfigureDecorShadows(root, materials.Accent);
+    }
+
+    /// <summary>
+    /// Self-lit strips and the ground plane contribute nothing to the shadow map, so they are
+    /// excluded from every cascade pass; unlit surfaces cannot receive shadows either.
+    /// </summary>
+    private static void ConfigureDecorShadows(Transform root, Material selfLit)
+    {
+        foreach (MeshRenderer renderer in root.GetComponentsInChildren<MeshRenderer>())
+        {
+            bool isSelfLit = renderer.sharedMaterial == selfLit;
+            bool isFloor = renderer.name == OuterFloorName;
+
+            renderer.shadowCastingMode = isSelfLit || isFloor ? ShadowCastingMode.Off : ShadowCastingMode.On;
+            renderer.receiveShadows = !isSelfLit;
+        }
     }
 
     /// <summary>

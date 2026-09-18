@@ -6,6 +6,8 @@ using UnityEngine;
 /// so a jab, a roundhouse and a sweep each project their own reach instead of sharing one volume
 /// parked in front of the chest. On the first valid contact it forwards the attack data to the
 /// opponent's <see cref="Hurtbox"/> and disables itself so a single swing cannot hit more than once.
+/// The owner's own capsule is excluded from the pair on every activation, so the physics step never
+/// reports the swing overlapping the body it belongs to.
 /// </summary>
 [RequireComponent(typeof(BoxCollider))]
 public class Hitbox : MonoBehaviour
@@ -36,6 +38,7 @@ public class Hitbox : MonoBehaviour
         currentAttackData = data;
         ApplyShape(hitboxCollider, data);
         hitboxCollider.enabled = true;
+        IgnoreOwnerBody();
     }
 
     public void Deactivate()
@@ -56,6 +59,18 @@ public class Hitbox : MonoBehaviour
         }
 
         Deactivate();
+    }
+
+    /// <summary>
+    /// The ignore pair is re-applied after each enable because PhysX drops it whenever either
+    /// collider is disabled, which happens on every attack and on round resets.
+    /// </summary>
+    private void IgnoreOwnerBody()
+    {
+        if (attackerController == null) return;
+
+        CharacterController ownerBody = attackerController.characterController;
+        if (ownerBody != null && ownerBody.enabled) Physics.IgnoreCollision(hitboxCollider, ownerBody, true);
     }
 
     /// <summary>

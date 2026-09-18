@@ -4,8 +4,10 @@ using UnityEngine;
 /// Straight-line projectile fired by <see cref="SpecialAttackState"/> from the owner's
 /// <see cref="ProjectilePool"/>. Carries the attack data of the move that launched it and applies
 /// it to the first opposing <see cref="Hurtbox"/> it overlaps. A projectile that is dodged
-/// (invincible frames, height mismatch) keeps flying until its lifetime runs out; either way it
-/// returns to the pool by deactivating instead of being destroyed.
+/// (invincible frames, height mismatch) keeps flying until it reaches a boundary wall or its
+/// lifetime runs out; either way it returns to the pool by deactivating instead of being destroyed.
+/// The collision matrix limits its contacts to fighter bodies and walls, and the kinematic body on
+/// the prefab makes it a true moving trigger rather than a static collider dragged by its transform.
 /// </summary>
 [RequireComponent(typeof(Collider))]
 public class HadoukenProjectile : MonoBehaviour
@@ -59,8 +61,13 @@ public class HadoukenProjectile : MonoBehaviour
     {
         if (!IsInFlight || owner == null || attackData == null) return;
 
-        if (!other.TryGetComponent(out Hurtbox target) || target.Owner == owner) return;
+        if (!other.TryGetComponent(out Hurtbox target))
+        {
+            Recall();
+            return;
+        }
 
+        if (target.Owner == owner) return;
         if (!target.ReceiveHit(attackData, owner, other.bounds.ClosestPoint(transform.position))) return;
 
         owner.NotifyAttackConnected();

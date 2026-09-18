@@ -43,6 +43,8 @@ public static class FighterSceneSetup
             return;
         }
 
+        CombatLayers.EnsureLayers();
+
         RobotController[] fighters = UnityEngine.Object.FindObjectsByType<RobotController>(FindObjectsSortMode.None);
         Array.Sort(fighters, (a, b) => string.CompareOrdinal(a.name, b.name));
 
@@ -90,6 +92,7 @@ public static class FighterSceneSetup
         }
 
         RemovePlaceholderVisuals(root);
+        root.layer = CombatLayers.FighterLayer;
         GameObject model = ReplaceModel(root, modelAsset);
         float height = MeasureHeight(root, model);
 
@@ -117,7 +120,7 @@ public static class FighterSceneSetup
 
         GameObject model = (GameObject)PrefabUtility.InstantiatePrefab(modelAsset, root.transform);
         model.name = ModelObjectName;
-        model.layer = root.layer;
+        CombatLayers.SetLayerRecursively(model, root.layer);
         model.transform.localPosition = Vector3.zero;
         model.transform.localRotation = Quaternion.identity;
         model.transform.localScale = Vector3.one;
@@ -205,7 +208,7 @@ public static class FighterSceneSetup
             hitbox = hitboxObject.AddComponent<Hitbox>();
         }
 
-        hitbox.gameObject.layer = fighter.gameObject.layer;
+        hitbox.gameObject.layer = CombatLayers.HitboxLayer;
         hitbox.transform.localPosition = Vector3.zero;
         hitbox.transform.localRotation = Quaternion.identity;
         hitbox.transform.localScale = Vector3.one;
