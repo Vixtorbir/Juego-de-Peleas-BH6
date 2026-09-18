@@ -33,7 +33,10 @@ public class CrouchState : RobotState
         if (robot.MovementInput.y > StandUpInputThreshold)
         {
             robot.ChangeState(new IdleState(robot));
+            return;
         }
+
+        ApplyGroundingForce();
     }
 
     public override void Exit()

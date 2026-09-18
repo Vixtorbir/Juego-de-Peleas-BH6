@@ -39,6 +39,7 @@ public class RobotController : MonoBehaviour
     private const float DirectionReleaseThreshold = 0.2f;
     private const float CrouchHeightRatio = 0.5f;
     private const float FacingDeadZone = 0.001f;
+    private const int ProjectilePoolCapacity = 2;
 
     [Header("Dependencies")]
     public InputReader inputReader;
@@ -68,6 +69,7 @@ public class RobotController : MonoBehaviour
 
     [Header("Projectile Settings")]
     public AttackData hadoukenData;
+    [Tooltip("Projectile prefab pre-instantiated into this fighter's pool at startup; never spawned during the match.")]
     public GameObject hadoukenPrefab;
     public Transform hadoukenSpawnPoint;
 
@@ -90,6 +92,7 @@ public class RobotController : MonoBehaviour
     public Transform CameraTransform { get; private set; }
     public Hurtbox Hurtbox { get; private set; }
     public HealthComponent Health { get; private set; }
+    public ProjectilePool Projectiles { get; private set; }
     public RobotState CurrentState => currentState;
 
     private RobotState currentState;
@@ -116,6 +119,11 @@ public class RobotController : MonoBehaviour
 
         standingHeight = characterController.height;
         standingCenter = characterController.center;
+
+        if (hadoukenPrefab != null)
+        {
+            Projectiles = new ProjectilePool(hadoukenPrefab, name, ProjectilePoolCapacity);
+        }
     }
 
     private void Start()
@@ -246,6 +254,7 @@ public class RobotController : MonoBehaviour
         characterController.enabled = true;
 
         if (Health != null) Health.ResetHealth();
+        Projectiles?.RecallAll();
 
         bufferedCommand = FighterCommand.None;
         bufferTimer = 0f;

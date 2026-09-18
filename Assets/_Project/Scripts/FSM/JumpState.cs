@@ -32,9 +32,8 @@ public class JumpState : RobotState
         Vector3 velocity = horizontalVelocity + Vector3.up * verticalVelocity;
         robot.characterController.Move(velocity * Time.deltaTime);
 
-        if (robot.characterController.isGrounded && verticalVelocity < 0f)
+        if (HasLanded(verticalVelocity))
         {
-            robot.characterController.Move(Vector3.up * GroundSnapVelocity);
             robot.ChangeState(new IdleState(robot));
         }
     }

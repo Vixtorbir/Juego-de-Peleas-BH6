@@ -31,6 +31,7 @@ public class CrouchAttackState : RobotState
     public override void Tick()
     {
         stateTimer += Time.deltaTime;
+        ApplyGroundingForce();
 
         if (stateTimer < data.startupTime) return;
 

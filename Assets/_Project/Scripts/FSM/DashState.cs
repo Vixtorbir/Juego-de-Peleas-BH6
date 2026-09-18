@@ -2,7 +2,8 @@ using UnityEngine;
 
 /// <summary>
 /// Fixed-duration burst of movement towards or away from the opponent, triggered by a
-/// double tap on the horizontal axis.
+/// double tap on the horizontal axis. The burst stays glued to the floor so a dash never
+/// lifts the capsule off its ground contact.
 /// </summary>
 public class DashState : RobotState
 {
@@ -34,7 +35,10 @@ public class DashState : RobotState
     public override void Tick()
     {
         stateTimer -= Time.deltaTime;
-        robot.characterController.Move(dashDirection * (DashSpeed * Time.deltaTime));
+
+        Vector3 velocity = dashDirection * DashSpeed;
+        velocity.y = GroundingVelocity;
+        robot.characterController.Move(velocity * Time.deltaTime);
 
         if (stateTimer <= 0f)
         {

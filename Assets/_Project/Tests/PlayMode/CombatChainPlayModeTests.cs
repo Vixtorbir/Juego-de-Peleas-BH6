@@ -8,7 +8,9 @@ using UnityEngine.TestTools;
 /// <summary>
 /// Play-mode coverage of the combat feel rules in the training scene: on-connect chain cancels
 /// produce true combos, launchers put the defender into a juggle that can be followed up in the
-/// air, and every clean hit freezes the game clock for the tier's hitstop.
+/// air, every clean hit freezes the game clock for the tier's hitstop, a cornered defender stays
+/// pinned while the attacker absorbs the pushback, and projectiles land and recycle without
+/// growing the scene.
 /// </summary>
 public class CombatChainPlayModeTests
 {
@@ -16,6 +18,9 @@ public class CombatChainPlayModeTests
     private const float IntroWait = 2.5f;
     private const float ContactDistance = 1.25f;
     private const float StepTimeout = 3f;
+    private const float CornerX = 14.9f;
+    private const float WallPinTolerance = 0.08f;
+    private const float MinAttackerCornerShove = 0.1f;
 
     private RobotController player1;
     private RobotController player2;
@@ -109,6 +114,56 @@ public class CombatChainPlayModeTests
 
         Assert.GreaterOrEqual(frozenFor, 0.12f, "Heavy punch hitstop should last well over a light hit's five frames.");
         Assert.AreEqual(1f, Time.timeScale, 0.001f, "Time scale must return to normal after hitstop.");
+    }
+
+    [UnityTest]
+    public IEnumerator CornerPushbackPinsDefenderAndShovesAttacker()
+    {
+        Teleport(player2, CornerX);
+        Teleport(player1, CornerX - ContactDistance);
+        yield return null;
+
+        float defenderStartX = player2.transform.position.x;
+        float attackerStartX = player1.transform.position.x;
+        float defenderMaxX = defenderStartX;
+
+        player1.ChangeState(new AttackState(player1, player1.rightKickBase));
+        yield return WaitForState<HitstunState>(player2);
+
+        while (player2.CurrentState is HitstunState)
+        {
+            defenderMaxX = Mathf.Max(defenderMaxX, player2.transform.position.x);
+            yield return null;
+        }
+
+        Assert.LessOrEqual(defenderMaxX - defenderStartX, WallPinTolerance, "Cornered defender was pushed through the wall.");
+        Assert.GreaterOrEqual(player2.transform.position.x, defenderStartX - WallPinTolerance, "Cornered defender bounced back off the wall.");
+        Assert.Less(player1.transform.position.x, attackerStartX - MinAttackerCornerShove, "Attacker did not absorb the corner pushback.");
+        Assert.Greater(player2.transform.position.x, player1.transform.position.x, "Fighters swapped sides during corner pushback.");
+    }
+
+    [UnityTest]
+    public IEnumerator HadoukenHitsFromRangeAndReturnsToPool()
+    {
+        Teleport(player1, 0f);
+        Teleport(player2, 4f);
+        yield return null;
+
+        int projectilesBefore = CountProjectilesInScene();
+        float startHealth = player2.Health.CurrentHealth;
+
+        player1.ChangeState(new SpecialAttackState(player1, player1.hadoukenData, player1.Projectiles, player1.hadoukenSpawnPoint));
+        yield return WaitUntilRealtime(() => player1.Projectiles.CountInFlight() > 0, "Hadouken was never fired.");
+        yield return WaitUntilRealtime(() => player2.Health.CurrentHealth < startHealth, "Hadouken never connected.");
+
+        Assert.AreEqual(0, player1.Projectiles.CountInFlight(), "Projectile should return to the pool on impact.");
+        Assert.AreEqual(projectilesBefore, CountProjectilesInScene(), "Firing must reuse pooled projectiles, never instantiate.");
+        Assert.IsTrue(player2.CurrentState is HitstunState, "Projectile hit should put the defender in hitstun.");
+    }
+
+    private static int CountProjectilesInScene()
+    {
+        return Object.FindObjectsByType<HadoukenProjectile>(FindObjectsInactive.Include, FindObjectsSortMode.None).Length;
     }
 
     private static void Teleport(RobotController fighter, float x)

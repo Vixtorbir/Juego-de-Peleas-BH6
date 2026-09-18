@@ -2,31 +2,32 @@ using UnityEngine;
 
 /// <summary>
 /// Projectile special (quarter-circle forward + punch). The fighter is rooted for the attack's
-/// full frame data: the projectile is released once the startup frames elapse, mirroring the
-/// throw frame of the animation, and the recovery frames leave the move punishable up close.
+/// full frame data: the projectile is released from the owner's <see cref="ProjectilePool"/> once
+/// the startup frames elapse, mirroring the throw frame of the animation, and the recovery frames
+/// leave the move punishable up close.
 /// </summary>
 public class SpecialAttackState : RobotState
 {
     private const float ProjectileSpeed = 12f;
 
     private readonly AttackData attackData;
-    private readonly GameObject projectilePrefab;
+    private readonly ProjectilePool projectiles;
     private readonly Transform spawnPoint;
 
     private float timer;
-    private bool projectileSpawned;
+    private bool projectileFired;
 
-    public SpecialAttackState(RobotController robot, AttackData data, GameObject prefab, Transform spawn) : base(robot)
+    public SpecialAttackState(RobotController robot, AttackData data, ProjectilePool pool, Transform spawn) : base(robot)
     {
         attackData = data;
-        projectilePrefab = prefab;
+        projectiles = pool;
         spawnPoint = spawn;
     }
 
     public override void Enter()
     {
         timer = 0f;
-        projectileSpawned = false;
+        projectileFired = false;
 
         robot.AttackConnected = false;
         robot.FaceOpponent();
@@ -46,9 +47,9 @@ public class SpecialAttackState : RobotState
             return;
         }
 
-        if (!projectileSpawned && timer >= attackData.startupTime)
+        if (!projectileFired && timer >= attackData.startupTime)
         {
-            SpawnProjectile();
+            FireProjectile();
         }
 
         if (timer >= attackData.TotalDuration)
@@ -57,22 +58,14 @@ public class SpecialAttackState : RobotState
         }
     }
 
-    private void SpawnProjectile()
+    private void FireProjectile()
     {
-        projectileSpawned = true;
+        projectileFired = true;
 
-        if (projectilePrefab == null || spawnPoint == null || robot.opponentTarget == null) return;
+        if (projectiles == null || spawnPoint == null) return;
         if (AudioManager.Instance != null) AudioManager.Instance.PlayHadoukenShot();
 
-        float forwardSign = Mathf.Sign(robot.opponentTarget.position.x - robot.transform.position.x);
-        Vector3 fireDirection = new Vector3(forwardSign, 0f, 0f);
-
-        GameObject instance = Object.Instantiate(projectilePrefab, spawnPoint.position, Quaternion.identity);
-        HadoukenProjectile projectile = instance.GetComponent<HadoukenProjectile>();
-
-        if (projectile != null)
-        {
-            projectile.Initialize(fireDirection, ProjectileSpeed, attackData, robot);
-        }
+        Vector3 fireDirection = robot.transform.forward.x < 0f ? Vector3.left : Vector3.right;
+        projectiles.Acquire().Launch(spawnPoint.position, fireDirection, ProjectileSpeed, attackData, robot);
     }
 }

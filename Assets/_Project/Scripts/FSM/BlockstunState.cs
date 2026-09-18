@@ -3,11 +3,12 @@ using UnityEngine;
 /// <summary>
 /// Reaction to a blocked attack. Shorter than hitstun and with weaker knockback, it preserves
 /// the crouching posture if the block was taken low so the guard is not dropped on exit.
+/// A cornered block hands slightly less momentum back to the attacker than a cornered hit,
+/// which keeps corner pressure and frame traps viable.
 /// </summary>
 public class BlockstunState : RobotState
 {
-    private const float WallTransferRatio = 0.3f;
-    private const float WallDampening = 0.35f;
+    private const float WallTransferRatio = 0.8f;
     private const float StayCrouchedInputThreshold = -0.2f;
 
     private readonly bool blockedCrouching;
@@ -20,7 +21,7 @@ public class BlockstunState : RobotState
         this.duration = duration;
         timer = duration;
         blockedCrouching = isCrouching;
-        pushback = new PushbackSolver(pushbackForce, attacker, WallTransferRatio, WallDampening);
+        pushback = new PushbackSolver(robot, attacker, pushbackForce, WallTransferRatio);
     }
 
     public override void Enter()
@@ -36,7 +37,8 @@ public class BlockstunState : RobotState
     public override void Tick()
     {
         timer -= Time.deltaTime;
-        pushback.Tick(robot);
+        pushback.Tick();
+        ApplyGroundingForce();
 
         if (timer > 0f) return;
 

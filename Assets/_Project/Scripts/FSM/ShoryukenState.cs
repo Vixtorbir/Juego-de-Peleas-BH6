@@ -4,8 +4,9 @@ using UnityEngine;
 /// Rising uppercut special driven by its <see cref="AttackData"/> frame data. The startup frames
 /// are invincible when the data flags them so the move works as a reversal and anti-air, the
 /// hitbox is live from the end of startup for the active window while the fighter climbs and
-/// drifts towards the opponent, and landing is followed by the data's recovery, which leaves a
-/// long punishable window on whiff or block.
+/// drifts forward, and landing is followed by the data's recovery, which leaves a long punishable
+/// window on whiff or block. The leap direction is locked at takeoff: a cross-over during the
+/// rise never reverses the arc mid-air.
 /// </summary>
 public class ShoryukenState : RobotState
 {
@@ -16,6 +17,7 @@ public class ShoryukenState : RobotState
     private readonly AttackData attackData;
     private float timer;
     private float verticalVelocity;
+    private float forwardSign;
     private bool hitboxActive;
     private bool landed;
     private float landingTimer;
@@ -36,6 +38,7 @@ public class ShoryukenState : RobotState
         robot.AttackConnected = false;
         robot.IsInvincible = attackData != null && attackData.invincibleStartup;
         robot.FaceOpponent();
+        forwardSign = robot.transform.forward.x < 0f ? -1f : 1f;
 
         PlayAttackAnimation(attackData);
 
@@ -55,10 +58,9 @@ public class ShoryukenState : RobotState
         UpdateHitbox();
         Move();
 
-        if (verticalVelocity < 0f && robot.characterController.isGrounded)
+        if (HasLanded(verticalVelocity))
         {
             landed = true;
-            robot.characterController.Move(Vector3.up * GroundSnapVelocity);
             DeactivateHitbox();
         }
     }
@@ -96,10 +98,6 @@ public class ShoryukenState : RobotState
     {
         verticalVelocity += RiseGravity * Time.deltaTime;
 
-        float forwardSign = robot.opponentTarget != null
-            ? Mathf.Sign(robot.opponentTarget.position.x - robot.transform.position.x)
-            : 0f;
-
         Vector3 velocity = new Vector3(forwardSign * ForwardSpeed, verticalVelocity, 0f);
         robot.characterController.Move(velocity * Time.deltaTime);
     }
@@ -123,9 +121,4 @@ public class ShoryukenState : RobotState
         robot.hitboxBase.Deactivate();
         hitboxActive = false;
     }
-
-    /// <summary>
-    /// The airborne portion is dictated by the jump physics, so the clip is stretched over the
-    /// full flight time plus the landing recovery rather than over the raw frame data.
-    /// </summary>
 }

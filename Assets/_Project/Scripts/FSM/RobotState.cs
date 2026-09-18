@@ -105,13 +105,29 @@ public abstract class RobotState
     }
 
     /// <summary>
-    /// Keeps a grounded fighter pressed against the floor so CharacterController.isGrounded
-    /// stays reliable, and lets it fall if the ground disappears underneath.
+    /// Vertical velocity that keeps a grounded fighter pressed against the floor so
+    /// CharacterController.isGrounded stays reliable, or lets it fall if the ground disappears
+    /// underneath. States that already integrate their own horizontal motion fold this into the
+    /// same Move call.
     /// </summary>
+    protected float GroundingVelocity => robot.characterController.isGrounded ? GroundSnapVelocity : FallVelocity;
+
     protected void ApplyGroundingForce()
     {
-        float verticalVelocity = robot.characterController.isGrounded ? GroundSnapVelocity : FallVelocity;
-        robot.characterController.Move(new Vector3(0f, verticalVelocity * Time.deltaTime, 0f));
+        robot.characterController.Move(new Vector3(0f, GroundingVelocity * Time.deltaTime, 0f));
+    }
+
+    /// <summary>
+    /// True on the frame a falling fighter touches the floor. The grounding force is applied on
+    /// that same frame, so isGrounded holds through the state transition instead of flickering
+    /// while the next state takes over.
+    /// </summary>
+    protected bool HasLanded(float verticalVelocity)
+    {
+        if (verticalVelocity >= 0f || !robot.characterController.isGrounded) return false;
+
+        ApplyGroundingForce();
+        return true;
     }
 
     /// <summary>
@@ -121,7 +137,7 @@ public abstract class RobotState
     {
         if (robot.TryConsumeCommand(FighterCommand.Hadouken))
         {
-            robot.ChangeState(new SpecialAttackState(robot, robot.hadoukenData, robot.hadoukenPrefab, robot.hadoukenSpawnPoint));
+            robot.ChangeState(new SpecialAttackState(robot, robot.hadoukenData, robot.Projectiles, robot.hadoukenSpawnPoint));
             return true;
         }
 

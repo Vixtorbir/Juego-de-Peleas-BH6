@@ -2,12 +2,12 @@ using UnityEngine;
 
 /// <summary>
 /// Reaction to a clean hit. The fighter is locked out of input for the attack's hitstun
-/// duration while knockback (with wall bounce) is integrated by <see cref="PushbackSolver"/>.
+/// duration while knockback (with corner transfer to the attacker) is integrated by
+/// <see cref="PushbackSolver"/>.
 /// </summary>
 public class HitstunState : RobotState
 {
-    private const float WallTransferRatio = 0.4f;
-    private const float WallDampening = 0.5f;
+    private const float WallTransferRatio = 1f;
 
     private readonly float duration;
     private float timer;
@@ -17,7 +17,7 @@ public class HitstunState : RobotState
     {
         duration = hitstunDuration;
         timer = hitstunDuration;
-        pushback = new PushbackSolver(pushbackForce, attacker, WallTransferRatio, WallDampening);
+        pushback = new PushbackSolver(robot, attacker, pushbackForce, WallTransferRatio);
     }
 
     public override void Enter()
@@ -28,7 +28,8 @@ public class HitstunState : RobotState
     public override void Tick()
     {
         timer -= Time.deltaTime;
-        pushback.Tick(robot);
+        pushback.Tick();
+        ApplyGroundingForce();
 
         if (timer <= 0f)
         {

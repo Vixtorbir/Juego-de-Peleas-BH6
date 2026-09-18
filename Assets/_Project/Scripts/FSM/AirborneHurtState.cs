@@ -42,9 +42,8 @@ public class AirborneHurtState : RobotState
         Vector3 velocity = new Vector3(horizontalVelocity, verticalVelocity, 0f);
         robot.characterController.Move(velocity * Time.deltaTime);
 
-        if (robot.characterController.isGrounded && verticalVelocity < 0f)
+        if (HasLanded(verticalVelocity))
         {
-            robot.characterController.Move(Vector3.up * GroundSnapVelocity);
             robot.ChangeState(new HitstunState(robot, LandingRecoveryDuration, 0f, attacker));
         }
     }

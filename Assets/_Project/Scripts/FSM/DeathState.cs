@@ -6,7 +6,6 @@ using UnityEngine;
 /// </summary>
 public class DeathState : RobotState
 {
-
     public DeathState(RobotController robot) : base(robot) { }
 
     public override void Enter()
@@ -19,9 +18,6 @@ public class DeathState : RobotState
 
     public override void Tick()
     {
-        if (!robot.IsGrounded)
-        {
-            robot.characterController.Move(Vector3.up * (FallVelocity * Time.deltaTime));
-        }
+        ApplyGroundingForce();
     }
 }
