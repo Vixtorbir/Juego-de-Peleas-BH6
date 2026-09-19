@@ -31,6 +31,8 @@ public class Hurtbox : MonoBehaviour
     private const float KnockoutShakeDuration = 0.4f;
     private const float KnockoutShakeMagnitude = 0.35f;
     private const float LauncherShakeVerticalBias = 1f;
+    private const float HeavyImpactZoomPunch = -1.5f;
+    private const float KnockoutZoomPunch = -2.5f;
 
     private static readonly float[] HitstopByWeight = { 0.08f, 0.14f, 0.16f };
     private static readonly float[] ShakeDurationByWeight = { 0.1f, 0.16f, 0.2f };
@@ -167,8 +169,9 @@ public class Hurtbox : MonoBehaviour
     /// <summary>
     /// Hitstop and screen shake are tiered by <see cref="AttackWeight"/>: light attacks freeze for
     /// five frames, medium and heavy ones for eight to ten. Launchers and counter hits step up to
-    /// the heavy-impact tier with a directional shake along the knockback; blocks soften both. The
-    /// flash is spawned at the contact point and keeps animating through the freeze.
+    /// the heavy-impact tier with a directional shake along the knockback and a lens punch; blocks
+    /// soften the freeze and the shake and never punch the lens. The flash is spawned at the
+    /// contact point and keeps animating through the freeze.
     /// </summary>
     private void PlayImpactFeedback(AttackData attack, RobotController attacker, bool counterHit, bool blocked, Vector3 contactPoint)
     {
@@ -199,6 +202,7 @@ public class Hurtbox : MonoBehaviour
         if (fightingCamera != null)
         {
             fightingCamera.ShakeCamera(shakeDuration, shakeMagnitude, ComputeKnockbackDirection(attack, attacker));
+            if (heavyImpact || (!blocked && attack.weight == AttackWeight.Heavy)) fightingCamera.PunchZoom(HeavyImpactZoomPunch);
         }
 
         if (HitsparkPool.Instance != null)
@@ -231,6 +235,7 @@ public class Hurtbox : MonoBehaviour
         if (fightingCamera != null)
         {
             fightingCamera.ShakeCamera(KnockoutShakeDuration, KnockoutShakeMagnitude, Vector3.zero);
+            fightingCamera.PunchZoom(KnockoutZoomPunch);
         }
 
         if (AudioManager.Instance != null)

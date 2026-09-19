@@ -16,7 +16,6 @@ public static class AudioSceneSetup
     private const string AudioRoot = "Assets/_Project/Audio";
     private const string LibraryPath = AudioRoot + "/CombatAudioLibrary.asset";
     private const string MusicFolder = AudioRoot + "/Music";
-    private const string ManagersObjectName = "Managers";
     private const float MusicMasterVolume = 0.16f;
 
     private readonly struct EventBinding
@@ -180,7 +179,8 @@ public static class AudioSceneSetup
         AudioManager manager = UnityEngine.Object.FindFirstObjectByType<AudioManager>();
         if (manager == null)
         {
-            GameObject host = GameObject.Find(ManagersObjectName) ?? new GameObject(ManagersObjectName);
+            var host = new GameObject(nameof(AudioManager));
+            host.transform.SetParent(SceneHierarchyOrganizer.GetOrCreateCategory(SceneHierarchyOrganizer.ManagersCategory), false);
             manager = host.AddComponent<AudioManager>();
         }
 

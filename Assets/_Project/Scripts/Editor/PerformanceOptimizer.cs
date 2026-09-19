@@ -16,7 +16,6 @@ public static class PerformanceOptimizer
     private const string PipelineAssetPath = "Assets/Settings/PC_RPAsset.asset";
     private const string MaterialsRoot = "Assets/_Project/Art/Materials";
     private const string ProjectilePrefabPath = "Assets/_Project/Prefabs/Sphere.prefab";
-    private const string ArenaRootName = "Arena";
 
     private const float ShadowDistance = 18f;
     private const int ShadowCascadeCount = 2;
@@ -167,7 +166,7 @@ public static class PerformanceOptimizer
         {
             GameObject target = collider.gameObject;
             if (target.GetComponentInParent<RobotController>() != null) continue;
-            if (target.transform.root.name == ArenaRootName) continue;
+            if (SceneHierarchyOrganizer.IsUnderDecor(target.transform, ArenaSceneSetup.ArenaRootName)) continue;
 
             if (collider is MeshCollider) target.layer = CombatLayers.GroundLayer;
             else if (collider is BoxCollider) target.layer = CombatLayers.WallLayer;

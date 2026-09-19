@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using UnityEditor;
 using UnityEditor.Animations;
 using UnityEditor.SceneManagement;
@@ -9,8 +10,10 @@ using UnityEngine.SceneManagement;
 /// <summary>
 /// Replaces the visuals of every fighter in the training scene with a rigged humanoid model of real
 /// combat proportions (Mixamo Y Bot / X Bot) and re-fits the collision capsule, melee hitbox holder
-/// and projectile anchor to the model's measured height. Works on the existing fighter GameObjects
-/// so every cross reference (opponent, input reader, attack data) survives untouched.
+/// and projectile anchor to the model. The projectile anchor is placed at the palms measured on the
+/// Hadouken release frame, falling back to a height ratio when the clip cannot be sampled. Works on
+/// the existing fighter GameObjects so every cross reference (opponent, input reader, attack data)
+/// survives untouched.
 /// </summary>
 public static class FighterSceneSetup
 {
@@ -54,10 +57,12 @@ public static class FighterSceneSetup
             return;
         }
 
+        Vector3? palmAnchor = MeasureProjectileAnchor(fighters);
+
         for (int i = 0; i < fighters.Length; i++)
         {
             string modelPath = FighterModelPaths[i % FighterModelPaths.Length];
-            SetupFighter(fighters[i], modelPath, controller);
+            SetupFighter(fighters[i], modelPath, controller, palmAnchor);
         }
 
         for (int i = 0; i < fighters.Length; i++)
@@ -81,7 +86,28 @@ public static class FighterSceneSetup
         return EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
     }
 
-    private static void SetupFighter(RobotController fighter, string modelPath, AnimatorController controller)
+    /// <summary>
+    /// Samples the Hadouken clip once for the whole roster; every fighter shares the animation set,
+    /// so the release pose is the same for all of them.
+    /// </summary>
+    private static Vector3? MeasureProjectileAnchor(RobotController[] fighters)
+    {
+        foreach (RobotController fighter in fighters)
+        {
+            if (fighter.hadoukenData == null || fighter.hadoukenData.animationClip == null) continue;
+
+            var report = new StringBuilder();
+            if (HadoukenReleaseCalibrator.TryMeasureRelease(fighter.hadoukenData, report, out HadoukenReleaseCalibrator.ReleaseProfile profile))
+                return profile.PalmAnchor;
+
+            Debug.LogWarning($"[FighterSceneSetup] Hadouken release could not be measured; projectile anchor falls back to the height ratio.\n{report}");
+            break;
+        }
+
+        return null;
+    }
+
+    private static void SetupFighter(RobotController fighter, string modelPath, AnimatorController controller, Vector3? palmAnchor)
     {
         GameObject root = fighter.gameObject;
         GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(modelPath);
@@ -101,7 +127,7 @@ public static class FighterSceneSetup
         EnsureComponent<Hurtbox>(root);
 
         fighter.hitboxBase = ConfigureMeleeHitbox(fighter);
-        fighter.hadoukenSpawnPoint = ConfigureProjectileSpawn(fighter, height);
+        fighter.hadoukenSpawnPoint = ConfigureProjectileSpawn(fighter, height, palmAnchor);
         AssignTimedClips(fighter, controller);
 
         EditorUtility.SetDirty(fighter);
@@ -231,7 +257,7 @@ public static class FighterSceneSetup
         return hitbox;
     }
 
-    private static Transform ConfigureProjectileSpawn(RobotController fighter, float height)
+    private static Transform ConfigureProjectileSpawn(RobotController fighter, float height, Vector3? palmAnchor)
     {
         Transform spawn = fighter.hadoukenSpawnPoint;
         if (spawn == null) spawn = fighter.transform.Find(ProjectileSpawnName);
@@ -241,8 +267,9 @@ public static class FighterSceneSetup
             spawn.SetParent(fighter.transform, false);
         }
 
-        spawn.localPosition = new Vector3(0f, height * ProjectileHeightRatio, fighter.characterController.radius + ProjectileForwardOffset);
-        spawn.localRotation = Quaternion.identity;
+        spawn.name = ProjectileSpawnName;
+        Vector3 fallback = new Vector3(0f, height * ProjectileHeightRatio, fighter.characterController.radius + ProjectileForwardOffset);
+        spawn.SetLocalPositionAndRotation(palmAnchor ?? fallback, Quaternion.identity);
         return spawn;
     }
 

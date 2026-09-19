@@ -5,13 +5,12 @@ using UnityEngine.SceneManagement;
 
 /// <summary>
 /// Creates the impact-flash materials (unlit HDR colours so the bloom pass catches them) and
-/// installs the <see cref="HitsparkPool"/> on the scene's managers object with those materials wired.
+/// installs the <see cref="HitsparkPool"/> on its own manager object with those materials wired.
 /// </summary>
 public static class CombatVfxSceneSetup
 {
     private const string MaterialsRoot = "Assets/_Project/Art/Materials";
     private const string UnlitShaderName = "Universal Render Pipeline/Unlit";
-    private const string ManagersObjectName = "Managers";
 
     private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
 
@@ -33,7 +32,8 @@ public static class CombatVfxSceneSetup
         HitsparkPool pool = Object.FindFirstObjectByType<HitsparkPool>();
         if (pool == null)
         {
-            GameObject host = GameObject.Find(ManagersObjectName) ?? new GameObject(ManagersObjectName);
+            var host = new GameObject(nameof(HitsparkPool));
+            host.transform.SetParent(SceneHierarchyOrganizer.GetOrCreateCategory(SceneHierarchyOrganizer.ManagersCategory), false);
             pool = host.AddComponent<HitsparkPool>();
         }
 

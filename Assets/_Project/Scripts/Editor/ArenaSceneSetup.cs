@@ -27,8 +27,9 @@ public static class ArenaSceneSetup
     private const int MaxTextureSize = 1024;
     private const int TextureAnisoLevel = 8;
 
-    private const string ArenaRootName = "Arena";
-    private const string KeyLightName = "Directional Light";
+    public const string ArenaRootName = "Arena";
+    public const string KeyLightName = "Key Light";
+
     private const string FillLightName = "Fill Light";
     private const string RimLightName = "Rim Light";
     private const string GlobalVolumeName = "Global Volume";
@@ -220,7 +221,7 @@ public static class ArenaSceneSetup
         {
             GameObject target = renderer.gameObject;
             if (target.GetComponentInParent<RobotController>() != null) continue;
-            if (target.transform.root.name == ArenaRootName) continue;
+            if (SceneHierarchyOrganizer.IsUnderDecor(target.transform, ArenaRootName)) continue;
 
             if (target.TryGetComponent(out MeshCollider _))
             {
@@ -245,6 +246,7 @@ public static class ArenaSceneSetup
         if (existing != null) Object.DestroyImmediate(existing);
 
         Transform root = new GameObject(ArenaRootName).transform;
+        root.SetParent(SceneHierarchyOrganizer.GetOrCreateCategory(SceneHierarchyOrganizer.EnvironmentCategory), false);
 
         GameObject outerFloor = CreatePrimitive(PrimitiveType.Plane, OuterFloorName, root, new Vector3(0f, -0.02f, 0f), Vector3.zero, new Vector3(8f, 1f, 6f), materials.Pillar);
         Object.DestroyImmediate(outerFloor.GetComponent<Collider>());
@@ -438,6 +440,7 @@ public static class ArenaSceneSetup
         if (light == null)
         {
             light = new GameObject(name).AddComponent<Light>();
+            light.transform.SetParent(SceneHierarchyOrganizer.GetOrCreateCategory(SceneHierarchyOrganizer.LightingCategory), false);
         }
 
         light.type = LightType.Directional;
@@ -469,7 +472,13 @@ public static class ArenaSceneSetup
 
         EditorUtility.SetDirty(profile);
 
-        GameObject volumeObject = GameObject.Find(GlobalVolumeName) ?? new GameObject(GlobalVolumeName);
+        GameObject volumeObject = GameObject.Find(GlobalVolumeName);
+        if (volumeObject == null)
+        {
+            volumeObject = new GameObject(GlobalVolumeName);
+            volumeObject.transform.SetParent(SceneHierarchyOrganizer.GetOrCreateCategory(SceneHierarchyOrganizer.LightingCategory), false);
+        }
+
         Volume volume = volumeObject.TryGetComponent(out Volume existingVolume) ? existingVolume : volumeObject.AddComponent<Volume>();
         volume.isGlobal = true;
         volume.priority = 0f;
