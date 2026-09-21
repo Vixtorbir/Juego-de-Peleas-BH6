@@ -1,7 +1,7 @@
 using UnityEngine;
 
 /// <summary>
-/// Grounded horizontal locomotion. Movement is interpreted relative to the camera so pressing
+/// Grounded horizontal locomotion. Movement is interpreted relative to the opponent so pressing
 /// towards the opponent always advances, and forward + RightPunch is routed to the launcher.
 /// </summary>
 public class WalkState : RobotState
@@ -17,8 +17,12 @@ public class WalkState : RobotState
 
     public WalkState(RobotController robot) : base(robot) { }
 
+    public override bool CanGuard => true;
+
     public override void Enter()
     {
+        smoothInput = Vector2.zero;
+        smoothVelocity = Vector2.zero;
         if (robot.Hurtbox != null) robot.Hurtbox.ResetCombo();
     }
 
@@ -30,19 +34,19 @@ public class WalkState : RobotState
 
         if (robot.MovementInput.y > VerticalInputThreshold)
         {
-            robot.ChangeState(new JumpState(robot));
+            robot.EnterJump();
             return;
         }
 
         if (robot.MovementInput.y < -VerticalInputThreshold)
         {
-            robot.ChangeState(new CrouchState(robot));
+            robot.EnterCrouch();
             return;
         }
 
         if (Mathf.Abs(robot.MovementInput.x) <= StopInputThreshold)
         {
-            robot.ChangeState(new IdleState(robot));
+            robot.EnterIdle();
             return;
         }
 
@@ -70,26 +74,26 @@ public class WalkState : RobotState
     {
         if (robot.TryConsumeCommand(FighterCommand.LeftPunch))
         {
-            robot.ChangeState(new AttackState(robot, robot.leftPunchBase));
+            robot.EnterAttack(robot.leftPunchBase);
             return true;
         }
 
         if (robot.TryConsumeCommand(FighterCommand.RightPunch))
         {
             bool advancing = robot.MovementInput.x * robot.GetScreenFacingSign() > LauncherForwardThreshold;
-            robot.ChangeState(new AttackState(robot, advancing ? robot.launcherBase : robot.rightPunchBase));
+            robot.EnterAttack(advancing ? robot.launcherBase : robot.rightPunchBase);
             return true;
         }
 
         if (robot.TryConsumeCommand(FighterCommand.LeftKick))
         {
-            robot.ChangeState(new AttackState(robot, robot.leftKickBase));
+            robot.EnterAttack(robot.leftKickBase);
             return true;
         }
 
         if (robot.TryConsumeCommand(FighterCommand.RightKick))
         {
-            robot.ChangeState(new AttackState(robot, robot.rightKickBase));
+            robot.EnterAttack(robot.rightKickBase);
             return true;
         }
 

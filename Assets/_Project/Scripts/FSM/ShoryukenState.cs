@@ -14,7 +14,7 @@ public class ShoryukenState : RobotState
     private const float RiseGravity = -25f;
     private const float ForwardSpeed = 4f;
 
-    private readonly AttackData attackData;
+    private AttackData attackData;
     private float timer;
     private float verticalVelocity;
     private float forwardSign;
@@ -22,7 +22,9 @@ public class ShoryukenState : RobotState
     private bool landed;
     private float landingTimer;
 
-    public ShoryukenState(RobotController robot, AttackData data) : base(robot)
+    public ShoryukenState(RobotController robot) : base(robot) { }
+
+    public void Configure(AttackData data)
     {
         attackData = data;
     }
@@ -81,7 +83,7 @@ public class ShoryukenState : RobotState
 
     private void UpdateHitbox()
     {
-        if (attackData == null || robot.hitboxBase == null) return;
+        if (attackData == null) return;
 
         if (!hitboxActive && timer >= attackData.startupTime && timer < attackData.ActiveEndTime)
         {
@@ -110,7 +112,7 @@ public class ShoryukenState : RobotState
         float recovery = attackData != null ? attackData.recoveryTime : 0f;
         if (landingTimer >= recovery)
         {
-            robot.ChangeState(new IdleState(robot));
+            robot.EnterIdle();
         }
     }
 

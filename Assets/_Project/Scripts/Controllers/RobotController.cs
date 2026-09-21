@@ -17,6 +17,8 @@ public enum FighterCommand
 /// Central fighter controller. Owns the state machine, translates raw input events into a
 /// short-lived command buffer, resolves facing and pushbox separation against the opponent,
 /// and exposes cached dependencies to the FSM states so they never query components at runtime.
+/// Every state is allocated once in Awake and entered through a typed method that configures
+/// the cached instance, so a full match runs without a single state allocation.
 /// </summary>
 [RequireComponent(typeof(CharacterController))]
 public class RobotController : MonoBehaviour
@@ -34,6 +36,9 @@ public class RobotController : MonoBehaviour
         CombatDirection.Down,
         CombatDirection.DownForward
     };
+
+    private static readonly Color PushboxGizmoColor = new Color(0f, 0.6f, 1f, 0.9f);
+    private static readonly Color BodyGizmoColor = new Color(0f, 1f, 0f, 0.12f);
 
     private const float DirectionPressThreshold = 0.6f;
     private const float DirectionReleaseThreshold = 0.2f;
@@ -89,14 +94,33 @@ public class RobotController : MonoBehaviour
     public bool IsInvincible { get; set; }
     public bool AttackConnected { get; set; }
     public Vector2 MovementInput { get; private set; }
-    public Transform CameraTransform { get; private set; }
     public Hurtbox Hurtbox { get; private set; }
     public HealthComponent Health { get; private set; }
     public ProjectilePool Projectiles { get; private set; }
     public RobotState CurrentState => currentState;
 
+    /// <summary>
+    /// Number of state entries since startup. Re-entering the cached instance of the current state
+    /// (chain cancels, air juggles) counts as a transition even though the reference is unchanged.
+    /// </summary>
+    public int TransitionCount { get; private set; }
+
     private RobotState currentState;
     private InputBuffer inputBuffer;
+
+    private IdleState idleState;
+    private WalkState walkState;
+    private JumpState jumpState;
+    private CrouchState crouchState;
+    private DashState dashState;
+    private AttackState attackState;
+    private CrouchAttackState crouchAttackState;
+    private SpecialAttackState specialAttackState;
+    private ShoryukenState shoryukenState;
+    private HitstunState hitstunState;
+    private BlockstunState blockstunState;
+    private AirborneHurtState airborneHurtState;
+    private DeathState deathState;
 
     private float bufferTimer;
     private float lastTapTime;
@@ -112,10 +136,18 @@ public class RobotController : MonoBehaviour
         if (characterController == null) characterController = GetComponent<CharacterController>();
         animator.applyRootMotion = false;
 
-        CameraTransform = Camera.main.transform;
         inputBuffer = GetComponent<InputBuffer>();
         Hurtbox = GetComponentInChildren<Hurtbox>();
         Health = GetComponent<HealthComponent>();
+        AllocateStates();
+
+        if (hitboxBase == null) hitboxBase = GetComponentInChildren<Hitbox>(true);
+        if (hitboxBase == null)
+        {
+            Debug.LogError("RobotController requires a Hitbox in its hierarchy; the fighter has been disabled.", this);
+            enabled = false;
+            return;
+        }
 
         standingHeight = characterController.height;
         standingCenter = characterController.center;
@@ -137,7 +169,7 @@ public class RobotController : MonoBehaviour
             inputReader.RightKickEvent += HandleRightKick;
         }
 
-        ChangeState(new IdleState(this));
+        EnterIdle();
     }
 
     private void OnDestroy()
@@ -161,11 +193,91 @@ public class RobotController : MonoBehaviour
         currentState?.Tick();
     }
 
-    public void ChangeState(RobotState newState)
+    private void AllocateStates()
+    {
+        idleState = new IdleState(this);
+        walkState = new WalkState(this);
+        jumpState = new JumpState(this);
+        crouchState = new CrouchState(this);
+        dashState = new DashState(this);
+        attackState = new AttackState(this);
+        crouchAttackState = new CrouchAttackState(this);
+        specialAttackState = new SpecialAttackState(this);
+        shoryukenState = new ShoryukenState(this);
+        hitstunState = new HitstunState(this);
+        blockstunState = new BlockstunState(this);
+        airborneHurtState = new AirborneHurtState(this);
+        deathState = new DeathState(this);
+    }
+
+    public void EnterIdle() => TransitionTo(idleState);
+
+    public void EnterWalk() => TransitionTo(walkState);
+
+    public void EnterJump() => TransitionTo(jumpState);
+
+    public void EnterCrouch() => TransitionTo(crouchState);
+
+    public void EnterDeath() => TransitionTo(deathState);
+
+    public void EnterDash(bool forward)
+    {
+        dashState.Configure(forward);
+        TransitionTo(dashState);
+    }
+
+    public void EnterAttack(AttackData data)
+    {
+        attackState.Configure(data);
+        TransitionTo(attackState);
+    }
+
+    public void EnterCrouchAttack(AttackData data)
+    {
+        crouchAttackState.Configure(data);
+        TransitionTo(crouchAttackState);
+    }
+
+    public void EnterSpecialAttack(AttackData data)
+    {
+        specialAttackState.Configure(data);
+        TransitionTo(specialAttackState);
+    }
+
+    public void EnterShoryuken(AttackData data)
+    {
+        shoryukenState.Configure(data);
+        TransitionTo(shoryukenState);
+    }
+
+    public void EnterHitstun(float duration, float pushbackForce, RobotController attacker)
+    {
+        hitstunState.Configure(duration, pushbackForce, attacker);
+        TransitionTo(hitstunState);
+    }
+
+    public void EnterBlockstun(float duration, bool crouching, float pushbackForce, RobotController attacker)
+    {
+        blockstunState.Configure(duration, crouching, pushbackForce, attacker);
+        TransitionTo(blockstunState);
+    }
+
+    public void EnterAirborneHurt(float launchForce, float driftSpeed, RobotController attacker)
+    {
+        airborneHurtState.Configure(launchForce, driftSpeed, attacker);
+        TransitionTo(airborneHurtState);
+    }
+
+    /// <summary>
+    /// Exits the current state and enters the next one. The same instance may be entered again:
+    /// Exit runs before Enter, so a chained attack or a re-launched juggle restarts cleanly.
+    /// </summary>
+    private void TransitionTo(RobotState nextState)
     {
         currentState?.Exit();
-        currentState = newState;
-        currentState?.Enter();
+        currentState = nextState;
+        TransitionCount++;
+        currentState.Enter();
     }
 
     /// <summary>
@@ -190,16 +302,17 @@ public class RobotController : MonoBehaviour
     }
 
     /// <summary>
-    /// Returns +1 when the opponent is on the camera's right side and -1 when on the left,
-    /// which lets states convert horizontal stick input into "towards" or "away" semantics.
+    /// Returns +1 when the opponent lies towards +X and -1 towards -X. The match is played along
+    /// the world X axis and the camera never rolls around it, so this is the screen-right sign
+    /// without any camera dependency. Without an opponent the fighter's own facing is used.
     /// </summary>
     public float GetScreenFacingSign()
     {
-        if (opponentTarget == null) return 1f;
+        float deltaX = opponentTarget != null
+            ? opponentTarget.position.x - transform.position.x
+            : transform.forward.x;
 
-        Vector3 toOpponent = opponentTarget.position - transform.position;
-        toOpponent.y = 0f;
-        return Mathf.Sign(Vector3.Dot(toOpponent, CameraTransform.right));
+        return deltaX < 0f ? -1f : 1f;
     }
 
     /// <summary>
@@ -262,7 +375,7 @@ public class RobotController : MonoBehaviour
         AttackConnected = false;
 
         animator.Play(FighterAnimatorParameters.LocomotionState, 0, 0f);
-        ChangeState(new IdleState(this));
+        EnterIdle();
     }
 
     private void UpdateGroundedState()
@@ -365,9 +478,16 @@ public class RobotController : MonoBehaviour
     private void HandleLeftKick() => BufferCommand(FighterCommand.LeftKick);
     private void HandleRightKick() => BufferCommand(FighterCommand.RightKick);
 
-    private void OnDrawGizmosSelected()
+    /// <summary>
+    /// Scene-view overlay of the two volumes the controller owns: the collision capsule that doubles
+    /// as the hurt volume, and the horizontal pushbox radius that keeps the fighters apart.
+    /// </summary>
+    private void OnDrawGizmos()
     {
-        Gizmos.color = new Color(0f, 0.6f, 1f, 0.9f);
-        Gizmos.DrawWireSphere(transform.position, pushboxRadius);
+        CharacterController body = characterController != null ? characterController : GetComponent<CharacterController>();
+        float height = body != null ? body.height : 2f;
+
+        if (body != null) CombatGizmos.DrawCollider(body, BodyGizmoColor);
+        CombatGizmos.DrawPushbox(transform, pushboxRadius, height, PushboxGizmoColor);
     }
 }

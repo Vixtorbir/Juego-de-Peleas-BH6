@@ -2,10 +2,13 @@ using System;
 using UnityEngine;
 
 /// <summary>
-/// Damage receiver for a fighter. Resolves the guard matrix (attack height versus stance),
+/// Damage receiver for a fighter. Resolves the guard matrix (attack height versus posture),
 /// counter hits, aerial juggles, chip damage and combo damage scaling, then hands the
-/// resulting reaction to the owner's state machine. Combo progress is broadcast so the HUD can
-/// present the hit count and accumulated damage without polling.
+/// resulting reaction to the owner's state machine. Whether a guard can be raised and at which
+/// height is read from the current state rather than from the stick: a fighter in hitstun or
+/// mid-attack cannot block, so a chain that connects is a true combo, and a standing fighter
+/// holding down is still hit high. Combo progress is broadcast so the HUD can present the hit
+/// count and accumulated damage without polling.
 /// </summary>
 public class Hurtbox : MonoBehaviour
 {
@@ -19,7 +22,6 @@ public class Hurtbox : MonoBehaviour
     private const float CounterLaunchMultiplier = 1.3f;
     private const float AirResetLaunchForce = 7f;
     private const float AirHitDrift = 1.5f;
-    private const float CrouchInputThreshold = -0.5f;
     private const float BlockInputThreshold = -0.3f;
 
     private const float HeavyImpactHitstop = 0.2f;
@@ -101,8 +103,9 @@ public class Hurtbox : MonoBehaviour
             return true;
         }
 
-        bool crouching = controller.MovementInput.y < CrouchInputThreshold;
-        bool blocking = !counterHit && IsHoldingBack();
+        RobotState posture = controller.CurrentState;
+        bool crouching = posture != null && posture.IsCrouchingPosture;
+        bool blocking = !counterHit && posture != null && posture.CanGuard && IsHoldingBack();
         GuardResult result = blocking ? ResolveGuard(attack.attackHeight, crouching) : GuardResult.Hit;
 
         switch (result)
@@ -113,7 +116,7 @@ public class Hurtbox : MonoBehaviour
             case GuardResult.Blocked:
                 PlayImpactFeedback(attack, attacker, false, true, contactPoint);
                 ApplyChipDamage(attack.damage);
-                controller.ChangeState(new BlockstunState(controller, attack.blockstunDuration, crouching, attack.blockPushback, attacker));
+                controller.EnterBlockstun(attack.blockstunDuration, crouching, attack.blockPushback, attacker);
                 return true;
 
             case GuardResult.GuardBroken:
@@ -259,7 +262,7 @@ public class Hurtbox : MonoBehaviour
         if (health.IsDead)
         {
             PlayKnockoutFeedback();
-            controller.ChangeState(new DeathState(controller));
+            controller.EnterDeath();
         }
     }
 
@@ -290,18 +293,14 @@ public class Hurtbox : MonoBehaviour
         if (attack.isLauncher)
         {
             float launchMultiplier = counterHit ? CounterLaunchMultiplier : 1f;
-            controller.ChangeState(new AirborneHurtState(controller, attack.launchForce * launchMultiplier, attack.hitPushback, attacker));
+            controller.EnterAirborneHurt(attack.launchForce * launchMultiplier, attack.hitPushback, attacker);
             return;
         }
 
         float hitstunMultiplier = counterHit ? CounterHitstunMultiplier : 1f;
         float pushbackMultiplier = counterHit ? CounterPushbackMultiplier : 1f;
 
-        controller.ChangeState(new HitstunState(
-            controller,
-            attack.hitstunDuration * hitstunMultiplier,
-            attack.hitPushback * pushbackMultiplier,
-            attacker));
+        controller.EnterHitstun(attack.hitstunDuration * hitstunMultiplier, attack.hitPushback * pushbackMultiplier, attacker);
     }
 
     /// <summary>
@@ -316,7 +315,7 @@ public class Hurtbox : MonoBehaviour
         float launchForce = attack.isLauncher ? attack.launchForce : AirResetLaunchForce;
         float drift = attack.isLauncher ? attack.hitPushback : AirHitDrift;
 
-        controller.ChangeState(new AirborneHurtState(controller, launchForce * launchMultiplier, drift, attacker));
+        controller.EnterAirborneHurt(launchForce * launchMultiplier, drift, attacker);
     }
 
     private void OnDrawGizmos()

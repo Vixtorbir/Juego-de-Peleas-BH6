@@ -8,6 +8,10 @@ public class CrouchState : RobotState
 
     public CrouchState(RobotController robot) : base(robot) { }
 
+    public override bool CanGuard => true;
+
+    public override bool IsCrouchingPosture => true;
+
     public override void Enter()
     {
         robot.SetCrouchingPosture(true);
@@ -20,19 +24,19 @@ public class CrouchState : RobotState
 
         if (robot.TryConsumeCommand(FighterCommand.LeftPunch) || robot.TryConsumeCommand(FighterCommand.RightPunch))
         {
-            robot.ChangeState(new CrouchAttackState(robot, robot.crouchPunchBase));
+            robot.EnterCrouchAttack(robot.crouchPunchBase);
             return;
         }
 
         if (robot.TryConsumeCommand(FighterCommand.LeftKick) || robot.TryConsumeCommand(FighterCommand.RightKick))
         {
-            robot.ChangeState(new CrouchAttackState(robot, robot.crouchSweepBase));
+            robot.EnterCrouchAttack(robot.crouchSweepBase);
             return;
         }
 
         if (robot.MovementInput.y > StandUpInputThreshold)
         {
-            robot.ChangeState(new IdleState(robot));
+            robot.EnterIdle();
             return;
         }
 

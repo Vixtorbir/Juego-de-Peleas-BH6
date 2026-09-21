@@ -7,13 +7,17 @@ using UnityEngine;
 /// (invincible frames, height mismatch) keeps flying until it reaches a boundary wall or its
 /// lifetime runs out; either way it returns to the pool by deactivating instead of being destroyed.
 /// The collision matrix limits its contacts to fighter bodies and walls, and the kinematic body on
-/// the prefab makes it a true moving trigger rather than a static collider dragged by its transform.
+/// the prefab makes it a true moving trigger: it advances with <see cref="Rigidbody.MovePosition"/>
+/// on the physics step, so PhysX sweeps the shape between poses and the renderer interpolates it,
+/// instead of teleporting a collider through its transform every frame.
 /// </summary>
 [RequireComponent(typeof(Collider))]
+[RequireComponent(typeof(Rigidbody))]
 public class HadoukenProjectile : MonoBehaviour
 {
     private const float Lifetime = 3f;
 
+    private Rigidbody body;
     private float speed;
     private float remainingLifetime;
     private Vector3 moveDirection;
@@ -21,6 +25,14 @@ public class HadoukenProjectile : MonoBehaviour
     private RobotController owner;
 
     public bool IsInFlight => remainingLifetime > 0f;
+
+    private void Awake()
+    {
+        body = GetComponent<Rigidbody>();
+        body.isKinematic = true;
+        body.useGravity = false;
+        body.interpolation = RigidbodyInterpolation.Interpolate;
+    }
 
     public void Launch(Vector3 origin, Vector3 direction, float projectileSpeed, AttackData data, RobotController creator)
     {
@@ -32,6 +44,7 @@ public class HadoukenProjectile : MonoBehaviour
         remainingLifetime = Lifetime;
 
         gameObject.SetActive(true);
+        body.position = origin;
     }
 
     /// <summary>
@@ -45,16 +58,16 @@ public class HadoukenProjectile : MonoBehaviour
         gameObject.SetActive(false);
     }
 
-    private void Update()
+    private void FixedUpdate()
     {
-        remainingLifetime -= Time.deltaTime;
+        remainingLifetime -= Time.fixedDeltaTime;
         if (remainingLifetime <= 0f)
         {
             Recall();
             return;
         }
 
-        transform.Translate(moveDirection * (speed * Time.deltaTime), Space.World);
+        body.MovePosition(body.position + moveDirection * (speed * Time.fixedDeltaTime));
     }
 
     private void OnTriggerEnter(Collider other)

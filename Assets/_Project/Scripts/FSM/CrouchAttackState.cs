@@ -1,74 +1,33 @@
-using UnityEngine;
-
 /// <summary>
 /// Crouching normal attack. Shares the startup/active/recovery timeline and the on-connect special
 /// and chain cancel rules of <see cref="AttackState"/>, but keeps the collision capsule crouched
-/// for the whole duration.
+/// for the whole duration and returns to the crouch when the stick is still held down.
 /// </summary>
-public class CrouchAttackState : RobotState
+public class CrouchAttackState : AttackState
 {
     private const float StayCrouchedInputThreshold = -0.2f;
 
-    private readonly AttackData data;
-    private float stateTimer;
-    private bool hitboxActive;
+    public CrouchAttackState(RobotController robot) : base(robot) { }
 
-    public CrouchAttackState(RobotController robot, AttackData attackData) : base(robot)
-    {
-        data = attackData;
-    }
+    public override bool IsCrouchingPosture => true;
 
     public override void Enter()
     {
-        stateTimer = 0f;
-        hitboxActive = false;
-        robot.IsInAttackStartup = true;
-        robot.AttackConnected = false;
         robot.SetCrouchingPosture(true);
-        PlayAttackAnimation(data);
-    }
-
-    public override void Tick()
-    {
-        stateTimer += Time.deltaTime;
-        ApplyGroundingForce();
-
-        if (stateTimer < data.startupTime) return;
-
-        robot.IsInAttackStartup = false;
-        if (TrySpecialCancel(data)) return;
-        if (TryChainCancel(data)) return;
-
-        if (stateTimer < data.ActiveEndTime)
-        {
-            if (!hitboxActive)
-            {
-                robot.hitboxBase.Activate(data);
-                hitboxActive = true;
-            }
-            return;
-        }
-
-        if (hitboxActive)
-        {
-            robot.hitboxBase.Deactivate();
-            hitboxActive = false;
-
-            if (!robot.AttackConnected && AudioManager.Instance != null) AudioManager.Instance.PlayWhiff();
-        }
-
-        if (stateTimer < data.TotalDuration) return;
-
-        if (robot.MovementInput.y < StayCrouchedInputThreshold)
-            robot.ChangeState(new CrouchState(robot));
-        else
-            robot.ChangeState(new IdleState(robot));
+        base.Enter();
     }
 
     public override void Exit()
     {
-        robot.IsInAttackStartup = false;
-        robot.hitboxBase.Deactivate();
+        base.Exit();
         robot.SetCrouchingPosture(false);
+    }
+
+    protected override void ExitToStance()
+    {
+        if (robot.MovementInput.y < StayCrouchedInputThreshold)
+            robot.EnterCrouch();
+        else
+            robot.EnterIdle();
     }
 }

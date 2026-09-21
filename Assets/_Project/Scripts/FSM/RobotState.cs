@@ -1,9 +1,10 @@
 using UnityEngine;
 
 /// <summary>
-/// Base class for every fighter state. States are self-contained behaviours that read from
-/// the owning <see cref="RobotController"/> and request transitions through
-/// <see cref="RobotController.ChangeState"/>.
+/// Base class for every fighter state. States are allocated once by the owning
+/// <see cref="RobotController"/> and re-used for the whole match: parameters are written through
+/// a state's Configure method and transitions go through the controller's typed entry points, so
+/// no state object is ever created while the match is running.
 /// </summary>
 public abstract class RobotState
 {
@@ -17,6 +18,18 @@ public abstract class RobotState
     {
         this.robot = robot;
     }
+
+    /// <summary>
+    /// True while the fighter can raise a guard. Reactions and attacks return false, so a hit
+    /// confirmed during hitstun or recovery can never be blocked by holding back.
+    /// </summary>
+    public virtual bool CanGuard => false;
+
+    /// <summary>
+    /// True while the collision capsule is lowered. Guard height is resolved from this posture
+    /// rather than from the raw stick, so a standing fighter holding down is still hit high.
+    /// </summary>
+    public virtual bool IsCrouchingPosture => false;
 
     public virtual void Enter() { }
 
@@ -85,7 +98,7 @@ public abstract class RobotState
             ComboBranch branch = data.comboBranches[i];
             if (branch.nextAttack == null || !robot.TryConsumeCommand(branch.inputCommand)) continue;
 
-            robot.ChangeState(new AttackState(robot, branch.nextAttack));
+            robot.EnterAttack(branch.nextAttack);
             return true;
         }
 
@@ -137,13 +150,13 @@ public abstract class RobotState
     {
         if (robot.TryConsumeCommand(FighterCommand.Hadouken))
         {
-            robot.ChangeState(new SpecialAttackState(robot, robot.hadoukenData, robot.Projectiles, robot.hadoukenSpawnPoint));
+            robot.EnterSpecialAttack(robot.hadoukenData);
             return true;
         }
 
         if (robot.TryConsumeCommand(FighterCommand.Shoryuken))
         {
-            robot.ChangeState(new ShoryukenState(robot, robot.shoryukenData));
+            robot.EnterShoryuken(robot.shoryukenData);
             return true;
         }
 
@@ -154,13 +167,13 @@ public abstract class RobotState
     {
         if (robot.TryConsumeCommand(FighterCommand.DashForward))
         {
-            robot.ChangeState(new DashState(robot, true));
+            robot.EnterDash(true);
             return true;
         }
 
         if (robot.TryConsumeCommand(FighterCommand.DashBackward))
         {
-            robot.ChangeState(new DashState(robot, false));
+            robot.EnterDash(false);
             return true;
         }
 

@@ -34,7 +34,7 @@ public class JumpState : RobotState
 
         if (HasLanded(verticalVelocity))
         {
-            robot.ChangeState(new IdleState(robot));
+            robot.EnterIdle();
         }
     }
 }

@@ -4,28 +4,39 @@ using UnityEngine;
 /// Reaction to a blocked attack. Shorter than hitstun and with weaker knockback, it preserves
 /// the crouching posture if the block was taken low so the guard is not dropped on exit.
 /// A cornered block hands slightly less momentum back to the attacker than a cornered hit,
-/// which keeps corner pressure and frame traps viable.
+/// which keeps corner pressure and frame traps viable. The guard stays up throughout, so a
+/// string of blocked hits keeps being blocked at the same height.
 /// </summary>
 public class BlockstunState : RobotState
 {
     private const float WallTransferRatio = 0.8f;
     private const float StayCrouchedInputThreshold = -0.2f;
 
-    private readonly bool blockedCrouching;
-    private readonly float duration;
+    private bool blockedCrouching;
+    private float duration;
+    private float pushbackForce;
+    private RobotController attacker;
     private float timer;
     private PushbackSolver pushback;
 
-    public BlockstunState(RobotController robot, float duration, bool isCrouching, float pushbackForce, RobotController attacker) : base(robot)
+    public BlockstunState(RobotController robot) : base(robot) { }
+
+    public override bool CanGuard => true;
+
+    public override bool IsCrouchingPosture => blockedCrouching;
+
+    public void Configure(float blockstunDuration, bool isCrouching, float initialPushback, RobotController source)
     {
-        this.duration = duration;
-        timer = duration;
+        duration = blockstunDuration;
         blockedCrouching = isCrouching;
-        pushback = new PushbackSolver(robot, attacker, pushbackForce, WallTransferRatio);
+        pushbackForce = initialPushback;
+        attacker = source;
     }
 
     public override void Enter()
     {
+        timer = duration;
+        pushback = new PushbackSolver(robot, attacker, pushbackForce, WallTransferRatio);
         PlayTimedAnimation(FighterAnimatorParameters.Blockstun, robot.blockReactionClip, duration);
 
         if (blockedCrouching)
@@ -43,16 +54,17 @@ public class BlockstunState : RobotState
         if (timer > 0f) return;
 
         if (robot.MovementInput.y < StayCrouchedInputThreshold)
-            robot.ChangeState(new CrouchState(robot));
+            robot.EnterCrouch();
         else
-            robot.ChangeState(new IdleState(robot));
+            robot.EnterIdle();
     }
 
+    /// <summary>
+    /// Always restores the standing capsule: the state is configured for its next entry before
+    /// this runs, so the flag can no longer be trusted to say how the previous block was taken.
+    /// </summary>
     public override void Exit()
     {
-        if (blockedCrouching)
-        {
-            robot.SetCrouchingPosture(false);
-        }
+        robot.SetCrouchingPosture(false);
     }
 }

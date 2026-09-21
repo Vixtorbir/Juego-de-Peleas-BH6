@@ -80,7 +80,7 @@ public class CombatChainPlayModeTests
     {
         float startHealth = player2.Health.CurrentHealth;
 
-        player1.ChangeState(new AttackState(player1, player1.launcherBase));
+        player1.EnterAttack(player1.launcherBase);
         yield return WaitForState<AirborneHurtState>(player2);
 
         float afterLauncher = player2.Health.CurrentHealth;
@@ -89,7 +89,7 @@ public class CombatChainPlayModeTests
         yield return WaitUntilRealtime(() => player2.transform.position.y > 0.6f, "Defender never left the ground.");
         Assert.IsFalse(player2.IsGrounded, "Defender should be airborne after the launcher.");
 
-        player1.ChangeState(new ShoryukenState(player1, player1.shoryukenData));
+        player1.EnterShoryuken(player1.shoryukenData);
         yield return WaitUntilRealtime(() => player2.Health.CurrentHealth < afterLauncher, "Shoryuken never connected with the airborne defender.");
         Assert.IsTrue(player2.CurrentState is AirborneHurtState, "Air hit should re-launch the defender into the juggle state.");
 
@@ -100,7 +100,7 @@ public class CombatChainPlayModeTests
     [UnityTest]
     public IEnumerator CleanHitFreezesGameClock()
     {
-        player1.ChangeState(new AttackState(player1, player1.rightPunchBase));
+        player1.EnterAttack(player1.rightPunchBase);
         yield return WaitUntilRealtime(() => CombatEffectsManager.Instance.IsHitstopActive, "No hitstop was triggered by a clean hit.");
 
         Assert.Less(Time.timeScale, 0.05f, "Hitstop should freeze the game clock.");
@@ -127,7 +127,7 @@ public class CombatChainPlayModeTests
         float attackerStartX = player1.transform.position.x;
         float defenderMaxX = defenderStartX;
 
-        player1.ChangeState(new AttackState(player1, player1.rightKickBase));
+        player1.EnterAttack(player1.rightKickBase);
         yield return WaitForState<HitstunState>(player2);
 
         while (player2.CurrentState is HitstunState)
@@ -152,7 +152,7 @@ public class CombatChainPlayModeTests
         int projectilesBefore = CountProjectilesInScene();
         float startHealth = player2.Health.CurrentHealth;
 
-        player1.ChangeState(new SpecialAttackState(player1, player1.hadoukenData, player1.Projectiles, player1.hadoukenSpawnPoint));
+        player1.EnterSpecialAttack(player1.hadoukenData);
         yield return WaitUntilRealtime(() => player1.Projectiles.CountInFlight() > 0, "Hadouken was never fired.");
         yield return WaitUntilRealtime(() => player2.Health.CurrentHealth < startHealth, "Hadouken never connected.");
 

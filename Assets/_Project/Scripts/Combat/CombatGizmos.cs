@@ -33,6 +33,27 @@ public static class CombatGizmos
         }
     }
 
+    /// <summary>
+    /// Draws the horizontal separation rule a fighter enforces against its opponent: a cylinder of
+    /// the given radius standing on the fighter's feet, rendered as two rings and four edges.
+    /// </summary>
+    public static void DrawPushbox(Transform owner, float radius, float height, Color color)
+    {
+        Vector3 bottom = owner.position;
+        Vector3 top = bottom + Vector3.up * height;
+
+        Gizmos.color = color;
+        DrawRing(bottom, Vector3.right, Vector3.forward, radius);
+        DrawRing(top, Vector3.right, Vector3.forward, radius);
+
+        Vector3 right = Vector3.right * radius;
+        Vector3 forward = Vector3.forward * radius;
+        Gizmos.DrawLine(bottom + right, top + right);
+        Gizmos.DrawLine(bottom - right, top - right);
+        Gizmos.DrawLine(bottom + forward, top + forward);
+        Gizmos.DrawLine(bottom - forward, top - forward);
+    }
+
     private static void DrawBox(BoxCollider box, Color fillColor, Color wireColor)
     {
         Gizmos.matrix = box.transform.localToWorldMatrix;

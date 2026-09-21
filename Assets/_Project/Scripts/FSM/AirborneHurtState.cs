@@ -12,20 +12,25 @@ public class AirborneHurtState : RobotState
     private const float LandingRecoveryDuration = 0.45f;
     private const float DriftDamping = 1.2f;
 
-    private readonly float driftSpeed;
-    private readonly RobotController attacker;
+    private float launchForce;
+    private float driftSpeed;
+    private RobotController attacker;
     private float verticalVelocity;
     private float horizontalVelocity;
 
-    public AirborneHurtState(RobotController robot, float launchForce, float drift, RobotController attacker) : base(robot)
+    public AirborneHurtState(RobotController robot) : base(robot) { }
+
+    public void Configure(float launch, float drift, RobotController source)
     {
-        verticalVelocity = launchForce;
+        launchForce = launch;
         driftSpeed = drift;
-        this.attacker = attacker;
+        attacker = source;
     }
 
     public override void Enter()
     {
+        verticalVelocity = launchForce;
+
         float awayFromAttacker = attacker != null
             ? Mathf.Sign(robot.transform.position.x - attacker.transform.position.x)
             : -robot.transform.forward.x;
@@ -44,7 +49,7 @@ public class AirborneHurtState : RobotState
 
         if (HasLanded(verticalVelocity))
         {
-            robot.ChangeState(new HitstunState(robot, LandingRecoveryDuration, 0f, attacker));
+            robot.EnterHitstun(LandingRecoveryDuration, 0f, attacker);
         }
     }
 }

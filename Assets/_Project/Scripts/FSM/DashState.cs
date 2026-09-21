@@ -10,13 +10,15 @@ public class DashState : RobotState
     private const float DashDuration = 0.18f;
     private const float DashSpeed = 14f;
 
-    private readonly bool isForward;
+    private bool isForward;
     private float stateTimer;
     private Vector3 dashDirection;
 
-    public DashState(RobotController robot, bool isForward) : base(robot)
+    public DashState(RobotController robot) : base(robot) { }
+
+    public void Configure(bool forward)
     {
-        this.isForward = isForward;
+        isForward = forward;
     }
 
     public override void Enter()
@@ -42,7 +44,7 @@ public class DashState : RobotState
 
         if (stateTimer <= 0f)
         {
-            robot.ChangeState(new IdleState(robot));
+            robot.EnterIdle();
         }
     }
 }

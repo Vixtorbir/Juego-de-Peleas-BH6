@@ -221,7 +221,8 @@ public static class FighterSceneSetup
     /// <summary>
     /// The melee hitbox holder sits at the fighter origin with no offset of its own: every attack
     /// reshapes the box from its <see cref="AttackData"/> offset and size, so the reach of each strike
-    /// is authored next to its frame data instead of on a scene object.
+    /// is authored next to its frame data instead of on a scene object. A kinematic Rigidbody makes
+    /// the volume a kinematic trigger, so PhysX tracks it as a moving actor instead of a static shape.
     /// </summary>
     private static Hitbox ConfigureMeleeHitbox(RobotController fighter)
     {
@@ -233,6 +234,10 @@ public static class FighterSceneSetup
             hitboxObject.AddComponent<BoxCollider>();
             hitbox = hitboxObject.AddComponent<Hitbox>();
         }
+
+        Rigidbody body = EnsureComponent<Rigidbody>(hitbox.gameObject);
+        body.isKinematic = true;
+        body.useGravity = false;
 
         hitbox.gameObject.layer = CombatLayers.HitboxLayer;
         hitbox.transform.localPosition = Vector3.zero;

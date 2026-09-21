@@ -3,25 +3,32 @@ using UnityEngine;
 /// <summary>
 /// Reaction to a clean hit. The fighter is locked out of input for the attack's hitstun
 /// duration while knockback (with corner transfer to the attacker) is integrated by
-/// <see cref="PushbackSolver"/>.
+/// <see cref="PushbackSolver"/>. Guarding is impossible here, which is what makes a chain
+/// that connects during hitstun a true combo.
 /// </summary>
 public class HitstunState : RobotState
 {
     private const float WallTransferRatio = 1f;
 
-    private readonly float duration;
+    private float duration;
+    private float pushbackForce;
+    private RobotController attacker;
     private float timer;
     private PushbackSolver pushback;
 
-    public HitstunState(RobotController robot, float hitstunDuration, float pushbackForce, RobotController attacker) : base(robot)
+    public HitstunState(RobotController robot) : base(robot) { }
+
+    public void Configure(float hitstunDuration, float initialPushback, RobotController source)
     {
         duration = hitstunDuration;
-        timer = hitstunDuration;
-        pushback = new PushbackSolver(robot, attacker, pushbackForce, WallTransferRatio);
+        pushbackForce = initialPushback;
+        attacker = source;
     }
 
     public override void Enter()
     {
+        timer = duration;
+        pushback = new PushbackSolver(robot, attacker, pushbackForce, WallTransferRatio);
         PlayTimedAnimation(FighterAnimatorParameters.Hitstun, robot.hitReactionClip, duration);
     }
 
@@ -33,7 +40,7 @@ public class HitstunState : RobotState
 
         if (timer <= 0f)
         {
-            robot.ChangeState(new IdleState(robot));
+            robot.EnterIdle();
         }
     }
 }

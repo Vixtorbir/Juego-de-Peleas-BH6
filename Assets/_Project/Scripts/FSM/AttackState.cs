@@ -9,11 +9,13 @@ using UnityEngine;
 /// </summary>
 public class AttackState : RobotState
 {
-    private readonly AttackData data;
+    private AttackData data;
     private float stateTimer;
     private bool hitboxActive;
 
-    public AttackState(RobotController robot, AttackData attackData) : base(robot)
+    public AttackState(RobotController robot) : base(robot) { }
+
+    public void Configure(AttackData attackData)
     {
         data = attackData;
     }
@@ -31,6 +33,12 @@ public class AttackState : RobotState
     {
         stateTimer += Time.deltaTime;
         ApplyGroundingForce();
+
+        if (data == null)
+        {
+            ExitToStance();
+            return;
+        }
 
         if (stateTimer < data.startupTime) return;
 
@@ -58,7 +66,7 @@ public class AttackState : RobotState
 
         if (stateTimer >= data.TotalDuration)
         {
-            robot.ChangeState(new IdleState(robot));
+            ExitToStance();
         }
     }
 
@@ -66,5 +74,14 @@ public class AttackState : RobotState
     {
         robot.IsInAttackStartup = false;
         robot.hitboxBase.Deactivate();
+    }
+
+    /// <summary>
+    /// Stance the fighter settles into once the recovery frames elapse. Standing attacks always
+    /// return to Idle; crouching attacks override this to honour a held-down stick.
+    /// </summary>
+    protected virtual void ExitToStance()
+    {
+        robot.EnterIdle();
     }
 }

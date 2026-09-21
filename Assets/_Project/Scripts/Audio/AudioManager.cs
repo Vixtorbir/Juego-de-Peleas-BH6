@@ -1,9 +1,12 @@
 using UnityEngine;
+using UnityEngine.Audio;
 
 /// <summary>
 /// Scene-wide audio service. One-shot SFX are played through a fixed round-robin pool of
 /// AudioSources created once at startup, so overlapping hits never cut each other off and no
 /// components or clips are allocated during the match. Music runs on its own looping source.
+/// Each pool is routed to its mixer group when one is assigned (Master > SFX and Master > Music
+/// in CombatMixer), and falls back to the listener when the project has no mixer wired yet.
 /// Gameplay code only ever calls the semantic methods below; the mapping to clips lives in the
 /// <see cref="CombatAudioLibrary"/> asset.
 /// </summary>
@@ -16,6 +19,14 @@ public class AudioManager : MonoBehaviour
     public static AudioManager Instance { get; private set; }
 
     [SerializeField] private CombatAudioLibrary library;
+
+    [Header("Mixer Routing")]
+    [Tooltip("Output group for every one-shot combat effect. Optional; unrouted sources play straight to the listener.")]
+    [SerializeField] private AudioMixerGroup sfxMixerGroup;
+    [Tooltip("Output group for the battle theme. Optional; unrouted sources play straight to the listener.")]
+    [SerializeField] private AudioMixerGroup musicMixerGroup;
+
+    [Header("Music")]
     [SerializeField] private bool playMusicOnStart = true;
     [Tooltip("Master level for the battle theme. Kept low so the music sits under the hit and block effects.")]
     [SerializeField, Range(0f, 1f)] private float musicMasterVolume = 0.16f;
@@ -151,13 +162,13 @@ public class AudioManager : MonoBehaviour
         sfxSources = new AudioSource[SfxSourceCount];
         for (int i = 0; i < SfxSourceCount; i++)
         {
-            sfxSources[i] = CreateSource("SFX Source", false);
+            sfxSources[i] = CreateSource("SFX Source", false, sfxMixerGroup);
         }
 
-        musicSource = CreateSource("Music Source", true);
+        musicSource = CreateSource("Music Source", true, musicMixerGroup);
     }
 
-    private AudioSource CreateSource(string name, bool loop)
+    private AudioSource CreateSource(string name, bool loop, AudioMixerGroup outputGroup)
     {
         var holder = new GameObject(name);
         holder.transform.SetParent(transform, false);
@@ -167,6 +178,7 @@ public class AudioManager : MonoBehaviour
         source.loop = loop;
         source.spatialBlend = 0f;
         source.ignoreListenerPause = true;
+        if (outputGroup != null) source.outputAudioMixerGroup = outputGroup;
         return source;
     }
 }

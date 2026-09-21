@@ -11,6 +11,8 @@ public class IdleState : RobotState
 
     public IdleState(RobotController robot) : base(robot) { }
 
+    public override bool CanGuard => true;
+
     public override void Enter()
     {
         robot.animator.SetFloat(FighterAnimatorParameters.InputX, 0f);
@@ -30,19 +32,19 @@ public class IdleState : RobotState
 
         if (robot.MovementInput.y > VerticalInputThreshold)
         {
-            robot.ChangeState(new JumpState(robot));
+            robot.EnterJump();
             return;
         }
 
         if (robot.MovementInput.y < -VerticalInputThreshold)
         {
-            robot.ChangeState(new CrouchState(robot));
+            robot.EnterCrouch();
             return;
         }
 
         if (Mathf.Abs(robot.MovementInput.x) > WalkInputThreshold)
         {
-            robot.ChangeState(new WalkState(robot));
+            robot.EnterWalk();
             return;
         }
 
@@ -53,25 +55,25 @@ public class IdleState : RobotState
     {
         if (robot.TryConsumeCommand(FighterCommand.LeftPunch))
         {
-            robot.ChangeState(new AttackState(robot, robot.leftPunchBase));
+            robot.EnterAttack(robot.leftPunchBase);
             return true;
         }
 
         if (robot.TryConsumeCommand(FighterCommand.RightPunch))
         {
-            robot.ChangeState(new AttackState(robot, robot.rightPunchBase));
+            robot.EnterAttack(robot.rightPunchBase);
             return true;
         }
 
         if (robot.TryConsumeCommand(FighterCommand.LeftKick))
         {
-            robot.ChangeState(new AttackState(robot, robot.leftKickBase));
+            robot.EnterAttack(robot.leftKickBase);
             return true;
         }
 
         if (robot.TryConsumeCommand(FighterCommand.RightKick))
         {
-            robot.ChangeState(new AttackState(robot, robot.rightKickBase));
+            robot.EnterAttack(robot.rightKickBase);
             return true;
         }
 

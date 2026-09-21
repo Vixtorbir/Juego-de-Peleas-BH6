@@ -6,9 +6,10 @@ using UnityEngine.InputSystem.Utilities;
 
 /// <summary>
 /// Drives the round flow of a match: places both fighters, locks input during the intro, runs
-/// the round clock, detects knockouts or time over and tallies round wins until one side reaches
-/// <see cref="roundsToWin"/>. Every transition is broadcast through C# events so presentation
-/// layers (HUD, announcer) bind once instead of polling. Fighters are injected so a future
+/// the round clock, reacts to knockouts through each fighter's <see cref="HealthComponent.OnDeath"/>
+/// or to time over, and tallies round wins until one side reaches <see cref="roundsToWin"/>.
+/// Every transition is broadcast through C# events so presentation layers (HUD, announcer) bind
+/// once instead of polling. Fighters are injected so a future
 /// character select can call <see cref="InitializeMatch"/>. Once the match is over, any player
 /// can restart it from the keyboard or from a controller's Start or South button.
 /// </summary>
@@ -87,6 +88,7 @@ public class MatchManager : MonoBehaviour
 
     private void OnDestroy()
     {
+        UnbindFighterHealth();
         if (Instance == this) Instance = null;
     }
 
@@ -108,27 +110,17 @@ public class MatchManager : MonoBehaviour
 
         if (CurrentState != MatchState.Fighting) return;
 
-        if (p1Health != null && p1Health.IsDead)
-        {
-            StartCoroutine(RoundEndRoutine(player2));
-            return;
-        }
-
-        if (p2Health != null && p2Health.IsDead)
-        {
-            StartCoroutine(RoundEndRoutine(player1));
-            return;
-        }
-
         TickRoundClock();
     }
 
     public void InitializeMatch(RobotController p1, RobotController p2)
     {
+        UnbindFighterHealth();
         player1 = p1;
         player2 = p2;
         p1Health = p1.GetComponent<HealthComponent>();
         p2Health = p2.GetComponent<HealthComponent>();
+        BindFighterHealth();
 
         RoundNumber = 0;
         Player1RoundsWon = 0;
@@ -158,6 +150,32 @@ public class MatchManager : MonoBehaviour
     {
         roundTimeRemaining = Mathf.Max(0f, seconds);
         PublishSeconds(Mathf.CeilToInt(roundTimeRemaining));
+    }
+
+    private void BindFighterHealth()
+    {
+        if (p1Health != null) p1Health.OnDeath += HandlePlayer1Knockout;
+        if (p2Health != null) p2Health.OnDeath += HandlePlayer2Knockout;
+    }
+
+    private void UnbindFighterHealth()
+    {
+        if (p1Health != null) p1Health.OnDeath -= HandlePlayer1Knockout;
+        if (p2Health != null) p2Health.OnDeath -= HandlePlayer2Knockout;
+    }
+
+    private void HandlePlayer1Knockout() => EndRound(player2);
+
+    private void HandlePlayer2Knockout() => EndRound(player1);
+
+    /// <summary>
+    /// Closes the round for <paramref name="winner"/>. A knockout arriving once the round is already
+    /// decided (both fighters dropping on the same physics step) is ignored, so a round can only end once.
+    /// </summary>
+    private void EndRound(RobotController winner)
+    {
+        if (CurrentState != MatchState.Fighting) return;
+        StartCoroutine(RoundEndRoutine(winner));
     }
 
     private IEnumerator RoundFlowRoutine()
@@ -195,7 +213,7 @@ public class MatchManager : MonoBehaviour
         roundTimeRemaining = 0f;
         PublishSeconds(0);
         OnTimeOver?.Invoke();
-        StartCoroutine(RoundEndRoutine(ResolveTimeOverWinner()));
+        EndRound(ResolveTimeOverWinner());
     }
 
     private void PublishSeconds(int seconds)

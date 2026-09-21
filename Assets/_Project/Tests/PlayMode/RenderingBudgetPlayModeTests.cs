@@ -114,7 +114,7 @@ public class RenderingBudgetPlayModeTests
 
     private IEnumerator Sample(FrameSample sample, bool fighting)
     {
-        RobotState lastState = player2.CurrentState;
+        int transitionsAtStart = player2.TransitionCount;
         float start = Time.time;
         float nextAttackTime = start;
         sample.Allocations.BeginWindow();
@@ -136,14 +136,9 @@ public class RenderingBudgetPlayModeTests
             sample.SetPassCalls += UnityEditor.UnityStats.setPassCalls;
             sample.ShadowCasters += UnityEditor.UnityStats.shadowCasters;
             sample.Triangles += UnityEditor.UnityStats.triangles;
-
-            if (!ReferenceEquals(lastState, player2.CurrentState))
-            {
-                lastState = player2.CurrentState;
-                sample.Transitions++;
-            }
         }
 
+        sample.Transitions += player2.TransitionCount - transitionsAtStart;
         sample.Allocations.EndWindow();
     }
 

@@ -11,18 +11,15 @@ public class SpecialAttackState : RobotState
 {
     private const float ProjectileSpeed = 12f;
 
-    private readonly AttackData attackData;
-    private readonly ProjectilePool projectiles;
-    private readonly Transform spawnPoint;
-
+    private AttackData attackData;
     private float timer;
     private bool projectileFired;
 
-    public SpecialAttackState(RobotController robot, AttackData data, ProjectilePool pool, Transform spawn) : base(robot)
+    public SpecialAttackState(RobotController robot) : base(robot) { }
+
+    public void Configure(AttackData data)
     {
         attackData = data;
-        projectiles = pool;
-        spawnPoint = spawn;
     }
 
     public override void Enter()
@@ -44,7 +41,7 @@ public class SpecialAttackState : RobotState
 
         if (attackData == null)
         {
-            robot.ChangeState(new IdleState(robot));
+            robot.EnterIdle();
             return;
         }
 
@@ -55,7 +52,7 @@ public class SpecialAttackState : RobotState
 
         if (timer >= attackData.TotalDuration)
         {
-            robot.ChangeState(new IdleState(robot));
+            robot.EnterIdle();
         }
     }
 
@@ -63,6 +60,8 @@ public class SpecialAttackState : RobotState
     {
         projectileFired = true;
 
+        ProjectilePool projectiles = robot.Projectiles;
+        Transform spawnPoint = robot.hadoukenSpawnPoint;
         if (projectiles == null || spawnPoint == null) return;
         if (AudioManager.Instance != null) AudioManager.Instance.PlayHadoukenShot();
 

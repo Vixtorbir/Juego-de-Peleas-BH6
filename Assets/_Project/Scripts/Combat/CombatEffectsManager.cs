@@ -26,6 +26,18 @@ public class CombatEffectsManager : MonoBehaviour
         Instance = this;
     }
 
+    /// <summary>
+    /// A hitstop in flight must never outlive the manager: disabling it (scene unload, editor
+    /// stop, object toggled) clears the freeze so the next scene starts on normal time.
+    /// </summary>
+    private void OnDisable()
+    {
+        if (Instance != this) return;
+
+        hitstopRemaining = 0f;
+        Time.timeScale = 1f;
+    }
+
     private void OnDestroy()
     {
         if (Instance == this)

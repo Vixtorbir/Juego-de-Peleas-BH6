@@ -25,6 +25,8 @@ public class InputReader : MonoBehaviour
     private const string RightKickActionName = "RightKick";
     private const int MaxControllersPerRefresh = 8;
 
+    private static readonly Comparison<InputDevice> DeviceIdOrder = CompareByDeviceId;
+
     [Header("Player Assignment")]
     [FormerlySerializedAs("tipoJugador")]
     public PlayerSlot playerSlot = PlayerSlot.Player1;
@@ -44,8 +46,11 @@ public class InputReader : MonoBehaviour
     private InputAction rightKickAction;
 
     private readonly List<InputDevice> connectedControllers = new List<InputDevice>(MaxControllersPerRefresh);
-    private readonly List<InputDevice> allowedDevices = new List<InputDevice>(2);
+    private readonly List<InputDevice> listenedDevices = new List<InputDevice>(MaxControllersPerRefresh + 1);
     private readonly StringBuilder deviceReport = new StringBuilder(128);
+
+    private InputDevice[] routedDevices;
+    private bool routedUnrestricted;
 
     private void Awake()
     {
@@ -113,31 +118,51 @@ public class InputReader : MonoBehaviour
     /// Decides which devices this slot listens to. With fewer than two controllers Player 1 is left
     /// unrestricted (every device reaches it) and Player 2 keeps the keyboard only, so a single pad
     /// never drives both fighters. With two or more controllers each slot gets the keyboard plus the
-    /// controller matching its index in connection order.
+    /// controller matching its index in connection order. The routing is only pushed to the asset,
+    /// and only logged, when the resolved device set actually differs from the one in place, so the
+    /// per-round enable/disable cycle driven by the match flow neither allocates nor spams the log.
     /// </summary>
     private void RefreshDeviceRouting()
     {
         CollectConnectedControllers();
-        allowedDevices.Clear();
+        listenedDevices.Clear();
 
         bool splitControllers = connectedControllers.Count >= 2;
         bool unrestricted = !splitControllers && playerSlot == PlayerSlot.Player1;
 
+        if (Keyboard.current != null) listenedDevices.Add(Keyboard.current);
+
         if (unrestricted)
         {
-            controls.devices = null;
+            for (int i = 0; i < connectedControllers.Count; i++) listenedDevices.Add(connectedControllers[i]);
         }
-        else
+        else if (splitControllers)
         {
-            if (Keyboard.current != null) allowedDevices.Add(Keyboard.current);
-
             int controllerIndex = playerSlot == PlayerSlot.Player1 ? 0 : 1;
-            if (splitControllers) allowedDevices.Add(connectedControllers[controllerIndex]);
-
-            controls.devices = allowedDevices.ToArray();
+            listenedDevices.Add(connectedControllers[controllerIndex]);
         }
 
-        LogDeviceRouting(unrestricted);
+        if (routedDevices != null && unrestricted == routedUnrestricted && IsSameDeviceSet(listenedDevices, routedDevices)) return;
+
+        routedDevices = listenedDevices.ToArray();
+        routedUnrestricted = unrestricted;
+
+        if (unrestricted) controls.devices = null;
+        else controls.devices = routedDevices;
+
+        LogDeviceRouting();
+    }
+
+    private static bool IsSameDeviceSet(List<InputDevice> current, InputDevice[] previous)
+    {
+        if (current.Count != previous.Length) return false;
+
+        for (int i = 0; i < previous.Length; i++)
+        {
+            if (!ReferenceEquals(current[i], previous[i])) return false;
+        }
+
+        return true;
     }
 
     /// <summary>
@@ -160,26 +185,16 @@ public class InputReader : MonoBehaviour
             connectedControllers.Add(device);
         }
 
-        connectedControllers.Sort(CompareByDeviceId);
+        connectedControllers.Sort(DeviceIdOrder);
     }
 
     private static int CompareByDeviceId(InputDevice a, InputDevice b) => a.deviceId.CompareTo(b.deviceId);
 
-    private void LogDeviceRouting(bool unrestricted)
+    private void LogDeviceRouting()
     {
         deviceReport.Clear();
-        deviceReport.Append("Input initialized: listening to [");
-
-        if (unrestricted)
-        {
-            if (Keyboard.current != null) AppendDeviceName(Keyboard.current);
-            for (int i = 0; i < connectedControllers.Count; i++) AppendDeviceName(connectedControllers[i]);
-        }
-        else
-        {
-            for (int i = 0; i < allowedDevices.Count; i++) AppendDeviceName(allowedDevices[i]);
-        }
-
+        deviceReport.Append("Input routing: listening to [");
+        for (int i = 0; i < listenedDevices.Count; i++) AppendDeviceName(listenedDevices[i]);
         deviceReport.Append("] (").Append(playerSlot == PlayerSlot.Player1 ? "Player1" : "Player2").Append(')');
         Debug.Log(deviceReport.ToString(), this);
     }

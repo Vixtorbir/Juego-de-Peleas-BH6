@@ -3,19 +3,23 @@ using System.Collections.Generic;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.Audio;
 using UnityEngine.SceneManagement;
 
 /// <summary>
 /// Builds the <see cref="CombatAudioLibrary"/> asset from the clips under the audio folder,
-/// grouping variations by file name prefix, and installs an <see cref="AudioManager"/> on the
-/// scene's managers object. Import settings are tuned per role: short SFX decompress on load,
-/// music streams.
+/// grouping variations by file name prefix, installs an <see cref="AudioManager"/> on the
+/// scene's managers object and routes its pools to the SFX and Music groups of the combat mixer.
+/// Import settings are tuned per role: short SFX decompress on load, music streams.
 /// </summary>
 public static class AudioSceneSetup
 {
     private const string AudioRoot = "Assets/_Project/Audio";
     private const string LibraryPath = AudioRoot + "/CombatAudioLibrary.asset";
+    private const string MixerPath = AudioRoot + "/CombatMixer.mixer";
     private const string MusicFolder = AudioRoot + "/Music";
+    private const string SfxGroupName = "SFX";
+    private const string MusicGroupName = "Music";
     private const float MusicMasterVolume = 0.16f;
 
     private readonly struct EventBinding
@@ -187,9 +191,34 @@ public static class AudioSceneSetup
         var serialized = new SerializedObject(manager);
         serialized.FindProperty("library").objectReferenceValue = library;
         serialized.FindProperty("musicMasterVolume").floatValue = MusicMasterVolume;
+        serialized.FindProperty("sfxMixerGroup").objectReferenceValue = FindMixerGroup(SfxGroupName);
+        serialized.FindProperty("musicMixerGroup").objectReferenceValue = FindMixerGroup(MusicGroupName);
         serialized.ApplyModifiedPropertiesWithoutUndo();
 
         EditorSceneManager.MarkSceneDirty(scene);
         EditorSceneManager.SaveScene(scene);
+    }
+
+    /// <summary>
+    /// Resolves a child group of the combat mixer by exact name. A missing mixer or group leaves the
+    /// pool routed to the listener, which <see cref="AudioManager"/> tolerates, and is reported so the
+    /// mix is never silently flat.
+    /// </summary>
+    private static AudioMixerGroup FindMixerGroup(string groupName)
+    {
+        AudioMixer mixer = AssetDatabase.LoadAssetAtPath<AudioMixer>(MixerPath);
+        if (mixer == null)
+        {
+            Debug.LogError($"[AudioSceneSetup] Combat mixer not found at '{MixerPath}'; '{groupName}' left unrouted.");
+            return null;
+        }
+
+        foreach (AudioMixerGroup group in mixer.FindMatchingGroups(groupName))
+        {
+            if (group.name == groupName) return group;
+        }
+
+        Debug.LogError($"[AudioSceneSetup] Group '{groupName}' not found in '{MixerPath}'; left unrouted.");
+        return null;
     }
 }
