@@ -27,13 +27,17 @@ MonoBehaviour:
   impactSound: 1
   specialCancelable: 1
   cancelWindowEnd: 0
+  jumpCancelable: 0
+  dashCancelable: 1
   invincibleStartup: 0
   attackHeight: 1
+  isOverhead: 0
   blockstunDuration: 0.3
   hitPushback: 6
   blockPushback: 5
   isLauncher: 0
   launchForce: 15
+  isAirAttack: 0
   groundedReaction: 0
   airborneReaction: 2
   bounceForce: 9

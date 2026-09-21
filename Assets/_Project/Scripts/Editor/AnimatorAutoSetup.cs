@@ -99,7 +99,13 @@ public static class AnimatorAutoSetup
         { "CrouchSweep", new[] { "Leg_Sweep", "Leg Sweep" } },
         { "Launcher", new[] { "Launcher_Hook", "Hook Punch", "Uppercut" } },
         { "Hadouken", new[] { "Hadouken", "Fireball" } },
-        { "Shoryuken", new[] { "Uppercut", "Shoryuken" } }
+        { "Shoryuken", new[] { "Uppercut", "Shoryuken" } },
+        { "Overhead", new[] { "Cross_Punch", "Cross Punch" } },
+        { "AntiAir", new[] { "Uppercut", "Shoryuken" } },
+        { "AirLeftPunch", new[] { "Jab", "Punching" } },
+        { "AirRightPunch", new[] { "Cross_Punch", "Cross Punch" } },
+        { "AirLeftKick", new[] { "Front_Kick", "Kicking" } },
+        { "AirRightKick", new[] { "Roundhouse_Kick", "Roundhouse Kick", "Mma Kick" } }
     };
 
     [MenuItem("Fighting Game/Setup Animator Controller", priority = 20)]

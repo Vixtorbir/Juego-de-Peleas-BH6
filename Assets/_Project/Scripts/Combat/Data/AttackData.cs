@@ -114,11 +114,17 @@ public class AttackData : ScriptableObject
     public bool specialCancelable = true;
     [Tooltip("Seconds from the attack start after which chain and special cancels close. 0 keeps the window open to the end of recovery.")]
     public float cancelWindowEnd = 0f;
+    [Tooltip("On connect, holding up cancels the remaining frames into a super jump so the attacker can chase a launched opponent.")]
+    public bool jumpCancelable = false;
+    [Tooltip("On connect, a buffered dash cancels the remaining frames into the dash.")]
+    public bool dashCancelable = false;
     [Tooltip("The fighter ignores incoming hits during the startup frames. Reserved for reversal specials.")]
     public bool invincibleStartup = false;
 
     [Header("Guard & Block Settings")]
     public AttackHeight attackHeight = AttackHeight.Mid;
+    [Tooltip("Must be blocked standing: a crouching guard is broken. Jumping attacks and the overhead command normal set this.")]
+    public bool isOverhead = false;
     public float blockstunDuration = 0.25f;
 
     [Header("Pushback Settings")]
@@ -129,6 +135,10 @@ public class AttackData : ScriptableObject
     [Tooltip("Marks the launcher tier of the gatling ladder (Light > Medium > Heavy > Launcher) and defaults the grounded reaction to a launch.")]
     public bool isLauncher = false;
     public float launchForce = 15f;
+
+    [Header("Aerial")]
+    [Tooltip("Performed from a jump: the attacker keeps falling through the swing and lands into a short recovery.")]
+    public bool isAirAttack = false;
 
     [Header("Hit Reactions")]
     [Tooltip("Reaction of a standing or crouching defender. Hitstun on a launcher resolves to Launch.")]

@@ -73,6 +73,8 @@ public class CombatRules : ScriptableObject
     public float airResetLaunchForce = 7f;
     [Tooltip("Horizontal drift of a non-launcher air hit.")]
     public float airHitDrift = 1.5f;
+    [Tooltip("Vertical speed added above the attacker's own when an airborne attacker hits an airborne defender, so air chains carry the body along the attacker's arc.")]
+    public float airToAirPop = 1.5f;
     public int maxWallBounces = 1;
     public int maxGroundBounces = 1;
     [Tooltip("Fraction of horizontal speed kept when the body rebounds off a wall.")]
@@ -108,6 +110,22 @@ public class CombatRules : ScriptableObject
     [Tooltip("Game speed during the knockout beat.")]
     [Range(0.05f, 1f)] public float knockoutSlowMotionScale = 0.25f;
     public float knockoutSlowMotionDuration = 0.6f;
+
+    [Header("Air Mobility")]
+    [Tooltip("Horizontal speed of an air dash. Gravity is frozen for its duration.")]
+    public float airDashSpeed = 9f;
+    public float airDashDuration = 0.2f;
+    [Tooltip("Frames into an air dash before an air normal may interrupt it.")]
+    public float airDashAttackDelay = 3f * Frame;
+    [Tooltip("Fraction of the dash speed carried into the fall once the dash ends.")]
+    [Range(0f, 1f)] public float airDashCarryRatio = 0.5f;
+    public int maxAirDashesPerJump = 1;
+    [Tooltip("Height above the floor below which no air action may start, so a jump never dashes off the ground.")]
+    public float airActionMinHeight = 0.3f;
+    [Tooltip("Vertical speed of the super jump a jump cancel grants, tuned to follow a launched body.")]
+    public float jumpCancelForce = 15f;
+    [Tooltip("Recovery after landing during an air attack before control returns.")]
+    public float airLandingRecovery = 4f * Frame;
 
     [Header("Input Buffer")]
     [Tooltip("Frames an input stays valid once the fighter becomes actionable.")]

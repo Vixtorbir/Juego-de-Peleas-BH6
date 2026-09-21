@@ -1,36 +1,73 @@
 using UnityEngine;
 
 /// <summary>
-/// Ballistic jump. The horizontal component is locked at takeoff from the stick direction
-/// relative to the opponent, so the arc cannot be steered mid-air.
+/// Airborne state. On takeoff the horizontal component is locked from the stick direction relative
+/// to the opponent, so the arc cannot be steered mid-air; the state is also re-entered after an air
+/// dash or an air attack to continue the fall from the controller's shared air velocity. Once the
+/// capsule clears the air-action height a buffered air normal or air dash may be consumed, which is
+/// what makes jump-ins, air chains and instant air dashes possible.
 /// </summary>
 public class JumpState : RobotState
 {
-    private const float JumpForce = 12f;
+    public const float StandardJumpForce = 12f;
+
     private const float HorizontalAirSpeed = 4f;
 
+    private float takeoffForce;
+    private bool takeoff;
     private float verticalVelocity;
-    private Vector3 horizontalVelocity;
+    private float horizontalVelocity;
 
     public JumpState(RobotController robot) : base(robot) { }
 
+    public override bool AcceptsCommands => robot.IsAboveAirActionHeight;
+
+    /// <summary>Next entry leaves the ground with the given vertical speed.</summary>
+    public void ConfigureTakeoff(float verticalForce)
+    {
+        takeoff = true;
+        takeoffForce = verticalForce;
+    }
+
+    /// <summary>Next entry continues the flight stored in <see cref="RobotController.AirVelocity"/>.</summary>
+    public void ConfigureMidair()
+    {
+        takeoff = false;
+    }
+
     public override void Enter()
     {
-        verticalVelocity = JumpForce;
+        if (takeoff)
+        {
+            verticalVelocity = takeoffForce;
+            robot.FaceOpponent();
 
-        robot.FaceOpponent();
+            float forwardAmount = robot.MovementInput.x * robot.GetScreenFacingSign();
+            horizontalVelocity = robot.transform.forward.x * (forwardAmount * HorizontalAirSpeed);
+        }
+        else
+        {
+            verticalVelocity = robot.AirVelocity.y;
+            horizontalVelocity = robot.AirVelocity.x;
+        }
+
         PlayAnimationState(FighterAnimatorParameters.Jump);
-
-        float forwardAmount = robot.MovementInput.x * robot.GetScreenFacingSign();
-        horizontalVelocity = robot.transform.forward * (forwardAmount * HorizontalAirSpeed);
+        robot.AirVelocity = new Vector2(horizontalVelocity, verticalVelocity);
     }
 
     public override void Tick()
     {
+        if (AcceptsCommands)
+        {
+            if (TryConsumeAirDashCommands()) return;
+            if (TryConsumeAirNormalCommands()) return;
+        }
+
         verticalVelocity += Gravity * Time.deltaTime;
 
-        Vector3 velocity = horizontalVelocity + Vector3.up * verticalVelocity;
+        Vector3 velocity = new Vector3(horizontalVelocity, verticalVelocity, 0f);
         robot.characterController.Move(velocity * Time.deltaTime);
+        robot.AirVelocity = new Vector2(horizontalVelocity, verticalVelocity);
 
         if (HasLanded(verticalVelocity))
         {

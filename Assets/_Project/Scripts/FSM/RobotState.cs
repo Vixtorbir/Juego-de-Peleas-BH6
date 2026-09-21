@@ -131,9 +131,10 @@ public abstract class RobotState
     /// <summary>
     /// Chain cancel. Explicit <see cref="ComboBranch"/> links (target combos) are checked first;
     /// otherwise the universal gatling rule lets a connected normal chain into any normal of a
-    /// strictly higher tier: Light > Medium > Heavy > Launcher. Returns true on transition.
+    /// strictly higher tier: Light > Medium > Heavy > Launcher on the ground, j.L > j.M > j.H in
+    /// the air. Returns true on transition.
     /// </summary>
-    protected bool TryChainCancel(AttackData data)
+    protected bool TryChainCancel(AttackData data, bool airborne)
     {
         if (data == null || !robot.AttackConnected) return false;
 
@@ -151,7 +152,7 @@ public abstract class RobotState
 
         FighterCommand command = robot.bufferedCommand;
         bool crouching = robot.MovementInput.y < CrouchInputThreshold;
-        AttackData next = robot.ResolveNormal(command, crouching);
+        AttackData next = airborne ? robot.ResolveAirNormal(command) : robot.ResolveNormal(command, crouching);
         if (next == null || next.GatlingTier <= data.GatlingTier || !robot.TryConsumeCommand(command)) return false;
 
         EnterNormal(next);
@@ -235,10 +236,45 @@ public abstract class RobotState
         return true;
     }
 
-    /// <summary>Crouching normals keep the capsule lowered for their whole duration; everything else stands.</summary>
+    /// <summary>Starts the jumping normal bound to the buffered attack button. Returns true on transition.</summary>
+    protected bool TryConsumeAirNormalCommands()
+    {
+        FighterCommand command = robot.bufferedCommand;
+        AttackData attack = robot.ResolveAirNormal(command);
+        if (attack == null || !robot.TryConsumeCommand(command)) return false;
+
+        robot.EnterAirAttack(attack);
+        return true;
+    }
+
+    /// <summary>
+    /// Consumes a buffered dash into an air dash while the jump still has one left. A dash pressed
+    /// past the limit stays buffered and expires with the leniency window.
+    /// </summary>
+    protected bool TryConsumeAirDashCommands()
+    {
+        if (robot.AirDashesUsed >= robot.Rules.maxAirDashesPerJump) return false;
+
+        if (robot.TryConsumeCommand(FighterCommand.DashForward))
+        {
+            robot.EnterAirDash(true);
+            return true;
+        }
+
+        if (robot.TryConsumeCommand(FighterCommand.DashBackward))
+        {
+            robot.EnterAirDash(false);
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>Crouching normals keep the capsule lowered, jumping normals keep falling; everything else stands.</summary>
     private void EnterNormal(AttackData attack)
     {
-        if (robot.IsCrouchingNormal(attack)) robot.EnterCrouchAttack(attack);
+        if (attack.isAirAttack) robot.EnterAirAttack(attack);
+        else if (robot.IsCrouchingNormal(attack)) robot.EnterCrouchAttack(attack);
         else robot.EnterAttack(attack);
     }
 }

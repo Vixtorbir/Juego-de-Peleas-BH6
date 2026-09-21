@@ -111,7 +111,7 @@ public class Hurtbox : MonoBehaviour
 
         bool crouching = posture != null && posture.IsCrouchingPosture;
         bool blocking = !counterHit && posture != null && posture.CanGuard && IsHoldingBack();
-        GuardResult result = blocking ? ResolveGuard(attack.attackHeight, crouching) : GuardResult.Hit;
+        GuardResult result = blocking ? ResolveGuard(attack.attackHeight, attack.isOverhead, crouching) : GuardResult.Hit;
 
         switch (result)
         {
@@ -175,17 +175,20 @@ public class Hurtbox : MonoBehaviour
     }
 
     /// <summary>
-    /// High attacks pass over a crouching guard, Mid attacks require a standing guard and
-    /// Low attacks require a crouching guard.
+    /// Guard matrix. Overheads (jumping attacks, the overhead command normal) must be blocked
+    /// standing and break a crouching guard. Otherwise High attacks pass over a crouching guard,
+    /// Mid attacks are blocked in either posture, and Low attacks must be blocked crouching.
     /// </summary>
-    private static GuardResult ResolveGuard(AttackHeight height, bool crouching)
+    private static GuardResult ResolveGuard(AttackHeight height, bool overhead, bool crouching)
     {
+        if (overhead) return crouching ? GuardResult.GuardBroken : GuardResult.Blocked;
+
         switch (height)
         {
             case AttackHeight.High:
                 return crouching ? GuardResult.Whiffed : GuardResult.Blocked;
             case AttackHeight.Mid:
-                return crouching ? GuardResult.GuardBroken : GuardResult.Blocked;
+                return GuardResult.Blocked;
             case AttackHeight.Low:
                 return crouching ? GuardResult.Blocked : GuardResult.GuardBroken;
             default:
@@ -375,8 +378,9 @@ public class Hurtbox : MonoBehaviour
 
     /// <summary>
     /// Air hits re-launch the defender with juggle decay: every air hit lowers the next launch and
-    /// steepens gravity, so the body sinks out of reach after a few reps. Wall and ground bounces are
-    /// granted once per combo and fall back to a plain relaunch afterwards.
+    /// steepens gravity, so the body sinks out of reach after a few reps. A wall bounce is granted
+    /// once per combo and falls back to a plain relaunch; a spent ground bounce still slams the body
+    /// down, straight into the knockdown.
     /// </summary>
     private void ApplyAirborneReaction(AttackData attack, bool counterHit, RobotController attacker)
     {
@@ -402,16 +406,33 @@ public class Hurtbox : MonoBehaviour
                     controller.EnterAirborneHurt(-attack.bounceForce, rules.airHitDrift, attacker, BounceMode.GroundBounce, attack.bounceForce);
                     return;
                 }
-                break;
+                controller.EnterAirborneHurt(-attack.bounceForce, rules.airHitDrift, attacker, BounceMode.None, attack.bounceForce);
+                return;
 
             case HitReaction.Knockdown:
                 controller.EnterAirborneHurt(0f, rules.airHitDrift, attacker, BounceMode.None, attack.bounceForce);
                 return;
         }
 
-        float launchForce = attack.isLauncher ? attack.launchForce : rules.airResetLaunchForce;
+        float launchForce = ResolveRelaunchForce(attack, attacker, launchMultiplier);
         float drift = attack.isLauncher ? attack.hitPushback : rules.airHitDrift;
-        controller.EnterAirborneHurt(launchForce * launchMultiplier, drift, attacker, BounceMode.None, attack.bounceForce);
+        controller.EnterAirborneHurt(launchForce, drift, attacker, BounceMode.None, attack.bounceForce);
+    }
+
+    /// <summary>
+    /// Launchers relaunch with their own force. A grounded attacker's normal pops the body by the
+    /// air-reset force; an airborne attacker's normal instead carries the body along the attacker's
+    /// current vertical speed plus a small pop, so an air chain keeps both fighters on the same arc
+    /// instead of firing the defender away from a falling attacker. Juggle decay scales the pop.
+    /// </summary>
+    private float ResolveRelaunchForce(AttackData attack, RobotController attacker, float launchMultiplier)
+    {
+        if (attack.isLauncher) return attack.launchForce * launchMultiplier;
+
+        bool airToAir = attacker != null && !attacker.IsGrounded;
+        if (airToAir) return attacker.AirVelocity.y + Rules.airToAirPop * launchMultiplier;
+
+        return Rules.airResetLaunchForce * launchMultiplier;
     }
 
     private bool TryConsumeWallBounce()

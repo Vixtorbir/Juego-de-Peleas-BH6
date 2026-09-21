@@ -8,10 +8,12 @@ using UnityEngine.TestTools;
 /// <summary>
 /// Play-mode coverage of the combat feel rules in the training scene: chain and gatling cancels
 /// produce true combos, launchers put the defender into a juggle whose height decays with every
-/// air hit, every clean hit freezes both fighters on their own timers with the defender held
-/// longer, a wall bounce is granted once per combo, a knockdown cannot be hit off the ground,
-/// a press during recovery fires on the first actionable frame, a cornered defender stays pinned
-/// while the attacker absorbs the pushback, and projectiles land and recycle without growing the scene.
+/// air hit, a launcher jump-cancels into an air chain that spikes the body into a ground bounce,
+/// an air dash is granted once per jump, an overhead breaks a crouching guard while a mid does not,
+/// every clean hit freezes both fighters on their own timers with the defender held longer, a wall
+/// bounce is granted once per combo, a knockdown cannot be hit off the ground, a press during
+/// recovery fires on the first actionable frame, a cornered defender stays pinned while the attacker
+/// absorbs the pushback, and projectiles land and recycle without growing the scene.
 /// </summary>
 public class CombatChainPlayModeTests
 {
@@ -28,6 +30,8 @@ public class CombatChainPlayModeTests
     private const float MinJuggleDecay = 0.5f;
     private const float WhiffDistance = 6f;
     private const float RecoveryProbeDelay = 0.25f;
+    private const float AirDashLockoutProbe = 0.15f;
+    private const float AirDashProbeHeight = 1.2f;
 
     private RobotController player1;
     private RobotController player2;
@@ -160,6 +164,144 @@ public class CombatChainPlayModeTests
         float launchRise = launchApex;
         float relaunchRise = relaunchApex - relaunchOrigin;
         Assert.Less(relaunchRise, launchRise - MinJuggleDecay, "Juggle decay did not shorten the relaunch: infinite juggles are possible.");
+    }
+
+    [UnityTest]
+    public IEnumerator LauncherJumpCancelsIntoAirCombo()
+    {
+        FighterCommand[] airRoute = { FighterCommand.LeftPunch, FighterCommand.RightPunch, FighterCommand.RightKick };
+        float facing = player1.GetScreenFacingSign();
+        float lastHealth = player2.Health.CurrentHealth;
+        int hitsLanded = 0;
+        int nextStep = 0;
+        bool defenderRecoveredBetweenHits = false;
+
+        player1.EnterAttack(player1.launcherBase);
+        yield return WaitForState<AirborneHurtState>(player2);
+        hitsLanded = 1;
+        lastHealth = player2.Health.CurrentHealth;
+
+        player1.SetMovementInput(new Vector2(facing, 1f));
+        yield return WaitForState<JumpState>(player1);
+        player1.SetMovementInput(new Vector2(facing, 0f));
+        Assert.IsTrue(player2.CurrentState is AirborneHurtState, "Jump cancel must not interrupt the launch.");
+
+        float deadline = Time.realtimeSinceStartup + RouteTimeout;
+        while (Time.realtimeSinceStartup < deadline && hitsLanded < airRoute.Length + 1)
+        {
+            if (nextStep == 0 && player1.CurrentState is JumpState && player1.IsAboveAirActionHeight)
+            {
+                player1.bufferedCommand = airRoute[nextStep++];
+            }
+
+            if (player2.Health.CurrentHealth < lastHealth)
+            {
+                lastHealth = player2.Health.CurrentHealth;
+                hitsLanded++;
+                if (nextStep > 0 && nextStep < airRoute.Length) player1.bufferedCommand = airRoute[nextStep++];
+            }
+            else if (player2.CurrentState.IsNeutral)
+            {
+                defenderRecoveredBetweenHits = true;
+            }
+
+            yield return null;
+        }
+
+        player1.SetMovementInput(Vector2.zero);
+        Assert.AreEqual(airRoute.Length + 1, hitsLanded, "Launcher > jump cancel > j.LP > j.RP > j.RK should land four hits.");
+        Assert.IsFalse(defenderRecoveredBetweenHits, "Defender regained control mid-air: a link in the air chain dropped.");
+        Assert.AreEqual(1, player2.Hurtbox.Combo.GroundBounces, "The air spike should grant the combo's ground bounce.");
+
+        yield return WaitUntilRealtime(() => player2.CurrentState is KnockdownState, "Spiked defender never came to rest in a knockdown.");
+    }
+
+    [UnityTest]
+    public IEnumerator AirDashExecutesOncePerJumpAndResetsOnLanding()
+    {
+        Teleport(player2, -0.5f + WhiffDistance);
+        yield return null;
+
+        player1.SetMovementInput(Vector2.up);
+        yield return WaitForState<JumpState>(player1);
+        player1.SetMovementInput(Vector2.zero);
+        yield return WaitUntilRealtime(() => player1.transform.position.y > AirDashProbeHeight, "Fighter never rose high enough to probe the air dash.");
+
+        player1.bufferedCommand = FighterCommand.DashForward;
+        yield return WaitForState<AirDashState>(player1);
+        Assert.AreEqual(1, player1.AirDashesUsed, "First air dash should consume the jump's allowance.");
+
+        yield return WaitForState<JumpState>(player1);
+        player1.bufferedCommand = FighterCommand.DashForward;
+        yield return new WaitForSecondsRealtime(AirDashLockoutProbe);
+
+        Assert.IsFalse(player1.CurrentState is AirDashState, "A second air dash in the same jump must be locked out.");
+        Assert.AreEqual(1, player1.AirDashesUsed, "Locked-out dash must not count.");
+        Assert.AreEqual(FighterCommand.None, player1.bufferedCommand, "Locked-out dash press should expire with the buffer leniency instead of firing on landing.");
+
+        yield return WaitForState<IdleState>(player1);
+        Assert.AreEqual(0, player1.AirDashesUsed, "Landing should restore the air dash.");
+
+        player1.SetMovementInput(Vector2.up);
+        yield return WaitForState<JumpState>(player1);
+        player1.SetMovementInput(Vector2.zero);
+        yield return WaitUntilRealtime(() => player1.transform.position.y > AirDashProbeHeight, "Fighter never rose high enough on the second jump.");
+
+        player1.bufferedCommand = FighterCommand.DashForward;
+        yield return WaitForState<AirDashState>(player1);
+    }
+
+    [UnityTest]
+    public IEnumerator OverheadCommandNormalBreaksCrouchingGuard()
+    {
+        float defenderFacing = player2.GetScreenFacingSign();
+        player2.SetMovementInput(new Vector2(-defenderFacing, -1f));
+        yield return WaitForState<CrouchState>(player2);
+
+        float guardedHealth = player2.Health.CurrentHealth;
+        Assert.IsTrue(player2.Hurtbox.ReceiveHit(player1.rightPunchBase, player1), "Mid attack on a crouching guard should still connect as a block.");
+        Assert.IsTrue(player2.CurrentState is BlockstunState, "A true mid must be blockable crouching.");
+        Assert.Greater(player2.Health.CurrentHealth, guardedHealth - player1.rightPunchBase.damage * 0.5f, "Blocked mid should only chip.");
+
+        yield return WaitForState<CrouchState>(player2);
+        float crouchGuardHealth = player2.Health.CurrentHealth;
+
+        player1.bufferedCommand = FighterCommand.Overhead;
+        yield return WaitUntilRealtime(() => player1.CurrentState is AttackState attack && attack.Data == player1.overheadBase, "Forward + RightPunch never resolved to the overhead.");
+        yield return WaitForState<HitstunState>(player2);
+        Assert.Less(player2.Health.CurrentHealth, crouchGuardHealth - player1.overheadBase.damage * 0.5f, "Overhead should break a crouching guard for full damage.");
+
+        player2.SetMovementInput(new Vector2(-defenderFacing, 0f));
+        yield return WaitUntilRealtime(() => player2.CurrentState.IsNeutral && !player2.CurrentState.IsCrouchingPosture, "Defender never stood back up.");
+
+        float standingGuardHealth = player2.Health.CurrentHealth;
+        Assert.IsTrue(player2.Hurtbox.ReceiveHit(player1.overheadBase, player1), "Overhead on a standing guard should connect as a block.");
+        Assert.IsTrue(player2.CurrentState is BlockstunState, "Overhead must be blockable standing.");
+        Assert.Greater(player2.Health.CurrentHealth, standingGuardHealth - player1.overheadBase.damage * 0.5f, "Blocked overhead should only chip.");
+        player2.SetMovementInput(Vector2.zero);
+    }
+
+    [UnityTest]
+    public IEnumerator AirSpikeGroundBouncesOnceThenKnocksDown()
+    {
+        player1.EnterAttack(player1.launcherBase);
+        yield return WaitForState<AirborneHurtState>(player2);
+        yield return WaitUntilRealtime(() => player2.transform.position.y > 0.6f, "Defender never left the ground.");
+
+        Assert.IsTrue(player2.Hurtbox.ReceiveHit(player1.airRightKickBase, player1), "Air spike on the airborne defender was rejected.");
+        AirborneHurtState juggle = player2.CurrentState as AirborneHurtState;
+        Assert.IsNotNull(juggle, "Spike should keep the defender in the juggle state until it lands.");
+        Assert.AreEqual(BounceMode.GroundBounce, juggle.PendingBounce, "First spike should grant the ground bounce.");
+        Assert.AreEqual(1, player2.Hurtbox.Combo.GroundBounces, "Ground bounce should be consumed on the granting hit.");
+
+        yield return WaitUntilRealtime(() => juggle.PendingBounce == BounceMode.None && player2.CurrentState is AirborneHurtState, "Defender never bounced off the floor.");
+        yield return WaitUntilRealtime(() => player2.transform.position.y > 0.6f, "Defender did not pop back up after the bounce.");
+
+        Assert.IsTrue(player2.Hurtbox.ReceiveHit(player1.airRightKickBase, player1), "Second air spike was rejected.");
+        Assert.AreEqual(BounceMode.None, juggle.PendingBounce, "Second spike in the same combo must not bounce again.");
+        Assert.AreEqual(1, player2.Hurtbox.Combo.GroundBounces, "Ground bounce count must stay at one per combo.");
+
+        yield return WaitUntilRealtime(() => player2.CurrentState is KnockdownState, "Spent spike should drop the defender straight into a knockdown.");
     }
 
     [UnityTest]

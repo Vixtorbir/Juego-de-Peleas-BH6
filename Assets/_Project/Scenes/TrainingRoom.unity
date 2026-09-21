@@ -1872,7 +1872,13 @@ MonoBehaviour:
   crouchPunchBase: {fileID: 11400000, guid: 5319aec61d0fbfd4ab71d15ca485b4eb, type: 2}
   crouchSweepBase: {fileID: 11400000, guid: a2564fd03854b10429ff79d37a130b5c, type: 2}
   launcherBase: {fileID: 11400000, guid: a42be1ded81bc2a4b99b0d5525e846ad, type: 2}
+  overheadBase: {fileID: 11400000, guid: 76e392da402253e469d6ed2f7b0794b0, type: 2}
+  antiAirBase: {fileID: 11400000, guid: 6f2008e976c94774aac32e86e5c46805, type: 2}
   shoryukenData: {fileID: 11400000, guid: edc5be205f5efcd40b39b173a9842145, type: 2}
+  airLeftPunchBase: {fileID: 11400000, guid: 98c2997313b144f4a83a53a91dcfd2f5, type: 2}
+  airRightPunchBase: {fileID: 11400000, guid: 8a36c6c2508737043b46e104672bc249, type: 2}
+  airLeftKickBase: {fileID: 11400000, guid: 0dd0f9ce7060ed24d96051f276307f43, type: 2}
+  airRightKickBase: {fileID: 11400000, guid: e587beced05b46745a342678be04b03f, type: 2}
   hadoukenData: {fileID: 11400000, guid: de6b19264baf7da47aff89576f61881f, type: 2}
   hadoukenPrefab: {fileID: 977442768426397397, guid: 419c7bd03de1a8b419c3c9cf363a0945, type: 3}
   hadoukenSpawnPoint: {fileID: 1147387385}
@@ -9391,7 +9397,13 @@ MonoBehaviour:
   crouchPunchBase: {fileID: 11400000, guid: 5319aec61d0fbfd4ab71d15ca485b4eb, type: 2}
   crouchSweepBase: {fileID: 11400000, guid: a2564fd03854b10429ff79d37a130b5c, type: 2}
   launcherBase: {fileID: 11400000, guid: a42be1ded81bc2a4b99b0d5525e846ad, type: 2}
+  overheadBase: {fileID: 11400000, guid: 76e392da402253e469d6ed2f7b0794b0, type: 2}
+  antiAirBase: {fileID: 11400000, guid: 6f2008e976c94774aac32e86e5c46805, type: 2}
   shoryukenData: {fileID: 11400000, guid: edc5be205f5efcd40b39b173a9842145, type: 2}
+  airLeftPunchBase: {fileID: 11400000, guid: 98c2997313b144f4a83a53a91dcfd2f5, type: 2}
+  airRightPunchBase: {fileID: 11400000, guid: 8a36c6c2508737043b46e104672bc249, type: 2}
+  airLeftKickBase: {fileID: 11400000, guid: 0dd0f9ce7060ed24d96051f276307f43, type: 2}
+  airRightKickBase: {fileID: 11400000, guid: e587beced05b46745a342678be04b03f, type: 2}
   hadoukenData: {fileID: 11400000, guid: de6b19264baf7da47aff89576f61881f, type: 2}
   hadoukenPrefab: {fileID: 977442768426397397, guid: 419c7bd03de1a8b419c3c9cf363a0945, type: 3}
   hadoukenSpawnPoint: {fileID: 474566855}

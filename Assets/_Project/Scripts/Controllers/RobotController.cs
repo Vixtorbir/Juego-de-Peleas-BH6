@@ -10,7 +10,10 @@ public enum FighterCommand
     DashForward,
     DashBackward,
     Hadouken,
-    Shoryuken
+    Shoryuken,
+    Launcher,
+    Overhead,
+    AntiAir
 }
 
 /// <summary>
@@ -21,7 +24,9 @@ public enum FighterCommand
 /// the cached instance, so a full match runs without a single state allocation. Hitstop is a
 /// per-fighter freeze on unscaled time: a frozen fighter skips its state tick and pauses its
 /// animator while the rest of the scene keeps running, so each side of a hit can be held for a
-/// different number of frames.
+/// different number of frames. Command normals are decoded from the stick at press time, and the
+/// airborne velocity is shared between the jump, air dash and air attack states so control can
+/// pass between them mid-air without losing momentum.
 /// </summary>
 [RequireComponent(typeof(CharacterController))]
 public class RobotController : MonoBehaviour
@@ -60,7 +65,8 @@ public class RobotController : MonoBehaviour
     private const float DirectionReleaseThreshold = 0.2f;
     private const float CrouchHeightRatio = 0.5f;
     private const float FacingDeadZone = 0.001f;
-    private const float LauncherForwardThreshold = 0.5f;
+    private const float CommandForwardThreshold = 0.5f;
+    private const float CommandDownThreshold = -0.5f;
     private const int ProjectilePoolCapacity = 2;
     private const string WallLayerName = "Wall";
 
@@ -90,7 +96,15 @@ public class RobotController : MonoBehaviour
     public AttackData crouchPunchBase;
     public AttackData crouchSweepBase;
     public AttackData launcherBase;
+    public AttackData overheadBase;
+    public AttackData antiAirBase;
     public AttackData shoryukenData;
+
+    [Header("Aerial Attack Data Assets")]
+    public AttackData airLeftPunchBase;
+    public AttackData airRightPunchBase;
+    public AttackData airLeftKickBase;
+    public AttackData airRightKickBase;
 
     [Header("Projectile Settings")]
     public AttackData hadoukenData;
@@ -128,6 +142,18 @@ public class RobotController : MonoBehaviour
         set => invincibleByState = value;
     }
 
+    /// <summary>
+    /// Velocity carried while airborne (x along the combat axis, y vertical). Written by whichever
+    /// air state is active so the next one continues the motion instead of restarting it.
+    /// </summary>
+    public Vector2 AirVelocity { get; set; }
+
+    /// <summary>Air dashes spent since the last takeoff; cleared on every return to a neutral stance.</summary>
+    public int AirDashesUsed { get; set; }
+
+    /// <summary>True once the capsule is high enough for an air action to start.</summary>
+    public bool IsAboveAirActionHeight => transform.position.y >= combatRules.airActionMinHeight;
+
     /// <summary>True while this fighter is held in hitstop.</summary>
     public bool IsFrozen => freezeRemaining > 0f;
 
@@ -148,8 +174,10 @@ public class RobotController : MonoBehaviour
     private JumpState jumpState;
     private CrouchState crouchState;
     private DashState dashState;
+    private AirDashState airDashState;
     private AttackState attackState;
     private CrouchAttackState crouchAttackState;
+    private AirAttackState airAttackState;
     private SpecialAttackState specialAttackState;
     private ShoryukenState shoryukenState;
     private HitstunState hitstunState;
@@ -248,8 +276,10 @@ public class RobotController : MonoBehaviour
         jumpState = new JumpState(this);
         crouchState = new CrouchState(this);
         dashState = new DashState(this);
+        airDashState = new AirDashState(this);
         attackState = new AttackState(this);
         crouchAttackState = new CrouchAttackState(this);
+        airAttackState = new AirAttackState(this);
         specialAttackState = new SpecialAttackState(this);
         shoryukenState = new ShoryukenState(this);
         hitstunState = new HitstunState(this);
@@ -263,7 +293,34 @@ public class RobotController : MonoBehaviour
 
     public void EnterWalk() => TransitionTo(walkState);
 
-    public void EnterJump() => TransitionTo(jumpState);
+    /// <summary>Takes off with the standard jump.</summary>
+    public void EnterJump() => EnterJump(JumpState.StandardJumpForce);
+
+    /// <summary>Takes off with a custom vertical speed; jump cancels use the rules' super-jump force.</summary>
+    public void EnterJump(float verticalForce)
+    {
+        jumpState.ConfigureTakeoff(verticalForce);
+        TransitionTo(jumpState);
+    }
+
+    /// <summary>Resumes free fall from the current <see cref="AirVelocity"/> after an air dash or air attack.</summary>
+    public void EnterAirborne()
+    {
+        jumpState.ConfigureMidair();
+        TransitionTo(jumpState);
+    }
+
+    public void EnterAirDash(bool forward)
+    {
+        airDashState.Configure(forward);
+        TransitionTo(airDashState);
+    }
+
+    public void EnterAirAttack(AttackData data)
+    {
+        airAttackState.Configure(data);
+        TransitionTo(airAttackState);
+    }
 
     public void EnterCrouch() => TransitionTo(crouchState);
 
@@ -333,7 +390,11 @@ public class RobotController : MonoBehaviour
         currentState?.Exit();
         currentState = nextState;
         TransitionCount++;
-        if (nextState.IsNeutral && Hurtbox != null) Hurtbox.ResetCombo();
+        if (nextState.IsNeutral)
+        {
+            AirDashesUsed = 0;
+            if (Hurtbox != null) Hurtbox.ResetCombo();
+        }
         currentState.Enter();
     }
 
@@ -377,8 +438,9 @@ public class RobotController : MonoBehaviour
     }
 
     /// <summary>
-    /// Normal bound to an attack button for the given posture, or null for non-attack commands.
-    /// Forward + RightPunch while standing is the launcher.
+    /// Grounded normal bound to a buffered command for the given posture, or null for non-attack
+    /// commands. Command normals (launcher, overhead, anti-air) were decoded from the stick when the
+    /// button was pressed, so they resolve regardless of the current posture.
     /// </summary>
     public AttackData ResolveNormal(FighterCommand command, bool crouching)
     {
@@ -387,12 +449,41 @@ public class RobotController : MonoBehaviour
             case FighterCommand.LeftPunch:
                 return crouching ? crouchPunchBase : leftPunchBase;
             case FighterCommand.RightPunch:
-                if (crouching) return crouchPunchBase;
-                return IsAdvancing() ? launcherBase : rightPunchBase;
+                return crouching ? crouchPunchBase : rightPunchBase;
             case FighterCommand.LeftKick:
+                return crouching ? crouchSweepBase : leftKickBase;
             case FighterCommand.RightKick:
-                if (crouching) return crouchSweepBase;
-                return command == FighterCommand.LeftKick ? leftKickBase : rightKickBase;
+                return crouching ? crouchSweepBase : rightKickBase;
+            case FighterCommand.Launcher:
+                return launcherBase;
+            case FighterCommand.Overhead:
+                return overheadBase;
+            case FighterCommand.AntiAir:
+                return antiAirBase;
+            default:
+                return null;
+        }
+    }
+
+    /// <summary>
+    /// Jumping normal bound to a buffered command, or null for non-attack commands. Direction-decoded
+    /// commands fold back onto their button so a forward press in the air still swings.
+    /// </summary>
+    public AttackData ResolveAirNormal(FighterCommand command)
+    {
+        switch (command)
+        {
+            case FighterCommand.LeftPunch:
+                return airLeftPunchBase;
+            case FighterCommand.RightPunch:
+            case FighterCommand.Overhead:
+                return airRightPunchBase;
+            case FighterCommand.LeftKick:
+                return airLeftKickBase;
+            case FighterCommand.RightKick:
+            case FighterCommand.Launcher:
+            case FighterCommand.AntiAir:
+                return airRightKickBase;
             default:
                 return null;
         }
@@ -487,6 +578,8 @@ public class RobotController : MonoBehaviour
         invulnerabilityTimer = 0f;
         invincibleByState = false;
         AttackConnected = false;
+        AirDashesUsed = 0;
+        AirVelocity = Vector2.zero;
         animator.speed = 1f;
 
         animator.Play(FighterAnimatorParameters.LocomotionState, 0, 0f);
@@ -574,10 +667,9 @@ public class RobotController : MonoBehaviour
         bufferTimer = 0f;
     }
 
-    private bool IsAdvancing()
-    {
-        return MovementInput.x * GetScreenFacingSign() > LauncherForwardThreshold;
-    }
+    private bool IsHoldingForward => MovementInput.x * GetScreenFacingSign() > CommandForwardThreshold;
+
+    private bool IsHoldingDown => MovementInput.y < CommandDownThreshold;
 
     /// <summary>
     /// Keeps both fighters from overlapping by pushing this controller away from the opponent
@@ -603,7 +695,14 @@ public class RobotController : MonoBehaviour
         characterController.Move(push);
     }
 
-    private void HandleMove(Vector2 input)
+    private void HandleMove(Vector2 input) => SetMovementInput(input);
+
+    /// <summary>
+    /// Applies a stick vector as if the player had moved it: feeds the states, and detects the
+    /// double tap that buffers a dash. Public so automated tests and AI drivers share the exact path
+    /// the input reader uses.
+    /// </summary>
+    public void SetMovementInput(Vector2 input)
     {
         MovementInput = input;
 
@@ -649,15 +748,29 @@ public class RobotController : MonoBehaviour
         BufferCommand(motionDetected ? FighterCommand.Hadouken : FighterCommand.LeftPunch);
     }
 
+    /// <summary>
+    /// Heavy buttons carry the command normals, decoded from the stick on the press: forward +
+    /// RightPunch is the overhead, forward + RightKick the launcher and down-forward + RightKick the
+    /// anti-air. A dragon punch motion always wins over the direction.
+    /// </summary>
     private void HandleRightPunch()
     {
         bool motionDetected = inputBuffer != null
             && (inputBuffer.CheckMotionInput(DragonPunch) || inputBuffer.CheckMotionInput(DragonPunchShortcut));
-        BufferCommand(motionDetected ? FighterCommand.Shoryuken : FighterCommand.RightPunch);
+
+        if (motionDetected) BufferCommand(FighterCommand.Shoryuken);
+        else if (IsHoldingForward && !IsHoldingDown) BufferCommand(FighterCommand.Overhead);
+        else BufferCommand(FighterCommand.RightPunch);
     }
 
     private void HandleLeftKick() => BufferCommand(FighterCommand.LeftKick);
-    private void HandleRightKick() => BufferCommand(FighterCommand.RightKick);
+
+    private void HandleRightKick()
+    {
+        if (IsHoldingForward && IsHoldingDown) BufferCommand(FighterCommand.AntiAir);
+        else if (IsHoldingForward) BufferCommand(FighterCommand.Launcher);
+        else BufferCommand(FighterCommand.RightKick);
+    }
 
     /// <summary>
     /// Scene-view overlay of the two volumes the controller owns: the collision capsule that doubles
