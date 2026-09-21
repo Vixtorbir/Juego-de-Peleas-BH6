@@ -2,43 +2,43 @@ using System;
 using UnityEngine;
 
 /// <summary>
+/// Running state of the combo being landed on a fighter. A plain struct on the hurtbox so combo
+/// tracking, bounce limits and route proration never touch the heap.
+/// </summary>
+public struct ComboState
+{
+    public int Hits;
+    public int JuggleHits;
+    public float Damage;
+    public float Proration;
+    public int WallBounces;
+    public int GroundBounces;
+
+    public static ComboState Fresh => new ComboState { Proration = 1f };
+}
+
+/// <summary>
 /// Damage receiver for a fighter. Resolves the guard matrix (attack height versus posture),
-/// counter hits, aerial juggles, chip damage and combo damage scaling, then hands the
-/// resulting reaction to the owner's state machine. Whether a guard can be raised and at which
+/// counter hits, aerial juggles, chip damage, combo damage scaling and hitstun decay, then hands
+/// the resulting reaction to the owner's state machine. Whether a guard can be raised and at which
 /// height is read from the current state rather than from the stick: a fighter in hitstun or
 /// mid-attack cannot block, so a chain that connects is a true combo, and a standing fighter
-/// holding down is still hit high. Combo progress is broadcast so the HUD can present the hit
-/// count and accumulated damage without polling.
+/// holding down is still hit high. Every impact freezes the two fighters for their own tier
+/// durations from <see cref="CombatRules"/>, so the defender is always held a little longer than
+/// the attacker. Combo progress is broadcast so the HUD can present the hit count and accumulated
+/// damage without polling.
 /// </summary>
 public class Hurtbox : MonoBehaviour
 {
     private enum GuardResult { Hit, Blocked, Whiffed, GuardBroken }
 
-    private const float ComboScalingFactor = 0.85f;
-    private const float MinComboScaling = 0.1f;
     private const float ChipDamageRatio = 0.15f;
     private const float CounterHitstunMultiplier = 1.5f;
     private const float CounterPushbackMultiplier = 1.4f;
     private const float CounterLaunchMultiplier = 1.3f;
-    private const float AirResetLaunchForce = 7f;
-    private const float AirHitDrift = 1.5f;
     private const float BlockInputThreshold = -0.3f;
-
-    private const float HeavyImpactHitstop = 0.2f;
-    private const float HeavyImpactShakeDuration = 0.22f;
-    private const float HeavyImpactShakeMagnitude = 0.28f;
-    private const float BlockedHitstopRatio = 0.6f;
-    private const float BlockedShakeRatio = 0.5f;
-    private const float KnockoutHitstop = 0.45f;
-    private const float KnockoutShakeDuration = 0.4f;
-    private const float KnockoutShakeMagnitude = 0.35f;
     private const float LauncherShakeVerticalBias = 1f;
-    private const float HeavyImpactZoomPunch = -1.5f;
-    private const float KnockoutZoomPunch = -2.5f;
-
-    private static readonly float[] HitstopByWeight = { 0.08f, 0.14f, 0.16f };
-    private static readonly float[] ShakeDurationByWeight = { 0.1f, 0.16f, 0.2f };
-    private static readonly float[] ShakeMagnitudeByWeight = { 0.06f, 0.14f, 0.2f };
+    private const float BounceShakeVerticalBias = 0.6f;
 
     private static readonly Color GizmoColor = new Color(0f, 1f, 0f, 0.2f);
 
@@ -46,8 +46,7 @@ public class Hurtbox : MonoBehaviour
     private HealthComponent health;
     private FightingCamera fightingCamera;
     private Collider hurtCollider;
-    private int comboHitCount;
-    private float totalComboDamage;
+    private ComboState combo = ComboState.Fresh;
 
     /// <summary>Raised after every clean hit of a combo with the running hit count and scaled damage total.</summary>
     public event Action<int, float> OnComboHit;
@@ -56,8 +55,11 @@ public class Hurtbox : MonoBehaviour
     public event Action OnComboEnd;
 
     public RobotController Owner => controller;
-    public int ComboHitCount => comboHitCount;
-    public float TotalComboDamage => totalComboDamage;
+    public ComboState Combo => combo;
+    public int ComboHitCount => combo.Hits;
+    public float TotalComboDamage => combo.Damage;
+
+    private CombatRules Rules => controller.Rules;
 
     private void Awake()
     {
@@ -80,30 +82,33 @@ public class Hurtbox : MonoBehaviour
     public bool ReceiveHit(AttackData attack, RobotController attacker)
     {
         Vector3 chest = hurtCollider != null ? hurtCollider.bounds.center : transform.position;
-        return ReceiveHit(attack, attacker, chest);
+        return ReceiveHit(attack, attacker, chest, true);
     }
 
     /// <summary>
     /// Overload taking the world-space contact point so the impact flash can be placed where the
-    /// strike actually met the body.
+    /// strike actually met the body. <paramref name="freezeAttacker"/> is false for projectiles:
+    /// a fireball landing from full screen never stalls the fighter who threw it.
     /// </summary>
-    public bool ReceiveHit(AttackData attack, RobotController attacker, Vector3 contactPoint)
+    public bool ReceiveHit(AttackData attack, RobotController attacker, Vector3 contactPoint, bool freezeAttacker)
     {
         if (controller == null || attack == null) return false;
         if (health != null && health.IsDead) return false;
         if (controller.IsInvincible) return false;
 
+        RobotState posture = controller.CurrentState;
         bool counterHit = controller.IsInAttackStartup;
 
         if (!controller.IsGrounded)
         {
-            PlayImpactFeedback(attack, attacker, counterHit, false, contactPoint);
-            ApplyDamage(attack.damage);
+            PlayImpactFeedback(attack, attacker, counterHit, false, contactPoint, freezeAttacker);
+            ApplyDamage(attack.damage, attacker);
             ApplyAirborneReaction(attack, counterHit, attacker);
             return true;
         }
 
-        RobotState posture = controller.CurrentState;
+        if (posture != null && posture.IgnoresGroundedHits) return false;
+
         bool crouching = posture != null && posture.IsCrouchingPosture;
         bool blocking = !counterHit && posture != null && posture.CanGuard && IsHoldingBack();
         GuardResult result = blocking ? ResolveGuard(attack.attackHeight, crouching) : GuardResult.Hit;
@@ -114,20 +119,20 @@ public class Hurtbox : MonoBehaviour
                 return false;
 
             case GuardResult.Blocked:
-                PlayImpactFeedback(attack, attacker, false, true, contactPoint);
+                PlayImpactFeedback(attack, attacker, false, true, contactPoint, freezeAttacker);
                 ApplyChipDamage(attack.damage);
                 controller.EnterBlockstun(attack.blockstunDuration, crouching, attack.blockPushback, attacker);
                 return true;
 
             case GuardResult.GuardBroken:
-                PlayImpactFeedback(attack, attacker, false, false, contactPoint);
-                ApplyDamage(attack.damage);
+                PlayImpactFeedback(attack, attacker, false, false, contactPoint, freezeAttacker);
+                ApplyDamage(attack.damage, attacker);
                 ApplyGroundedReaction(attack, false, attacker);
                 return true;
 
             default:
-                PlayImpactFeedback(attack, attacker, counterHit, false, contactPoint);
-                ApplyDamage(attack.damage);
+                PlayImpactFeedback(attack, attacker, counterHit, false, contactPoint, freezeAttacker);
+                ApplyDamage(attack.damage, attacker);
                 ApplyGroundedReaction(attack, counterHit, attacker);
                 return true;
         }
@@ -135,11 +140,38 @@ public class Hurtbox : MonoBehaviour
 
     public void ResetCombo()
     {
-        if (comboHitCount == 0) return;
+        if (combo.Hits == 0) return;
 
-        comboHitCount = 0;
-        totalComboDamage = 0f;
+        combo = ComboState.Fresh;
         OnComboEnd?.Invoke();
+    }
+
+    /// <summary>
+    /// Impact feedback for a rebound resolved by the juggle state: the bounce tier freezes the
+    /// body, shakes the camera along the rebound and pays the route proration.
+    /// </summary>
+    public void NotifyBounce(BounceMode bounce, RobotController attacker)
+    {
+        ImpactTier tier = Rules.bounceImpact;
+        controller.FreezeFor(tier.hitstop.defender);
+
+        Vector3 direction = bounce == BounceMode.WallBounce
+            ? new Vector3(attacker != null ? Mathf.Sign(attacker.transform.position.x - transform.position.x) : 0f, BounceShakeVerticalBias, 0f)
+            : Vector3.up;
+
+        if (fightingCamera != null)
+        {
+            fightingCamera.ShakeCamera(tier.shakeDuration, tier.shakeMagnitude, direction);
+            fightingCamera.Punch(direction, tier.cameraPunch);
+        }
+
+        if (HitsparkPool.Instance != null)
+        {
+            Vector3 contact = hurtCollider != null ? hurtCollider.bounds.center : transform.position;
+            HitsparkPool.Instance.Play(contact, HitsparkKind.Hit);
+        }
+
+        if (AudioManager.Instance != null) AudioManager.Instance.PlayBounce();
     }
 
     /// <summary>
@@ -170,42 +202,48 @@ public class Hurtbox : MonoBehaviour
     }
 
     /// <summary>
-    /// Hitstop and screen shake are tiered by <see cref="AttackWeight"/>: light attacks freeze for
-    /// five frames, medium and heavy ones for eight to ten. Launchers and counter hits step up to
-    /// the heavy-impact tier with a directional shake along the knockback and a lens punch; blocks
-    /// soften the freeze and the shake and never punch the lens. The flash is spawned at the
-    /// contact point and keeps animating through the freeze.
+    /// Hitstop, shake and camera punch come from the attack's <see cref="CombatRules"/> tier. Both
+    /// fighters freeze on their own timers: the defender for the tier plus any counter-hit bonus, the
+    /// attacker for the shorter attacker time. Launchers and counter hits step up to the launcher tier
+    /// with a shake along the knockback and a lens punch; blocks soften the freeze and the shake and
+    /// never punch the lens. The flash is spawned at the contact point and keeps animating through
+    /// the freeze.
     /// </summary>
-    private void PlayImpactFeedback(AttackData attack, RobotController attacker, bool counterHit, bool blocked, Vector3 contactPoint)
+    private void PlayImpactFeedback(AttackData attack, RobotController attacker, bool counterHit, bool blocked, Vector3 contactPoint, bool freezeAttacker)
     {
-        int tier = (int)attack.weight;
-        float hitstop = HitstopByWeight[tier];
-        float shakeDuration = ShakeDurationByWeight[tier];
-        float shakeMagnitude = ShakeMagnitudeByWeight[tier];
+        CombatRules rules = Rules;
+        ImpactTier tier = rules.ImpactFor(attack.weight);
 
         bool heavyImpact = !blocked && (counterHit || attack.isLauncher);
         if (heavyImpact)
         {
-            hitstop = Mathf.Max(hitstop, HeavyImpactHitstop);
-            shakeDuration = Mathf.Max(shakeDuration, HeavyImpactShakeDuration);
-            shakeMagnitude = Mathf.Max(shakeMagnitude, HeavyImpactShakeMagnitude);
+            ImpactTier launcher = rules.launcherImpact;
+            tier.hitstop.defender = Mathf.Max(tier.hitstop.defender, launcher.hitstop.defender);
+            tier.hitstop.attacker = Mathf.Max(tier.hitstop.attacker, launcher.hitstop.attacker);
+            tier.shakeDuration = Mathf.Max(tier.shakeDuration, launcher.shakeDuration);
+            tier.shakeMagnitude = Mathf.Max(tier.shakeMagnitude, launcher.shakeMagnitude);
+            tier.cameraPunch = Mathf.Max(tier.cameraPunch, launcher.cameraPunch);
         }
 
+        float defenderFreeze = tier.hitstop.defender + (counterHit ? rules.counterHitstopBonus : 0f);
+        float attackerFreeze = tier.hitstop.attacker;
         if (blocked)
         {
-            hitstop *= BlockedHitstopRatio;
-            shakeMagnitude *= BlockedShakeRatio;
+            defenderFreeze *= rules.blockedHitstopRatio;
+            attackerFreeze *= rules.blockedHitstopRatio;
+            tier.shakeMagnitude *= rules.blockedShakeRatio;
+            tier.cameraPunch *= rules.blockedShakeRatio;
         }
 
-        if (CombatEffectsManager.Instance != null)
-        {
-            CombatEffectsManager.Instance.TriggerHitstop(hitstop);
-        }
+        controller.FreezeFor(defenderFreeze);
+        if (freezeAttacker && attacker != null) attacker.FreezeFor(attackerFreeze);
 
         if (fightingCamera != null)
         {
-            fightingCamera.ShakeCamera(shakeDuration, shakeMagnitude, ComputeKnockbackDirection(attack, attacker));
-            if (heavyImpact || (!blocked && attack.weight == AttackWeight.Heavy)) fightingCamera.PunchZoom(HeavyImpactZoomPunch);
+            Vector3 knockback = ComputeKnockbackDirection(attack, attacker);
+            fightingCamera.ShakeCamera(tier.shakeDuration, tier.shakeMagnitude, knockback);
+            fightingCamera.Punch(knockback, tier.cameraPunch);
+            if (heavyImpact || (!blocked && attack.weight == AttackWeight.Heavy)) fightingCamera.PunchZoom(rules.heavyImpactZoomPunch);
         }
 
         if (HitsparkPool.Instance != null)
@@ -228,17 +266,21 @@ public class Hurtbox : MonoBehaviour
         return new Vector3(horizontal, vertical, 0f);
     }
 
-    private void PlayKnockoutFeedback()
+    private void PlayKnockoutFeedback(RobotController attacker)
     {
+        CombatRules rules = Rules;
+        controller.FreezeFor(rules.knockoutHitstop.defender);
+        if (attacker != null) attacker.FreezeFor(rules.knockoutHitstop.attacker);
+
         if (CombatEffectsManager.Instance != null)
         {
-            CombatEffectsManager.Instance.TriggerHitstop(KnockoutHitstop);
+            CombatEffectsManager.Instance.TriggerSlowMotion(rules.knockoutSlowMotionScale, rules.knockoutSlowMotionDuration);
         }
 
         if (fightingCamera != null)
         {
-            fightingCamera.ShakeCamera(KnockoutShakeDuration, KnockoutShakeMagnitude, Vector3.zero);
-            fightingCamera.PunchZoom(KnockoutZoomPunch);
+            fightingCamera.ShakeCamera(rules.knockoutShakeDuration, rules.knockoutShakeMagnitude, Vector3.zero);
+            fightingCamera.PunchZoom(rules.knockoutZoomPunch);
         }
 
         if (AudioManager.Instance != null)
@@ -247,21 +289,24 @@ public class Hurtbox : MonoBehaviour
         }
     }
 
-    private void ApplyDamage(float rawDamage)
+    /// <summary>
+    /// Damage is scaled by the combo position and by the route proration paid on launchers and
+    /// bounces, so a long juggle route deals less than a short grounded string of the same hits.
+    /// </summary>
+    private void ApplyDamage(float rawDamage, RobotController attacker)
     {
         if (health == null) return;
 
-        comboHitCount++;
+        combo.Hits++;
 
-        float scaling = Mathf.Max(Mathf.Pow(ComboScalingFactor, comboHitCount - 1), MinComboScaling);
-        float scaledDamage = rawDamage * scaling;
-        totalComboDamage += scaledDamage;
+        float scaledDamage = rawDamage * Rules.ComboScaling(combo.Hits) * combo.Proration;
+        combo.Damage += scaledDamage;
         health.TakeDamage(scaledDamage);
-        OnComboHit?.Invoke(comboHitCount, totalComboDamage);
+        OnComboHit?.Invoke(combo.Hits, combo.Damage);
 
         if (health.IsDead)
         {
-            PlayKnockoutFeedback();
+            PlayKnockoutFeedback(attacker);
             controller.EnterDeath();
         }
     }
@@ -290,32 +335,101 @@ public class Hurtbox : MonoBehaviour
     {
         if (health != null && health.IsDead) return;
 
-        if (attack.isLauncher)
-        {
-            float launchMultiplier = counterHit ? CounterLaunchMultiplier : 1f;
-            controller.EnterAirborneHurt(attack.launchForce * launchMultiplier, attack.hitPushback, attacker);
-            return;
-        }
-
-        float hitstunMultiplier = counterHit ? CounterHitstunMultiplier : 1f;
+        CombatRules rules = Rules;
+        float launchMultiplier = counterHit ? CounterLaunchMultiplier : 1f;
         float pushbackMultiplier = counterHit ? CounterPushbackMultiplier : 1f;
 
-        controller.EnterHitstun(attack.hitstunDuration * hitstunMultiplier, attack.hitPushback * pushbackMultiplier, attacker);
+        switch (attack.ResolvedGroundedReaction)
+        {
+            case HitReaction.Launch:
+                combo.JuggleHits = 0;
+                combo.Proration *= rules.launcherProration;
+                controller.EnterAirborneHurt(attack.launchForce * launchMultiplier, attack.hitPushback, attacker, BounceMode.None, attack.bounceForce);
+                return;
+
+            case HitReaction.WallBounce:
+                combo.JuggleHits = 0;
+                if (TryConsumeWallBounce())
+                {
+                    controller.EnterAirborneHurt(rules.wallBouncePop, rules.wallBounceDriftSpeed, attacker, BounceMode.WallBounce, attack.bounceForce);
+                    return;
+                }
+                controller.EnterAirborneHurt(attack.launchForce * launchMultiplier, attack.hitPushback * pushbackMultiplier, attacker, BounceMode.None, attack.bounceForce);
+                return;
+
+            case HitReaction.GroundBounce:
+                combo.JuggleHits = 0;
+                controller.EnterAirborneHurt(TryConsumeGroundBounce() ? attack.bounceForce : rules.airResetLaunchForce, attack.hitPushback, attacker, BounceMode.None, attack.bounceForce);
+                return;
+
+            case HitReaction.Knockdown:
+                controller.EnterKnockdown(rules.knockdownDuration, attack.hitPushback * pushbackMultiplier, attacker);
+                return;
+
+            default:
+                float hitstunMultiplier = (counterHit ? CounterHitstunMultiplier : 1f) * rules.HitstunScale(combo.Hits);
+                controller.EnterHitstun(attack.hitstunDuration * hitstunMultiplier, attack.hitPushback * pushbackMultiplier, attacker);
+                return;
+        }
     }
 
     /// <summary>
-    /// Air hits re-launch the defender: launchers with their full force, everything else with a
-    /// short pop that keeps the juggle alive and drifts the body slightly away from the attacker.
+    /// Air hits re-launch the defender with juggle decay: every air hit lowers the next launch and
+    /// steepens gravity, so the body sinks out of reach after a few reps. Wall and ground bounces are
+    /// granted once per combo and fall back to a plain relaunch afterwards.
     /// </summary>
     private void ApplyAirborneReaction(AttackData attack, bool counterHit, RobotController attacker)
     {
         if (health != null && health.IsDead) return;
 
-        float launchMultiplier = counterHit ? CounterLaunchMultiplier : 1f;
-        float launchForce = attack.isLauncher ? attack.launchForce : AirResetLaunchForce;
-        float drift = attack.isLauncher ? attack.hitPushback : AirHitDrift;
+        CombatRules rules = Rules;
+        combo.JuggleHits++;
+        float launchMultiplier = (counterHit ? CounterLaunchMultiplier : 1f) * rules.RelaunchScale(combo.JuggleHits);
 
-        controller.EnterAirborneHurt(launchForce * launchMultiplier, drift, attacker);
+        switch (attack.airborneReaction)
+        {
+            case HitReaction.WallBounce:
+                if (TryConsumeWallBounce())
+                {
+                    controller.EnterAirborneHurt(rules.wallBouncePop, rules.wallBounceDriftSpeed, attacker, BounceMode.WallBounce, attack.bounceForce);
+                    return;
+                }
+                break;
+
+            case HitReaction.GroundBounce:
+                if (TryConsumeGroundBounce())
+                {
+                    controller.EnterAirborneHurt(-attack.bounceForce, rules.airHitDrift, attacker, BounceMode.GroundBounce, attack.bounceForce);
+                    return;
+                }
+                break;
+
+            case HitReaction.Knockdown:
+                controller.EnterAirborneHurt(0f, rules.airHitDrift, attacker, BounceMode.None, attack.bounceForce);
+                return;
+        }
+
+        float launchForce = attack.isLauncher ? attack.launchForce : rules.airResetLaunchForce;
+        float drift = attack.isLauncher ? attack.hitPushback : rules.airHitDrift;
+        controller.EnterAirborneHurt(launchForce * launchMultiplier, drift, attacker, BounceMode.None, attack.bounceForce);
+    }
+
+    private bool TryConsumeWallBounce()
+    {
+        if (combo.WallBounces >= Rules.maxWallBounces) return false;
+
+        combo.WallBounces++;
+        combo.Proration *= Rules.bounceProration;
+        return true;
+    }
+
+    private bool TryConsumeGroundBounce()
+    {
+        if (combo.GroundBounces >= Rules.maxGroundBounces) return false;
+
+        combo.GroundBounces++;
+        combo.Proration *= Rules.bounceProration;
+        return true;
     }
 
     private void OnDrawGizmos()

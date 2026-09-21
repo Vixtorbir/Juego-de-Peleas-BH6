@@ -18,7 +18,10 @@ public enum FighterCommand
 /// short-lived command buffer, resolves facing and pushbox separation against the opponent,
 /// and exposes cached dependencies to the FSM states so they never query components at runtime.
 /// Every state is allocated once in Awake and entered through a typed method that configures
-/// the cached instance, so a full match runs without a single state allocation.
+/// the cached instance, so a full match runs without a single state allocation. Hitstop is a
+/// per-fighter freeze on unscaled time: a frozen fighter skips its state tick and pauses its
+/// animator while the rest of the scene keeps running, so each side of a hit can be held for a
+/// different number of frames.
 /// </summary>
 [RequireComponent(typeof(CharacterController))]
 public class RobotController : MonoBehaviour
@@ -30,11 +33,24 @@ public class RobotController : MonoBehaviour
         CombatDirection.Forward
     };
 
+    private static readonly CombatDirection[] QuarterCircleForwardShortcut =
+    {
+        CombatDirection.Down,
+        CombatDirection.Forward
+    };
+
     private static readonly CombatDirection[] DragonPunch =
     {
         CombatDirection.Forward,
         CombatDirection.Down,
         CombatDirection.DownForward
+    };
+
+    private static readonly CombatDirection[] DragonPunchShortcut =
+    {
+        CombatDirection.Forward,
+        CombatDirection.Down,
+        CombatDirection.Forward
     };
 
     private static readonly Color PushboxGizmoColor = new Color(0f, 0.6f, 1f, 0.9f);
@@ -44,13 +60,17 @@ public class RobotController : MonoBehaviour
     private const float DirectionReleaseThreshold = 0.2f;
     private const float CrouchHeightRatio = 0.5f;
     private const float FacingDeadZone = 0.001f;
+    private const float LauncherForwardThreshold = 0.5f;
     private const int ProjectilePoolCapacity = 2;
+    private const string WallLayerName = "Wall";
 
     [Header("Dependencies")]
     public InputReader inputReader;
     public Animator animator;
     public CharacterController characterController;
     public Hitbox hitboxBase;
+    [Tooltip("Match-wide tuning: proration, hitstun decay, juggle gravity, hitstop tiers and buffer leniency.")]
+    public CombatRules combatRules;
 
     [Header("Combat Settings")]
     public Transform opponentTarget;
@@ -79,25 +99,40 @@ public class RobotController : MonoBehaviour
     public Transform hadoukenSpawnPoint;
 
     [Header("Input Buffer")]
+    [Tooltip("Pending command. Writing it directly counts as a fresh press.")]
     public FighterCommand bufferedCommand = FighterCommand.None;
-    [SerializeField] private float bufferWindow = 0.2f;
     [SerializeField] private float doubleTapWindow = 0.25f;
 
     [Header("Physics & Grounding")]
     public LayerMask groundLayer;
+    [Tooltip("Stage boundary layer a wall-bounce reaction rebounds off.")]
+    public LayerMask wallLayer;
     public float groundCheckOffset = 0.1f;
     [SerializeField] private float pushboxRadius = 1.2f;
     [SerializeField] private float pushboxSeparationSpeed = 10f;
 
     public bool IsGrounded { get; private set; }
     public bool IsInAttackStartup { get; set; }
-    public bool IsInvincible { get; set; }
     public bool AttackConnected { get; set; }
     public Vector2 MovementInput { get; private set; }
     public Hurtbox Hurtbox { get; private set; }
     public HealthComponent Health { get; private set; }
     public ProjectilePool Projectiles { get; private set; }
+    public CombatRules Rules => combatRules;
     public RobotState CurrentState => currentState;
+
+    /// <summary>Set by reversal specials for their startup; wake-up invulnerability is added on top.</summary>
+    public bool IsInvincible
+    {
+        get => invincibleByState || invulnerabilityTimer > 0f;
+        set => invincibleByState = value;
+    }
+
+    /// <summary>True while this fighter is held in hitstop.</summary>
+    public bool IsFrozen => freezeRemaining > 0f;
+
+    /// <summary>Unscaled seconds of hitstop still to serve.</summary>
+    public float FreezeRemaining => freezeRemaining;
 
     /// <summary>
     /// Number of state entries since startup. Re-entering the cached instance of the current state
@@ -120,12 +155,20 @@ public class RobotController : MonoBehaviour
     private HitstunState hitstunState;
     private BlockstunState blockstunState;
     private AirborneHurtState airborneHurtState;
+    private KnockdownState knockdownState;
     private DeathState deathState;
 
+    private FighterCommand trackedCommand;
+    private float pressTime;
     private float bufferTimer;
+    private bool bufferWindowOpen;
     private float lastTapTime;
     private int lastTapDirection;
     private bool isDirectionHeld;
+
+    private float freezeRemaining;
+    private float invulnerabilityTimer;
+    private bool invincibleByState;
 
     private float standingHeight;
     private Vector3 standingCenter;
@@ -139,6 +182,8 @@ public class RobotController : MonoBehaviour
         inputBuffer = GetComponent<InputBuffer>();
         Hurtbox = GetComponentInChildren<Hurtbox>();
         Health = GetComponent<HealthComponent>();
+        if (combatRules == null) combatRules = ScriptableObject.CreateInstance<CombatRules>();
+        if (wallLayer.value == 0) wallLayer = LayerMask.GetMask(WallLayerName);
         AllocateStates();
 
         if (hitboxBase == null) hitboxBase = GetComponentInChildren<Hitbox>(true);
@@ -185,6 +230,9 @@ public class RobotController : MonoBehaviour
 
     private void Update()
     {
+        if (TickFreeze()) return;
+
+        TickInvulnerability();
         UpdateGroundedState();
         animator.SetBool(FighterAnimatorParameters.IsGrounded, IsGrounded);
         TickCommandBuffer();
@@ -207,6 +255,7 @@ public class RobotController : MonoBehaviour
         hitstunState = new HitstunState(this);
         blockstunState = new BlockstunState(this);
         airborneHurtState = new AirborneHurtState(this);
+        knockdownState = new KnockdownState(this);
         deathState = new DeathState(this);
     }
 
@@ -262,22 +311,49 @@ public class RobotController : MonoBehaviour
         TransitionTo(blockstunState);
     }
 
-    public void EnterAirborneHurt(float launchForce, float driftSpeed, RobotController attacker)
+    public void EnterAirborneHurt(float launchForce, float driftSpeed, RobotController attacker, BounceMode bounce, float bounceForce)
     {
-        airborneHurtState.Configure(launchForce, driftSpeed, attacker);
+        airborneHurtState.Configure(launchForce, driftSpeed, attacker, bounce, bounceForce);
         TransitionTo(airborneHurtState);
+    }
+
+    public void EnterKnockdown(float duration, float pushbackForce, RobotController attacker)
+    {
+        knockdownState.Configure(duration, pushbackForce, attacker);
+        TransitionTo(knockdownState);
     }
 
     /// <summary>
     /// Exits the current state and enters the next one. The same instance may be entered again:
     /// Exit runs before Enter, so a chained attack or a re-launched juggle restarts cleanly.
+    /// Entering a neutral stance ends any combo the opponent had running on this fighter.
     /// </summary>
     private void TransitionTo(RobotState nextState)
     {
         currentState?.Exit();
         currentState = nextState;
         TransitionCount++;
+        if (nextState.IsNeutral && Hurtbox != null) Hurtbox.ResetCombo();
         currentState.Enter();
+    }
+
+    /// <summary>
+    /// Holds this fighter in hitstop for <paramref name="seconds"/> of unscaled time. A longer
+    /// freeze always extends a shorter one. The animator is paused on its current pose so the
+    /// contact frame stays on screen.
+    /// </summary>
+    public void FreezeFor(float seconds)
+    {
+        if (seconds <= 0f) return;
+
+        freezeRemaining = Mathf.Max(freezeRemaining, seconds);
+        animator.speed = 0f;
+    }
+
+    /// <summary>Grants strike invulnerability for <paramref name="seconds"/> of gameplay time.</summary>
+    public void GrantInvulnerability(float seconds)
+    {
+        invulnerabilityTimer = Mathf.Max(invulnerabilityTimer, seconds);
     }
 
     /// <summary>
@@ -296,9 +372,35 @@ public class RobotController : MonoBehaviour
     {
         if (bufferedCommand != expectedCommand) return false;
 
-        bufferedCommand = FighterCommand.None;
-        bufferTimer = 0f;
+        ClearBufferedCommand();
         return true;
+    }
+
+    /// <summary>
+    /// Normal bound to an attack button for the given posture, or null for non-attack commands.
+    /// Forward + RightPunch while standing is the launcher.
+    /// </summary>
+    public AttackData ResolveNormal(FighterCommand command, bool crouching)
+    {
+        switch (command)
+        {
+            case FighterCommand.LeftPunch:
+                return crouching ? crouchPunchBase : leftPunchBase;
+            case FighterCommand.RightPunch:
+                if (crouching) return crouchPunchBase;
+                return IsAdvancing() ? launcherBase : rightPunchBase;
+            case FighterCommand.LeftKick:
+            case FighterCommand.RightKick:
+                if (crouching) return crouchSweepBase;
+                return command == FighterCommand.LeftKick ? leftKickBase : rightKickBase;
+            default:
+                return null;
+        }
+    }
+
+    public bool IsCrouchingNormal(AttackData attack)
+    {
+        return attack != null && (attack == crouchPunchBase || attack == crouchSweepBase);
     }
 
     /// <summary>
@@ -357,6 +459,17 @@ public class RobotController : MonoBehaviour
     }
 
     /// <summary>
+    /// True when the capsule touches the stage boundary on the side it is travelling towards.
+    /// Only walls count: the opponent's body never reads as a wall.
+    /// </summary>
+    public bool IsTouchingWall(float directionSign)
+    {
+        Vector3 origin = transform.TransformPoint(characterController.center);
+        float reach = characterController.radius + characterController.skinWidth + groundCheckOffset;
+        return Physics.Raycast(origin, new Vector3(directionSign, 0f, 0f), reach, wallLayer);
+    }
+
+    /// <summary>
     /// Teleports the fighter to its corner, restores health and returns to Idle for the next round.
     /// The CharacterController must be disabled during the teleport or it will reject the move.
     /// </summary>
@@ -369,13 +482,34 @@ public class RobotController : MonoBehaviour
         if (Health != null) Health.ResetHealth();
         Projectiles?.RecallAll();
 
-        bufferedCommand = FighterCommand.None;
-        bufferTimer = 0f;
-        IsInvincible = false;
+        ClearBufferedCommand();
+        freezeRemaining = 0f;
+        invulnerabilityTimer = 0f;
+        invincibleByState = false;
         AttackConnected = false;
+        animator.speed = 1f;
 
         animator.Play(FighterAnimatorParameters.LocomotionState, 0, 0f);
         EnterIdle();
+    }
+
+    /// <summary>Returns true while the fighter must stay frozen this frame.</summary>
+    private bool TickFreeze()
+    {
+        if (freezeRemaining <= 0f) return false;
+
+        freezeRemaining -= Time.unscaledDeltaTime;
+        if (freezeRemaining > 0f) return true;
+
+        freezeRemaining = 0f;
+        animator.speed = 1f;
+        return false;
+    }
+
+    private void TickInvulnerability()
+    {
+        if (invulnerabilityTimer <= 0f) return;
+        invulnerabilityTimer = Mathf.Max(0f, invulnerabilityTimer - Time.deltaTime);
     }
 
     private void UpdateGroundedState()
@@ -386,22 +520,63 @@ public class RobotController : MonoBehaviour
     }
 
     /// <summary>
-    /// The buffer only ages while the fighter can act on it. During an attack's startup the
-    /// window is held open, so a follow-up pressed early in a jab is still waiting when the
-    /// chain window opens on contact instead of expiring mid-swing.
+    /// First-actionable-frame buffering. A press is held, without ageing, through startup,
+    /// recovery, stun and hitstop; once the state accepts commands the leniency window opens and
+    /// the state ticking right after this consumes it. A press older than the hold-through limit
+    /// when the fighter becomes actionable is dropped, so mashing through a long stun stores nothing.
     /// </summary>
     private void TickCommandBuffer()
     {
-        if (bufferTimer <= 0f || IsInAttackStartup) return;
+        if (bufferedCommand == FighterCommand.None)
+        {
+            trackedCommand = FighterCommand.None;
+            return;
+        }
+
+        if (bufferedCommand != trackedCommand) RegisterPress(bufferedCommand);
+
+        if (currentState == null || !currentState.AcceptsCommands)
+        {
+            if (Time.unscaledTime - pressTime > combatRules.holdThrough) ClearBufferedCommand();
+            return;
+        }
+
+        if (!bufferWindowOpen)
+        {
+            bufferWindowOpen = true;
+            bufferTimer = combatRules.linkLeniency;
+            return;
+        }
 
         bufferTimer -= Time.deltaTime;
-        if (bufferTimer <= 0f) bufferedCommand = FighterCommand.None;
+        if (bufferTimer <= 0f) ClearBufferedCommand();
     }
 
     private void BufferCommand(FighterCommand command)
     {
         bufferedCommand = command;
-        bufferTimer = bufferWindow;
+        RegisterPress(command);
+    }
+
+    private void RegisterPress(FighterCommand command)
+    {
+        trackedCommand = command;
+        pressTime = Time.unscaledTime;
+        bufferWindowOpen = false;
+        bufferTimer = 0f;
+    }
+
+    private void ClearBufferedCommand()
+    {
+        bufferedCommand = FighterCommand.None;
+        trackedCommand = FighterCommand.None;
+        bufferWindowOpen = false;
+        bufferTimer = 0f;
+    }
+
+    private bool IsAdvancing()
+    {
+        return MovementInput.x * GetScreenFacingSign() > LauncherForwardThreshold;
     }
 
     /// <summary>
@@ -463,15 +638,21 @@ public class RobotController : MonoBehaviour
         lastTapDirection = 0;
     }
 
+    /// <summary>
+    /// Motion inputs accept the strict sequence and a lenient shortcut that skips the diagonal,
+    /// so a fast stick flick sampled once per frame still reads as the motion.
+    /// </summary>
     private void HandleLeftPunch()
     {
-        bool motionDetected = inputBuffer != null && inputBuffer.CheckMotionInput(QuarterCircleForward);
+        bool motionDetected = inputBuffer != null
+            && (inputBuffer.CheckMotionInput(QuarterCircleForward) || inputBuffer.CheckMotionInput(QuarterCircleForwardShortcut));
         BufferCommand(motionDetected ? FighterCommand.Hadouken : FighterCommand.LeftPunch);
     }
 
     private void HandleRightPunch()
     {
-        bool motionDetected = inputBuffer != null && inputBuffer.CheckMotionInput(DragonPunch);
+        bool motionDetected = inputBuffer != null
+            && (inputBuffer.CheckMotionInput(DragonPunch) || inputBuffer.CheckMotionInput(DragonPunchShortcut));
         BufferCommand(motionDetected ? FighterCommand.Shoryuken : FighterCommand.RightPunch);
     }
 

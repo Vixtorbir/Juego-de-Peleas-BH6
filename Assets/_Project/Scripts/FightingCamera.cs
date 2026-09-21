@@ -62,6 +62,10 @@ public class FightingCamera : MonoBehaviour
     [Tooltip("Time for a field-of-view punch to spring back to the base lens.")]
     public float zoomPunchDuration = 0.15f;
 
+    [Header("Impact Punch")]
+    [Tooltip("Time for a translational punch to settle back onto the framed position.")]
+    public float punchReturnTime = 0.09f;
+
     private Camera attachedCamera;
     private Quaternion baseRotation;
     private float baseFieldOfView;
@@ -79,6 +83,9 @@ public class FightingCamera : MonoBehaviour
 
     private float zoomPunchTimer;
     private float zoomPunchDelta;
+
+    private Vector3 punchOffset;
+    private Vector3 punchVelocity;
 
     private void Awake()
     {
@@ -128,6 +135,17 @@ public class FightingCamera : MonoBehaviour
         zoomPunchTimer = zoomPunchDuration;
     }
 
+    /// <summary>
+    /// Kicks the camera <paramref name="meters"/> along <paramref name="direction"/> (screen space)
+    /// and lets a critically damped spring bring it back, so a hit nudges the frame the way the
+    /// defender is knocked before the shake takes over. Punches accumulate; the spring settles them.
+    /// </summary>
+    public void Punch(Vector3 direction, float meters)
+    {
+        if (meters <= 0f || direction.sqrMagnitude < 0.0001f) return;
+        punchOffset += direction.normalized * meters;
+    }
+
     private void LateUpdate()
     {
         if (player1 == null || player2 == null) return;
@@ -145,7 +163,8 @@ public class FightingCamera : MonoBehaviour
         framedPosition.z = Mathf.SmoothDamp(framedPosition.z, targetZ, ref velocityZ, smoothTimeZoom, Mathf.Infinity, unscaledDelta);
 
         AdvanceShake(unscaledDelta, out Vector3 shakeOffset, out float shakeRoll);
-        transform.SetPositionAndRotation(framedPosition + shakeOffset, baseRotation * Quaternion.Euler(0f, 0f, shakeRoll));
+        punchOffset = Vector3.SmoothDamp(punchOffset, Vector3.zero, ref punchVelocity, Mathf.Max(punchReturnTime, MinSmoothTime), Mathf.Infinity, unscaledDelta);
+        transform.SetPositionAndRotation(framedPosition + shakeOffset + punchOffset, baseRotation * Quaternion.Euler(0f, 0f, shakeRoll));
 
         AdvanceZoomPunch(unscaledDelta);
     }

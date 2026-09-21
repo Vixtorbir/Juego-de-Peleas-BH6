@@ -67,7 +67,7 @@ public class Hitbox : MonoBehaviour
         if (!other.TryGetComponent(out Hurtbox target) || target.Owner == attackerController) return;
 
         Vector3 contactPoint = ComputeContactPoint(other);
-        if (target.ReceiveHit(currentAttackData, attackerController, contactPoint) && attackerController != null)
+        if (target.ReceiveHit(currentAttackData, attackerController, contactPoint, true) && attackerController != null)
         {
             attackerController.NotifyAttackConnected();
         }

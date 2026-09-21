@@ -81,7 +81,7 @@ public class HadoukenProjectile : MonoBehaviour
         }
 
         if (target.Owner == owner) return;
-        if (!target.ReceiveHit(attackData, owner, other.bounds.ClosestPoint(transform.position))) return;
+        if (!target.ReceiveHit(attackData, owner, other.bounds.ClosestPoint(transform.position), false)) return;
 
         owner.NotifyAttackConnected();
         Recall();

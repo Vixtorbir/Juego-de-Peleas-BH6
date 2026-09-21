@@ -1859,6 +1859,7 @@ MonoBehaviour:
   animator: {fileID: 422962608}
   characterController: {fileID: 422962609}
   hitboxBase: {fileID: 533375029}
+  combatRules: {fileID: 11400000, guid: 8275c6cbcc6148840a9c0379f99fee2b, type: 2}
   opponentTarget: {fileID: 1793476819}
   hitReactionClip: {fileID: -203655887218126122, guid: ca943b51d014a6f47a81e16e479865c1, type: 3}
   blockReactionClip: {fileID: -203655887218126122, guid: 0675d37d5efcf99498b67f0efddcd768, type: 3}
@@ -1876,11 +1877,13 @@ MonoBehaviour:
   hadoukenPrefab: {fileID: 977442768426397397, guid: 419c7bd03de1a8b419c3c9cf363a0945, type: 3}
   hadoukenSpawnPoint: {fileID: 1147387385}
   bufferedCommand: 0
-  bufferWindow: 0.2
   doubleTapWindow: 0.25
   groundLayer:
     serializedVersion: 2
     m_Bits: 8
+  wallLayer:
+    serializedVersion: 2
+    m_Bits: 2048
   groundCheckOffset: 0.1
   pushboxRadius: 1.2
   pushboxSeparationSpeed: 10
@@ -2271,6 +2274,9 @@ MonoBehaviour:
   library: {fileID: 11400000, guid: 9ec71869990ef954fbb86f150c221b2b, type: 2}
   sfxMixerGroup: {fileID: 24300008, guid: 4f1f339dd2fecd147b21d8722692e484, type: 2}
   musicMixerGroup: {fileID: 24300010, guid: 4f1f339dd2fecd147b21d8722692e484, type: 2}
+  defaultSnapshot: {fileID: 24500006, guid: 4f1f339dd2fecd147b21d8722692e484, type: 2}
+  impactSnapshot: {fileID: 24500016, guid: 4f1f339dd2fecd147b21d8722692e484, type: 2}
+  knockoutSnapshot: {fileID: 24500018, guid: 4f1f339dd2fecd147b21d8722692e484, type: 2}
   playMusicOnStart: 1
   musicMasterVolume: 0.16
 --- !u!1 &474566854
@@ -5251,6 +5257,7 @@ MonoBehaviour:
   smoothTimeY: 0.35
   smoothTimeZoom: 0.25
   zoomPunchDuration: 0.15
+  punchReturnTime: 0.09
 --- !u!1 &938252750
 GameObject:
   m_ObjectHideFlags: 0
@@ -9371,6 +9378,7 @@ MonoBehaviour:
   animator: {fileID: 1793476813}
   characterController: {fileID: 1793476814}
   hitboxBase: {fileID: 633728960}
+  combatRules: {fileID: 11400000, guid: 8275c6cbcc6148840a9c0379f99fee2b, type: 2}
   opponentTarget: {fileID: 422962607}
   hitReactionClip: {fileID: -203655887218126122, guid: ca943b51d014a6f47a81e16e479865c1, type: 3}
   blockReactionClip: {fileID: -203655887218126122, guid: 0675d37d5efcf99498b67f0efddcd768, type: 3}
@@ -9388,11 +9396,13 @@ MonoBehaviour:
   hadoukenPrefab: {fileID: 977442768426397397, guid: 419c7bd03de1a8b419c3c9cf363a0945, type: 3}
   hadoukenSpawnPoint: {fileID: 474566855}
   bufferedCommand: 0
-  bufferWindow: 0.2
   doubleTapWindow: 0.25
   groundLayer:
     serializedVersion: 2
     m_Bits: 8
+  wallLayer:
+    serializedVersion: 2
+    m_Bits: 2048
   groundCheckOffset: 0.1
   pushboxRadius: 1.2
   pushboxSeparationSpeed: 10

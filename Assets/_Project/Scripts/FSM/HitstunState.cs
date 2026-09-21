@@ -29,7 +29,7 @@ public class HitstunState : RobotState
     {
         timer = duration;
         pushback = new PushbackSolver(robot, attacker, pushbackForce, WallTransferRatio);
-        PlayTimedAnimation(FighterAnimatorParameters.Hitstun, robot.hitReactionClip, duration);
+        PlayReactionAnimation(FighterAnimatorParameters.Hitstun, robot.hitReactionClip, duration);
     }
 
     public override void Tick()

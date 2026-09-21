@@ -15,6 +15,13 @@ public class AttackState : RobotState
 
     public AttackState(RobotController robot) : base(robot) { }
 
+    public AttackData Data => data;
+
+    /// <summary>The buffer only ages while the cancel window is open, so a press during startup or after the window closes waits for the next actionable state.</summary>
+    public override bool AcceptsCommands => IsCancelWindowOpen;
+
+    private bool IsCancelWindowOpen => data != null && robot.AttackConnected && stateTimer >= data.startupTime && stateTimer < data.CancelWindowEnd;
+
     public void Configure(AttackData attackData)
     {
         data = attackData;
@@ -43,8 +50,11 @@ public class AttackState : RobotState
         if (stateTimer < data.startupTime) return;
 
         robot.IsInAttackStartup = false;
-        if (TrySpecialCancel(data)) return;
-        if (TryChainCancel(data)) return;
+        if (stateTimer < data.CancelWindowEnd)
+        {
+            if (TrySpecialCancel(data)) return;
+            if (TryChainCancel(data)) return;
+        }
 
         if (stateTimer < data.ActiveEndTime)
         {

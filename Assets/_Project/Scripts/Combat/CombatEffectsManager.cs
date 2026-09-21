@@ -1,19 +1,19 @@
 using UnityEngine;
 
 /// <summary>
-/// Scene-wide hitstop service. Freezes gameplay time on impact while UI and camera shake keep
-/// running on unscaled time. The freeze is tracked with an unscaled timer instead of a coroutine
-/// so triggering it every hit never allocates. A longer hitstop always extends a shorter one.
+/// Scene-wide cinematic time service. Per-hit hitstop is handled by each fighter's own freeze
+/// (<see cref="RobotController.FreezeFor"/>), so the global time scale is reserved for beats that
+/// must slow the whole scene at once: the knockout, and any future super freeze. The slow-motion
+/// is tracked with an unscaled timer instead of a coroutine so triggering it never allocates, and
+/// a longer beat always extends a shorter one.
 /// </summary>
 public class CombatEffectsManager : MonoBehaviour
 {
-    private const float HitstopTimeScale = 0.01f;
-
     public static CombatEffectsManager Instance { get; private set; }
 
-    public bool IsHitstopActive => hitstopRemaining > 0f;
+    public bool IsSlowMotionActive => slowMotionRemaining > 0f;
 
-    private float hitstopRemaining;
+    private float slowMotionRemaining;
 
     private void Awake()
     {
@@ -27,14 +27,14 @@ public class CombatEffectsManager : MonoBehaviour
     }
 
     /// <summary>
-    /// A hitstop in flight must never outlive the manager: disabling it (scene unload, editor
-    /// stop, object toggled) clears the freeze so the next scene starts on normal time.
+    /// A beat in flight must never outlive the manager: disabling it (scene unload, editor stop,
+    /// object toggled) restores normal time so the next scene starts cleanly.
     /// </summary>
     private void OnDisable()
     {
         if (Instance != this) return;
 
-        hitstopRemaining = 0f;
+        slowMotionRemaining = 0f;
         Time.timeScale = 1f;
     }
 
@@ -49,21 +49,25 @@ public class CombatEffectsManager : MonoBehaviour
 
     private void Update()
     {
-        if (hitstopRemaining <= 0f) return;
+        if (slowMotionRemaining <= 0f) return;
 
-        hitstopRemaining -= Time.unscaledDeltaTime;
-        if (hitstopRemaining <= 0f)
+        slowMotionRemaining -= Time.unscaledDeltaTime;
+        if (slowMotionRemaining <= 0f)
         {
-            hitstopRemaining = 0f;
+            slowMotionRemaining = 0f;
             Time.timeScale = 1f;
         }
     }
 
-    public void TriggerHitstop(float duration)
+    /// <summary>
+    /// Runs the scene at <paramref name="timeScale"/> for <paramref name="duration"/> seconds of
+    /// real time. The slower scale wins while both are in flight.
+    /// </summary>
+    public void TriggerSlowMotion(float timeScale, float duration)
     {
         if (duration <= 0f) return;
 
-        hitstopRemaining = Mathf.Max(hitstopRemaining, duration);
-        Time.timeScale = HitstopTimeScale;
+        slowMotionRemaining = Mathf.Max(slowMotionRemaining, duration);
+        Time.timeScale = IsSlowMotionActive ? Mathf.Min(Time.timeScale, timeScale) : timeScale;
     }
 }

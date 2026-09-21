@@ -37,7 +37,7 @@ public class BlockstunState : RobotState
     {
         timer = duration;
         pushback = new PushbackSolver(robot, attacker, pushbackForce, WallTransferRatio);
-        PlayTimedAnimation(FighterAnimatorParameters.Blockstun, robot.blockReactionClip, duration);
+        PlayReactionAnimation(FighterAnimatorParameters.Blockstun, robot.blockReactionClip, duration);
 
         if (blockedCrouching)
         {

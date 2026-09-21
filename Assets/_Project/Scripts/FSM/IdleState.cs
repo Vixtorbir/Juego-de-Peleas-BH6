@@ -13,11 +13,12 @@ public class IdleState : RobotState
 
     public override bool CanGuard => true;
 
+    public override bool IsNeutral => true;
+
     public override void Enter()
     {
         robot.animator.SetFloat(FighterAnimatorParameters.InputX, 0f);
         robot.animator.SetFloat(FighterAnimatorParameters.InputY, 0f);
-        if (robot.Hurtbox != null) robot.Hurtbox.ResetCombo();
         robot.FaceOpponent();
         ReturnToStance(FighterAnimatorParameters.LocomotionState);
     }
@@ -28,7 +29,7 @@ public class IdleState : RobotState
 
         if (TryConsumeSpecialCommands()) return;
         if (TryConsumeDashCommands()) return;
-        if (TryConsumeNormalCommands()) return;
+        if (TryConsumeNormalCommands(false)) return;
 
         if (robot.MovementInput.y > VerticalInputThreshold)
         {
@@ -49,34 +50,5 @@ public class IdleState : RobotState
         }
 
         ApplyGroundingForce();
-    }
-
-    private bool TryConsumeNormalCommands()
-    {
-        if (robot.TryConsumeCommand(FighterCommand.LeftPunch))
-        {
-            robot.EnterAttack(robot.leftPunchBase);
-            return true;
-        }
-
-        if (robot.TryConsumeCommand(FighterCommand.RightPunch))
-        {
-            robot.EnterAttack(robot.rightPunchBase);
-            return true;
-        }
-
-        if (robot.TryConsumeCommand(FighterCommand.LeftKick))
-        {
-            robot.EnterAttack(robot.leftKickBase);
-            return true;
-        }
-
-        if (robot.TryConsumeCommand(FighterCommand.RightKick))
-        {
-            robot.EnterAttack(robot.rightKickBase);
-            return true;
-        }
-
-        return false;
     }
 }

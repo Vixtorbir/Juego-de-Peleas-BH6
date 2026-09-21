@@ -20,6 +20,9 @@ public static class AudioSceneSetup
     private const string MusicFolder = AudioRoot + "/Music";
     private const string SfxGroupName = "SFX";
     private const string MusicGroupName = "Music";
+    private const string DefaultSnapshotName = "Default";
+    private const string ImpactSnapshotName = "Impact";
+    private const string KnockoutSnapshotName = "Knockout";
     private const float MusicMasterVolume = 0.16f;
 
     private readonly struct EventBinding
@@ -193,6 +196,9 @@ public static class AudioSceneSetup
         serialized.FindProperty("musicMasterVolume").floatValue = MusicMasterVolume;
         serialized.FindProperty("sfxMixerGroup").objectReferenceValue = FindMixerGroup(SfxGroupName);
         serialized.FindProperty("musicMixerGroup").objectReferenceValue = FindMixerGroup(MusicGroupName);
+        serialized.FindProperty("defaultSnapshot").objectReferenceValue = FindSnapshot(DefaultSnapshotName);
+        serialized.FindProperty("impactSnapshot").objectReferenceValue = FindSnapshot(ImpactSnapshotName);
+        serialized.FindProperty("knockoutSnapshot").objectReferenceValue = FindSnapshot(KnockoutSnapshotName);
         serialized.ApplyModifiedPropertiesWithoutUndo();
 
         EditorSceneManager.MarkSceneDirty(scene);
@@ -220,5 +226,13 @@ public static class AudioSceneSetup
 
         Debug.LogError($"[AudioSceneSetup] Group '{groupName}' not found in '{MixerPath}'; left unrouted.");
         return null;
+    }
+
+    private static AudioMixerSnapshot FindSnapshot(string snapshotName)
+    {
+        AudioMixer mixer = AssetDatabase.LoadAssetAtPath<AudioMixer>(MixerPath);
+        AudioMixerSnapshot snapshot = mixer != null ? mixer.FindSnapshot(snapshotName) : null;
+        if (snapshot == null) Debug.LogError($"[AudioSceneSetup] Snapshot '{snapshotName}' not found in '{MixerPath}'; music ducking falls back to source volume.");
+        return snapshot;
     }
 }

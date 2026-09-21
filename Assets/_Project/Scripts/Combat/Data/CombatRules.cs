@@ -1,0 +1,151 @@
+using UnityEngine;
+
+/// <summary>
+/// Freeze applied to each side of a connected hit, in seconds. The defender is held longer than
+/// the attacker so the attacker recovers first and the exchange reads as their advantage.
+/// </summary>
+[System.Serializable]
+public struct HitstopTier
+{
+    public float defender;
+    public float attacker;
+
+    public HitstopTier(float defender, float attacker)
+    {
+        this.defender = defender;
+        this.attacker = attacker;
+    }
+}
+
+/// <summary>
+/// Camera and hitstop response of one impact class, in seconds and metres.
+/// </summary>
+[System.Serializable]
+public struct ImpactTier
+{
+    public HitstopTier hitstop;
+    public float shakeDuration;
+    public float shakeMagnitude;
+    [Tooltip("Translational camera kick along the strike vector.")]
+    public float cameraPunch;
+
+    public ImpactTier(HitstopTier hitstop, float shakeDuration, float shakeMagnitude, float cameraPunch)
+    {
+        this.hitstop = hitstop;
+        this.shakeDuration = shakeDuration;
+        this.shakeMagnitude = shakeMagnitude;
+        this.cameraPunch = cameraPunch;
+    }
+}
+
+/// <summary>
+/// Match-wide combat tuning shared by every fighter: proration and hitstun decay that bound combo
+/// length, juggle gravity and bounce limits that bound air routes, per-tier hitstop and camera
+/// response, and the input buffer leniency. One asset, cached by each <see cref="RobotController"/>
+/// at startup, so a designer can retune the whole game's feel without touching code or attacks.
+/// </summary>
+[CreateAssetMenu(fileName = "CombatRules", menuName = "Fighting Game/Combat Rules")]
+public class CombatRules : ScriptableObject
+{
+    private const float Frame = 1f / 60f;
+
+    [Header("Damage Proration")]
+    [Tooltip("Multiplier applied per hit: hit n deals factor^(n-1) of its listed damage.")]
+    [Range(0.5f, 1f)] public float comboScalingFactor = 0.85f;
+    [Range(0.01f, 1f)] public float minComboScaling = 0.1f;
+    [Tooltip("Extra proration applied to every hit after a launcher connects.")]
+    [Range(0.1f, 1f)] public float launcherProration = 0.8f;
+    [Tooltip("Extra proration applied to every hit after a wall or ground bounce.")]
+    [Range(0.1f, 1f)] public float bounceProration = 0.7f;
+
+    [Header("Hitstun Decay")]
+    [Tooltip("Hitstun lost per combo hit, so grounded links stop being plus after a few reps.")]
+    [Range(0f, 0.2f)] public float hitstunDecayPerHit = 0.04f;
+    [Range(0.1f, 1f)] public float minHitstunScale = 0.65f;
+
+    [Header("Juggle Physics")]
+    [Tooltip("Gravity grows by this fraction per air hit, so each relaunch is shorter than the last.")]
+    [Range(0f, 1f)] public float juggleGravityPerHit = 0.12f;
+    [Tooltip("Relaunch force multiplier applied per air hit.")]
+    [Range(0.5f, 1f)] public float relaunchDecay = 0.9f;
+    [Range(0.1f, 1f)] public float minRelaunchScale = 0.55f;
+    [Tooltip("Vertical pop given to a non-launcher air hit.")]
+    public float airResetLaunchForce = 7f;
+    [Tooltip("Horizontal drift of a non-launcher air hit.")]
+    public float airHitDrift = 1.5f;
+    public int maxWallBounces = 1;
+    public int maxGroundBounces = 1;
+    [Tooltip("Fraction of horizontal speed kept when the body rebounds off a wall.")]
+    [Range(0f, 1f)] public float wallBounceRestitution = 0.6f;
+    [Tooltip("Minimum vertical velocity after a wall rebound so the body hangs in reach.")]
+    public float wallBouncePop = 6f;
+    [Tooltip("Horizontal speed a wall-bounce hit sends the body towards the wall with.")]
+    public float wallBounceDriftSpeed = 9f;
+
+    [Header("Knockdown")]
+    public float knockdownDuration = 0.6f;
+    [Tooltip("Strike invulnerability granted on wake-up so a knockdown never chains into itself.")]
+    public float wakeUpInvulnerability = 6f * Frame;
+
+    [Header("Hitstop & Camera (frames at 60 Hz)")]
+    public ImpactTier lightImpact = new ImpactTier(new HitstopTier(6f * Frame, 5f * Frame), 0.1f, 0.06f, 0.03f);
+    public ImpactTier mediumImpact = new ImpactTier(new HitstopTier(8f * Frame, 7f * Frame), 0.16f, 0.14f, 0.05f);
+    public ImpactTier heavyImpact = new ImpactTier(new HitstopTier(11f * Frame, 9f * Frame), 0.2f, 0.2f, 0.08f);
+    public ImpactTier launcherImpact = new ImpactTier(new HitstopTier(12f * Frame, 10f * Frame), 0.22f, 0.28f, 0.1f);
+    public ImpactTier bounceImpact = new ImpactTier(new HitstopTier(8f * Frame, 8f * Frame), 0.18f, 0.22f, 0.08f);
+    [Tooltip("Extra defender freeze on a counter hit.")]
+    public float counterHitstopBonus = 4f * Frame;
+    [Range(0f, 1f)] public float blockedHitstopRatio = 0.6f;
+    [Range(0f, 1f)] public float blockedShakeRatio = 0.5f;
+    [Tooltip("Field-of-view kick on heavy and counter hits, in degrees (negative tightens).")]
+    public float heavyImpactZoomPunch = -1.5f;
+
+    [Header("Knockout")]
+    public HitstopTier knockoutHitstop = new HitstopTier(27f * Frame, 27f * Frame);
+    public float knockoutShakeDuration = 0.4f;
+    public float knockoutShakeMagnitude = 0.35f;
+    public float knockoutZoomPunch = -2.5f;
+    [Tooltip("Game speed during the knockout beat.")]
+    [Range(0.05f, 1f)] public float knockoutSlowMotionScale = 0.25f;
+    public float knockoutSlowMotionDuration = 0.6f;
+
+    [Header("Input Buffer")]
+    [Tooltip("Frames an input stays valid once the fighter becomes actionable.")]
+    public float linkLeniency = 5f * Frame;
+    [Tooltip("A press older than this when the fighter becomes actionable is discarded, so mashing through a long stun never stores a stale input.")]
+    public float holdThrough = 0.5f;
+
+    /// <summary>Damage multiplier of hit <paramref name="hitNumber"/> (1-based) before route proration.</summary>
+    public float ComboScaling(int hitNumber)
+    {
+        return Mathf.Max(Mathf.Pow(comboScalingFactor, hitNumber - 1), minComboScaling);
+    }
+
+    /// <summary>Hitstun multiplier of hit <paramref name="hitNumber"/> (1-based).</summary>
+    public float HitstunScale(int hitNumber)
+    {
+        return Mathf.Max(1f - hitstunDecayPerHit * (hitNumber - 1), minHitstunScale);
+    }
+
+    /// <summary>Gravity multiplier after <paramref name="juggleHits"/> air hits.</summary>
+    public float GravityScale(int juggleHits)
+    {
+        return 1f + juggleGravityPerHit * juggleHits;
+    }
+
+    /// <summary>Launch force multiplier for the air hit following <paramref name="juggleHits"/> previous air hits.</summary>
+    public float RelaunchScale(int juggleHits)
+    {
+        return Mathf.Max(Mathf.Pow(relaunchDecay, juggleHits), minRelaunchScale);
+    }
+
+    public ImpactTier ImpactFor(AttackWeight weight)
+    {
+        switch (weight)
+        {
+            case AttackWeight.Light: return lightImpact;
+            case AttackWeight.Heavy: return heavyImpact;
+            default: return mediumImpact;
+        }
+    }
+}

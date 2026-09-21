@@ -10,7 +10,6 @@ public class WalkState : RobotState
     private const float SmoothTime = 0.1f;
     private const float VerticalInputThreshold = 0.6f;
     private const float StopInputThreshold = 0.01f;
-    private const float LauncherForwardThreshold = 0.5f;
 
     private Vector2 smoothInput;
     private Vector2 smoothVelocity;
@@ -19,18 +18,19 @@ public class WalkState : RobotState
 
     public override bool CanGuard => true;
 
+    public override bool IsNeutral => true;
+
     public override void Enter()
     {
         smoothInput = Vector2.zero;
         smoothVelocity = Vector2.zero;
-        if (robot.Hurtbox != null) robot.Hurtbox.ResetCombo();
     }
 
     public override void Tick()
     {
         if (TryConsumeSpecialCommands()) return;
         if (TryConsumeDashCommands()) return;
-        if (TryConsumeNormalCommands()) return;
+        if (TryConsumeNormalCommands(false)) return;
 
         if (robot.MovementInput.y > VerticalInputThreshold)
         {
@@ -68,35 +68,5 @@ public class WalkState : RobotState
         robot.characterController.Move(velocity * Time.deltaTime);
 
         ApplyGroundingForce();
-    }
-
-    private bool TryConsumeNormalCommands()
-    {
-        if (robot.TryConsumeCommand(FighterCommand.LeftPunch))
-        {
-            robot.EnterAttack(robot.leftPunchBase);
-            return true;
-        }
-
-        if (robot.TryConsumeCommand(FighterCommand.RightPunch))
-        {
-            bool advancing = robot.MovementInput.x * robot.GetScreenFacingSign() > LauncherForwardThreshold;
-            robot.EnterAttack(advancing ? robot.launcherBase : robot.rightPunchBase);
-            return true;
-        }
-
-        if (robot.TryConsumeCommand(FighterCommand.LeftKick))
-        {
-            robot.EnterAttack(robot.leftKickBase);
-            return true;
-        }
-
-        if (robot.TryConsumeCommand(FighterCommand.RightKick))
-        {
-            robot.EnterAttack(robot.rightKickBase);
-            return true;
-        }
-
-        return false;
     }
 }

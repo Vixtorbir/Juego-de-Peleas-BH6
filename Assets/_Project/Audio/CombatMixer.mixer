@@ -11,6 +11,8 @@ AudioMixerController:
   m_MasterGroup: {fileID: 24300002}
   m_Snapshots:
   - {fileID: 24500006}
+  - {fileID: 24500016}
+  - {fileID: 24500018}
   m_StartSnapshot: {fileID: 24500006}
   m_SuspendThreshold: -80
   m_EnableSuspend: 1
@@ -131,8 +133,32 @@ AudioMixerSnapshotController:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Snapshot
+  m_Name: Default
   m_AudioMixer: {fileID: 24100000}
   m_SnapshotID: c4ed53d8ec694e968757e1a6623778e5
   m_FloatValues: {}
+  m_TransitionOverrides: {}
+--- !u!245 &24500016
+AudioMixerSnapshotController:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Impact
+  m_AudioMixer: {fileID: 24100000}
+  m_SnapshotID: 858d9ed733ff42f3be9df2a67514ec73
+  m_FloatValues:
+    ac32989b871d4fcc90526529563fa6d6: -7
+  m_TransitionOverrides: {}
+--- !u!245 &24500018
+AudioMixerSnapshotController:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Knockout
+  m_AudioMixer: {fileID: 24100000}
+  m_SnapshotID: 86ea9618fc644d5f97590ba6d5a4ae36
+  m_FloatValues:
+    ac32989b871d4fcc90526529563fa6d6: -14
   m_TransitionOverrides: {}

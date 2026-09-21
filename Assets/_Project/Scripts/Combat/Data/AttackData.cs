@@ -46,9 +46,27 @@ public enum AttackImpactSound
 }
 
 /// <summary>
-/// Chain link from one attack to the next. Once the current attack has connected (hit or block),
-/// the buffered command cancels the remaining active and recovery frames straight into
-/// <see cref="nextAttack"/>.
+/// What a connected hit does to the defender's body. Grounded and airborne defenders resolve their
+/// own reaction, so a heavy kick can knock a standing opponent back but send an airborne one into
+/// the wall.
+/// </summary>
+public enum HitReaction
+{
+    /// <summary>Standing stun with knockback; on an airborne defender, a relaunch.</summary>
+    Hitstun,
+    /// <summary>Launch into a juggle with the attack's launch force.</summary>
+    Launch,
+    /// <summary>Send the body flying into the nearest wall; it rebounds once per combo.</summary>
+    WallBounce,
+    /// <summary>Slam the body into the floor; it pops back up once per combo.</summary>
+    GroundBounce,
+    /// <summary>Hard knockdown: the defender cannot be hit while down and wakes up invulnerable.</summary>
+    Knockdown
+}
+
+/// <summary>
+/// Chain link from one attack to the next. Explicit links are target combos: they take priority
+/// over the universal gatling rule and may chain within or below the current tier.
 /// </summary>
 [System.Serializable]
 public struct ComboBranch
@@ -94,6 +112,8 @@ public class AttackData : ScriptableObject
     [Header("Cancel & Invincibility")]
     [Tooltip("When the attack connects (hit or block), its active and recovery frames can be cancelled into a special move.")]
     public bool specialCancelable = true;
+    [Tooltip("Seconds from the attack start after which chain and special cancels close. 0 keeps the window open to the end of recovery.")]
+    public float cancelWindowEnd = 0f;
     [Tooltip("The fighter ignores incoming hits during the startup frames. Reserved for reversal specials.")]
     public bool invincibleStartup = false;
 
@@ -106,8 +126,17 @@ public class AttackData : ScriptableObject
     public float blockPushback = 4f;
 
     [Header("Launcher Settings")]
+    [Tooltip("Marks the launcher tier of the gatling ladder (Light > Medium > Heavy > Launcher) and defaults the grounded reaction to a launch.")]
     public bool isLauncher = false;
     public float launchForce = 15f;
+
+    [Header("Hit Reactions")]
+    [Tooltip("Reaction of a standing or crouching defender. Hitstun on a launcher resolves to Launch.")]
+    public HitReaction groundedReaction = HitReaction.Hitstun;
+    [Tooltip("Reaction of an airborne defender. Hitstun and Launch both relaunch, with juggle decay applied.")]
+    public HitReaction airborneReaction = HitReaction.Hitstun;
+    [Tooltip("Vertical speed of a ground-bounce pop or a wall-bounce rebound triggered by this attack.")]
+    public float bounceForce = 9f;
 
     [Header("Combo Routes")]
     [Tooltip("Chain cancels available as soon as this attack connects.")]
@@ -139,4 +168,16 @@ public class AttackData : ScriptableObject
 
     public float ActiveEndTime => startupTime + activeTime;
     public float TotalDuration => startupTime + activeTime + recoveryTime;
+
+    /// <summary>Time from the attack start at which its cancel window closes.</summary>
+    public float CancelWindowEnd => cancelWindowEnd > 0f ? cancelWindowEnd : TotalDuration;
+
+    /// <summary>
+    /// Position on the gatling ladder: Light (0), Medium (1), Heavy (2), Launcher (3). A connected
+    /// normal may chain into any normal of a strictly higher tier.
+    /// </summary>
+    public int GatlingTier => isLauncher ? 3 : (int)weight;
+
+    /// <summary>Grounded reaction with the launcher flag folded in for assets authored before reactions existed.</summary>
+    public HitReaction ResolvedGroundedReaction => groundedReaction == HitReaction.Hitstun && isLauncher ? HitReaction.Launch : groundedReaction;
 }

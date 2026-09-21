@@ -12,6 +12,8 @@ public class CrouchState : RobotState
 
     public override bool IsCrouchingPosture => true;
 
+    public override bool IsNeutral => true;
+
     public override void Enter()
     {
         robot.SetCrouchingPosture(true);
@@ -21,18 +23,7 @@ public class CrouchState : RobotState
     public override void Tick()
     {
         if (TryConsumeSpecialCommands()) return;
-
-        if (robot.TryConsumeCommand(FighterCommand.LeftPunch) || robot.TryConsumeCommand(FighterCommand.RightPunch))
-        {
-            robot.EnterCrouchAttack(robot.crouchPunchBase);
-            return;
-        }
-
-        if (robot.TryConsumeCommand(FighterCommand.LeftKick) || robot.TryConsumeCommand(FighterCommand.RightKick))
-        {
-            robot.EnterCrouchAttack(robot.crouchSweepBase);
-            return;
-        }
+        if (TryConsumeNormalCommands(true)) return;
 
         if (robot.MovementInput.y > StandUpInputThreshold)
         {

@@ -11,6 +11,7 @@ public abstract class RobotState
     protected const float Gravity = -35f;
     protected const float GroundSnapVelocity = -0.5f;
     protected const float FallVelocity = -9.81f;
+    protected const float CrouchInputThreshold = -0.5f;
 
     protected readonly RobotController robot;
 
@@ -30,6 +31,22 @@ public abstract class RobotState
     /// rather than from the raw stick, so a standing fighter holding down is still hit high.
     /// </summary>
     public virtual bool IsCrouchingPosture => false;
+
+    /// <summary>
+    /// True in the neutral stances. Entering a neutral state ends the opponent's combo, and only a
+    /// neutral state may start a fresh action from the buffer.
+    /// </summary>
+    public virtual bool IsNeutral => false;
+
+    /// <summary>
+    /// True while a buffered command could be consumed this frame: the neutral stances, and an
+    /// attack whose cancel window is open. The input buffer only ages during these frames, so a
+    /// press made during recovery or stun executes on the first actionable frame.
+    /// </summary>
+    public virtual bool AcceptsCommands => IsNeutral;
+
+    /// <summary>True while grounded hits pass through the body (knockdown lockout).</summary>
+    public virtual bool IgnoresGroundedHits => false;
 
     public virtual void Enter() { }
 
@@ -76,6 +93,32 @@ public abstract class RobotState
     }
 
     /// <summary>
+    /// Plays a state whose clip is rescaled to end exactly when the gameplay window (stun, dash)
+    /// ends. A null clip or non-positive duration plays the clip at its authored speed.
+    /// </summary>
+    protected void PlayTimedAnimation(int stateHash, AnimationClip clip, float duration)
+    {
+        if (robot.animator == null) return;
+
+        robot.animator.SetFloat(FighterAnimatorParameters.TimedSpeed, FighterAnimatorParameters.FitPlaybackSpeed(clip, duration));
+        PlayAnimationState(stateHash);
+    }
+
+    /// <summary>
+    /// Snaps to a reaction state and evaluates the graph at once, so the hit pose is on screen for
+    /// the whole hitstop even though the animator is paused the same frame. A cross-fade would never
+    /// start under a paused animator and the defender would freeze in its pre-hit pose.
+    /// </summary>
+    protected void PlayReactionAnimation(int stateHash, AnimationClip clip, float duration)
+    {
+        if (robot.animator == null) return;
+
+        robot.animator.SetFloat(FighterAnimatorParameters.TimedSpeed, FighterAnimatorParameters.FitPlaybackSpeed(clip, duration));
+        robot.animator.Play(stateHash, 0, 0f);
+        robot.animator.Update(0f);
+    }
+
+    /// <summary>
     /// Special cancel: once a cancelable normal has connected (hit or block), a buffered special
     /// command interrupts the remaining active and recovery frames. Returns true on transition.
     /// </summary>
@@ -86,35 +129,33 @@ public abstract class RobotState
     }
 
     /// <summary>
-    /// Chain cancel: once the attack has connected, the first <see cref="ComboBranch"/> whose
-    /// command is buffered replaces the remaining frames with the next attack. Returns true on transition.
+    /// Chain cancel. Explicit <see cref="ComboBranch"/> links (target combos) are checked first;
+    /// otherwise the universal gatling rule lets a connected normal chain into any normal of a
+    /// strictly higher tier: Light > Medium > Heavy > Launcher. Returns true on transition.
     /// </summary>
     protected bool TryChainCancel(AttackData data)
     {
-        if (data == null || data.comboBranches == null || !robot.AttackConnected) return false;
+        if (data == null || !robot.AttackConnected) return false;
 
-        for (int i = 0; i < data.comboBranches.Count; i++)
+        if (data.comboBranches != null)
         {
-            ComboBranch branch = data.comboBranches[i];
-            if (branch.nextAttack == null || !robot.TryConsumeCommand(branch.inputCommand)) continue;
+            for (int i = 0; i < data.comboBranches.Count; i++)
+            {
+                ComboBranch branch = data.comboBranches[i];
+                if (branch.nextAttack == null || !robot.TryConsumeCommand(branch.inputCommand)) continue;
 
-            robot.EnterAttack(branch.nextAttack);
-            return true;
+                EnterNormal(branch.nextAttack);
+                return true;
+            }
         }
 
-        return false;
-    }
+        FighterCommand command = robot.bufferedCommand;
+        bool crouching = robot.MovementInput.y < CrouchInputThreshold;
+        AttackData next = robot.ResolveNormal(command, crouching);
+        if (next == null || next.GatlingTier <= data.GatlingTier || !robot.TryConsumeCommand(command)) return false;
 
-    /// <summary>
-    /// Plays a state whose clip is rescaled to end exactly when the gameplay window (stun, dash)
-    /// ends. A null clip or non-positive duration plays the clip at its authored speed.
-    /// </summary>
-    protected void PlayTimedAnimation(int stateHash, AnimationClip clip, float duration)
-    {
-        if (robot.animator == null) return;
-
-        robot.animator.SetFloat(FighterAnimatorParameters.TimedSpeed, FighterAnimatorParameters.FitPlaybackSpeed(clip, duration));
-        PlayAnimationState(stateHash);
+        EnterNormal(next);
+        return true;
     }
 
     /// <summary>
@@ -178,5 +219,26 @@ public abstract class RobotState
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Starts the normal bound to the buffered attack button for the given posture. Returns true
+    /// on transition.
+    /// </summary>
+    protected bool TryConsumeNormalCommands(bool crouching)
+    {
+        FighterCommand command = robot.bufferedCommand;
+        AttackData attack = robot.ResolveNormal(command, crouching);
+        if (attack == null || !robot.TryConsumeCommand(command)) return false;
+
+        EnterNormal(attack);
+        return true;
+    }
+
+    /// <summary>Crouching normals keep the capsule lowered for their whole duration; everything else stands.</summary>
+    private void EnterNormal(AttackData attack)
+    {
+        if (robot.IsCrouchingNormal(attack)) robot.EnterCrouchAttack(attack);
+        else robot.EnterAttack(attack);
     }
 }

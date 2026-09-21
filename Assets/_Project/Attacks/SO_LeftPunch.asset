@@ -26,6 +26,7 @@ MonoBehaviour:
   weight: 0
   impactSound: 0
   specialCancelable: 1
+  cancelWindowEnd: 0
   invincibleStartup: 0
   attackHeight: 0
   blockstunDuration: 0.1667
@@ -33,8 +34,9 @@ MonoBehaviour:
   blockPushback: 1.5
   isLauncher: 0
   launchForce: 15
+  groundedReaction: 0
+  airborneReaction: 0
+  bounceForce: 9
   comboBranches:
-  - inputCommand: 2
-    nextAttack: {fileID: 11400000, guid: 54b0d6d2482a8654ea817dcbe35905c1, type: 2}
   - inputCommand: 2
     nextAttack: {fileID: 11400000, guid: 54b0d6d2482a8654ea817dcbe35905c1, type: 2}
