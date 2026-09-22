@@ -5,13 +5,6 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 
-/// <summary>
-/// Play-mode coverage of the super art. A full gauge buys the whole sequence and is spent in one
-/// step, the locked string lands every beat and ends in a hard knockdown for roughly a third of the
-/// life bar, a gauge one point short neither activates the move nor drains, a whiffed activation
-/// leaves a recovery the opponent can punish, and the whole sequence runs without the game code
-/// allocating a single managed byte.
-/// </summary>
 public class SuperArtPlayModeTests
 {
     private const string ScenePath = "Assets/_Project/Scenes/TrainingRoom.unity";
@@ -140,16 +133,20 @@ public class SuperArtPlayModeTests
     [UnityTest]
     public IEnumerator SuperArtRunsWithoutManagedAllocations()
     {
-        FillGauge(player1);
+        // The first super art of the session pays one-time editor costs (Mono JIT, lazy material
+        // validation on the first hitspark), so run one outside the window and measure the second.
+        yield return PerformSuperArt();
+        yield return WaitForState<IdleState>(player2);
+        player2.Health.ResetHealth();
+        Teleport(player1, -0.5f);
+        Teleport(player2, -0.5f + ContactDistance);
+        yield return null;
 
         var probe = new PlayerLoopAllocationProbe();
         PlayerLoopAllocationProbe.StartRecording();
         probe.BeginWindow();
 
-        player1.bufferedCommand = FighterCommand.SuperArt;
-        yield return WaitForState<SuperArtState>(player1);
-        yield return WaitUntilRealtime(() => player2.CurrentState is KnockdownState, "Super art never completed.");
-        yield return WaitForState<IdleState>(player1);
+        yield return PerformSuperArt();
 
         probe.EndWindow();
         PlayerLoopAllocationProbe.StopRecording();
@@ -157,7 +154,16 @@ public class SuperArtPlayModeTests
         Debug.Log("[SuperArt] frames=" + probe.Frames + " combatGameGcBytes=" + probe.AverageBytesPerFrame + " totalBytes=" + probe.Bytes);
 
         Assert.Greater(probe.Frames, 0, "The allocation probe recorded no frames.");
-        Assert.AreEqual(0, probe.AverageBytesPerFrame, "Super art allocates managed memory inside the combat loop.");
+        Assert.AreEqual(0, probe.Bytes, "Super art allocates managed memory inside the combat loop.");
+    }
+
+    private IEnumerator PerformSuperArt()
+    {
+        FillGauge(player1);
+        player1.bufferedCommand = FighterCommand.SuperArt;
+        yield return WaitForState<SuperArtState>(player1);
+        yield return WaitUntilRealtime(() => player2.CurrentState is KnockdownState, "Super art never completed.");
+        yield return WaitForState<IdleState>(player1);
     }
 
     private static void FillGauge(RobotController fighter)
