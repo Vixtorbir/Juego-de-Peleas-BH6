@@ -7,15 +7,15 @@ using UnityEngine;
 /// Applies the import settings the fighter art needs. The playable characters are the Explosive
 /// LLC fighter rigs: each becomes a Humanoid with its own generated avatar and its single material
 /// slot remapped to a project URP material that keeps the pack's texture under a player tint, so
-/// both fighters share the SRP Batcher path and read as blue and red at a glance. The pack's own
-/// animation FBX files (idle and walks, full-body exports) import as Humanoid with clean clip names
-/// and looping locomotion. The Mixamo combat library imports as Humanoid against the Y Bot avatar:
-/// a skeleton-only export has no T-pose of its own (its rest pose is the first animation frame), so
-/// an avatar generated from it carries a wrong muscle reference and the retargeted body ends up
-/// twisted; Y Bot therefore remains in the project purely as that reference rig. Each take is
-/// renamed after its file, locomotion clips loop, and root motion is baked into the pose so the
-/// CharacterController stays the only authority over the fighter's position. Frame ranges already
-/// trimmed by the attack timing calibrator are preserved across re-runs.
+/// both fighters share the SRP Batcher path and read as blue and red at a glance. Every animation
+/// library imports as Humanoid against a skinned reference rig rather than an avatar of its own: a
+/// skeleton-only export has no T-pose (its rest pose is the first animation frame), so a generated
+/// avatar carries a wrong muscle reference and the retargeted body ends up twisted at the ankles.
+/// The pack's idle and walks borrow the avatar of Male.FBX, the rig they were exported from, and
+/// the Mixamo combat library borrows Y Bot, which stays in the project purely as that reference.
+/// Each take is renamed after its file, locomotion clips loop, and root motion is baked into the
+/// pose so the CharacterController stays the only authority over the fighter's position. Frame
+/// ranges already trimmed by the attack timing calibrator are preserved across re-runs.
 /// </summary>
 public static class FighterModelImportSetup
 {
@@ -110,9 +110,10 @@ public static class FighterModelImportSetup
     {
         if (!AssetDatabase.IsValidFolder(root)) return 0;
 
-        Avatar referenceAvatar = role == ImportRole.LibraryAnimation ? FindAvatar(ReferenceAvatarModelPath) : null;
-        if (role == ImportRole.LibraryAnimation && referenceAvatar == null)
-            Debug.LogError($"[FighterModelImportSetup] Reference avatar not found in '{ReferenceAvatarModelPath}'; animation clips will fall back to self-generated avatars.");
+        string referenceAvatarPath = ReferenceAvatarPathFor(role);
+        Avatar referenceAvatar = referenceAvatarPath != null ? FindAvatar(referenceAvatarPath) : null;
+        if (referenceAvatarPath != null && referenceAvatar == null)
+            Debug.LogError($"[FighterModelImportSetup] Reference avatar not found in '{referenceAvatarPath}'; animation clips will fall back to self-generated avatars.");
 
         int configured = 0;
         foreach (string guid in AssetDatabase.FindAssets("t:Model", new[] { root }))
@@ -123,7 +124,7 @@ public static class FighterModelImportSetup
             switch (role)
             {
                 case ImportRole.PackAnimation:
-                    ConfigureAnimationImporter(importer, PackClipName(path), null);
+                    ConfigureAnimationImporter(importer, PackClipName(path), referenceAvatar);
                     break;
                 case ImportRole.ReferenceRig:
                     ConfigureCharacterImporter(importer);
@@ -152,6 +153,19 @@ public static class FighterModelImportSetup
         int separator = fileName.IndexOf(PackClipSeparator);
         return separator >= 0 && separator < fileName.Length - 1 ? fileName.Substring(separator + 1) : fileName;
     }
+
+    /// <summary>
+    /// Animation-only exports carry no bind pose, so their rest pose is the first animated frame and
+    /// an avatar generated from it retargets with twisted ankles. Both libraries therefore borrow the
+    /// avatar of a skinned model that shares their skeleton: the pack clips use Male.FBX, whose rig
+    /// they were exported from, and the Mixamo clips use the Y Bot reference rig.
+    /// </summary>
+    private static string ReferenceAvatarPathFor(ImportRole role) => role switch
+    {
+        ImportRole.PackAnimation => Player1ModelPath,
+        ImportRole.LibraryAnimation => ReferenceAvatarModelPath,
+        _ => null
+    };
 
     private static Avatar FindAvatar(string modelPath)
     {

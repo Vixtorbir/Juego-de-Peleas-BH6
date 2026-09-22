@@ -73,9 +73,9 @@ public static class AnimatorAutoSetup
         }
     }
 
-    private static readonly string[] IdleClipCandidates = { "Idle", "Fight_Idle", "Fighting Idle", "Bouncing Fight Idle" };
-    private static readonly string[] WalkForwardClipCandidates = { "WalkForward", "Walk_Forward", "Walking", "Walk" };
-    private static readonly string[] WalkBackwardClipCandidates = { "WalkBackward", "Walk_Backward", "Walking Backward", "Walking Backwards" };
+    private static readonly string[] IdleClipCandidates = { "Fight_Idle", "Fighting Idle", "Bouncing Fight Idle", "Idle" };
+    private static readonly string[] WalkForwardClipCandidates = { "Walk_Forward", "Walking", "WalkForward", "Walk" };
+    private static readonly string[] WalkBackwardClipCandidates = { "Walk_Backward", "Walking Backward", "Walking Backwards", "WalkBackward" };
     private static readonly string[] CrouchClipCandidates = { "Crouch_Idle", "Crouching Idle", "Crouch" };
     private static readonly string[] JumpClipCandidates = { "Jump", "Jumping Up", "Jumping" };
     private static readonly string[] DashForwardClipCandidates = { "Dash_Forward", "Step Forward", "Dodge Forward" };
