@@ -1,17 +1,6 @@
 using UnityEngine;
 using UnityEngine.Audio;
 
-/// <summary>
-/// Scene-wide audio service. One-shot SFX are played through a fixed round-robin pool of
-/// AudioSources created once at startup, so overlapping hits never cut each other off and no
-/// components or clips are allocated during the match. Music runs on its own looping source.
-/// Each pool is routed to its mixer group when one is assigned (Master > SFX and Master > Music
-/// in CombatMixer), and falls back to the listener when the project has no mixer wired yet. Heavy
-/// impacts and knockouts duck the music through mixer snapshots so the hit sits on top of the
-/// theme; without snapshots the manager falls back to scaling the music source itself.
-/// Gameplay code only ever calls the semantic methods below; the mapping to clips lives in the
-/// <see cref="CombatAudioLibrary"/> asset.
-/// </summary>
 public class AudioManager : MonoBehaviour
 {
     private const int SfxSourceCount = 10;
@@ -116,9 +105,6 @@ public class AudioManager : MonoBehaviour
         if (library != null) PlayEvent(in library.whiff);
     }
 
-    /// <summary>
-    /// Impact sound for an attack that landed, chosen by the attack's impact type and weight.
-    /// </summary>
     public void PlayHit(AttackData attack, bool counterHit)
     {
         if (library == null || attack == null) return;
@@ -151,10 +137,6 @@ public class AudioManager : MonoBehaviour
         if (library != null) PlayEvent(in library.block);
     }
 
-    /// <summary>
-    /// Strike deflected by an invulnerable or downed body. Uses the deflect event when the library has
-    /// clips for it, otherwise a pitched-up block so the metallic read exists before the asset does.
-    /// </summary>
     public void PlayDeflect()
     {
         if (library == null) return;
@@ -163,7 +145,6 @@ public class AudioManager : MonoBehaviour
         else PlayEvent(in library.block, DeflectFallbackVolume, DeflectFallbackPitch);
     }
 
-    /// <summary>Wall or ground rebound of a juggled body: the heavy impact layer with the music ducked.</summary>
     public void PlayBounce()
     {
         if (library == null) return;
@@ -187,9 +168,6 @@ public class AudioManager : MonoBehaviour
         if (library != null) PlayEvent(in library.shoryukenRise);
     }
 
-    /// <summary>
-    /// Knockout layer: heavy impact plus a tonal sting, with the music ducked underneath.
-    /// </summary>
     public void PlayKnockout()
     {
         if (library == null) return;
@@ -201,10 +179,7 @@ public class AudioManager : MonoBehaviour
         else musicVolumeScale = DuckedMusicVolumeRatio;
     }
 
-    /// <summary>
-    /// Snapshot-driven duck: snaps to <paramref name="target"/>, holds, then eases back to the
-    /// resting mix. A duck already holding is simply extended. No-op without a wired mixer.
-    /// </summary>
+    // A duck that is already holding just gets extended.
     private void DuckMusic(AudioMixerSnapshot target, float attack, float hold, float release)
     {
         if (!HasSnapshots) return;

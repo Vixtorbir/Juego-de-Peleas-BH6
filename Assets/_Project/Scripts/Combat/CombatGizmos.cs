@@ -1,9 +1,5 @@
 using UnityEngine;
 
-/// <summary>
-/// Scene-view drawing helpers shared by combat volumes so hit, hurt and push boxes
-/// render consistently regardless of the underlying collider type.
-/// </summary>
 public static class CombatGizmos
 {
     private const int CapsuleRingSegments = 16;
@@ -33,10 +29,6 @@ public static class CombatGizmos
         }
     }
 
-    /// <summary>
-    /// Draws the horizontal separation rule a fighter enforces against its opponent: a cylinder of
-    /// the given radius standing on the fighter's feet, rendered as two rings and four edges.
-    /// </summary>
     public static void DrawPushbox(Transform owner, float radius, float height, Color color)
     {
         Vector3 bottom = owner.position;
@@ -75,10 +67,6 @@ public static class CombatGizmos
         Gizmos.DrawWireSphere(center, radius);
     }
 
-    /// <summary>
-    /// Approximates a vertical capsule with two hemispheres and connecting edges, since
-    /// Gizmos has no native capsule primitive. Assumes uniform scale on the owner transform.
-    /// </summary>
     private static void DrawCapsule(Transform owner, Vector3 localCenter, float radius, float height, Color fillColor, Color wireColor)
     {
         float scale = MaxAbsScale(owner.lossyScale);

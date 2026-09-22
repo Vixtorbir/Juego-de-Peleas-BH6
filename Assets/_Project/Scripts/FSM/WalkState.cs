@@ -1,9 +1,5 @@
 using UnityEngine;
 
-/// <summary>
-/// Grounded horizontal locomotion. Movement is interpreted relative to the opponent so pressing
-/// towards the opponent always advances, and forward + RightPunch is routed to the launcher.
-/// </summary>
 public class WalkState : RobotState
 {
     private const float WalkSpeed = 3f;

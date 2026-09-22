@@ -1,11 +1,5 @@
 using UnityEngine;
 
-/// <summary>
-/// Reaction to a clean hit. The fighter is locked out of input for the attack's hitstun
-/// duration while knockback (with corner transfer to the attacker) is integrated by
-/// <see cref="PushbackSolver"/>. Guarding is impossible here, which is what makes a chain
-/// that connects during hitstun a true combo.
-/// </summary>
 public class HitstunState : RobotState
 {
     private const float WallTransferRatio = 1f;

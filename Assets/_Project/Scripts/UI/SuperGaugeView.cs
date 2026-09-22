@@ -1,15 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>
-/// Heat gauge for one fighter, sitting under the life bar. The charge fill chases the meter value
-/// so gains read as a sweep rather than a snap, a lead segment sits ahead of the fill to give the
-/// sweep a bright edge, and the whole bar breathes once the gauge is full so a ready super reads
-/// at a glance. Fill direction and the angled silhouette are authored on the images in the scene,
-/// so the view only writes fill amounts, colours and label text. Every animation runs on unscaled
-/// time and the percentage label is served from a prebuilt table, so a charging gauge allocates
-/// nothing.
-/// </summary>
 public class SuperGaugeView : MonoBehaviour
 {
     private const int PercentSteps = 101;
@@ -42,10 +33,6 @@ public class SuperGaugeView : MonoBehaviour
     public float ChargeFill => chargeFill != null ? chargeFill.fillAmount : 0f;
     public bool IsFull => boundMeter != null && boundMeter.IsFull;
 
-    /// <summary>
-    /// Subscribes to the fighter's meter and mirrors its current charge at once, so the gauge is
-    /// correct even when the HUD comes up mid-round.
-    /// </summary>
     public void Bind(SuperMeterComponent meter)
     {
         Unbind();
@@ -96,10 +83,6 @@ public class SuperGaugeView : MonoBehaviour
         PublishPercent(chargeFill.fillAmount);
     }
 
-    /// <summary>
-    /// A full gauge breathes between the charge and full colours so the ready state is visible
-    /// without a separate flashing element competing with the life bar.
-    /// </summary>
     private void TickFullPulse()
     {
         if (chargeFill == null) return;
@@ -140,11 +123,6 @@ public class SuperGaugeView : MonoBehaviour
         chargeLabel.SetText(PercentLookup[percent]);
     }
 
-    /// <summary>
-    /// TMP grows its glyph buffers to the longest text it has parsed, and "100" is the only
-    /// three-digit label. Parsing it once at bind time keeps that growth out of the first full
-    /// gauge of the fight; the snap that follows publishes the real value.
-    /// </summary>
     private void WarmLabelBuffers()
     {
         if (chargeLabel == null) return;

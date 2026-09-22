@@ -3,13 +3,6 @@ using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.Controls;
 using UnityEngine.InputSystem.Utilities;
 
-/// <summary>
-/// Training room tooling. Fills both super gauges (M / R3) and restores both life bars
-/// (Backspace / Select) on demand, keeps the dummy (player 2) from being knocked out mid-combo by
-/// flooring its health, and lets the dummy recover once it has stood idle for a moment without
-/// being hit. Devices are polled directly so the hotkeys stay independent of the fighters' action
-/// maps. Disabling the component restores normal lethal damage.
-/// </summary>
 public class TrainingModeController : MonoBehaviour
 {
     private const string JoystickFillMeterButton = "button12";
@@ -140,10 +133,7 @@ public class TrainingModeController : MonoBehaviour
         return WasJoystickButtonPressed(JoystickRestoreHealthButton);
     }
 
-    /// <summary>
-    /// DirectInput pads such as the Logitech RumblePad 2 enumerate as <see cref="Joystick"/> rather than
-    /// <see cref="Gamepad"/>, so their buttons are only reachable by HID control name.
-    /// </summary>
+    // DirectInput pads show up as Joystick, not Gamepad, so buttons are read by HID control name.
     private static bool WasJoystickButtonPressed(string controlName)
     {
         ReadOnlyArray<Joystick> joysticks = Joystick.all;

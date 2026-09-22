@@ -1,12 +1,5 @@
 using UnityEngine;
 
-/// <summary>
-/// Air dash: a fixed-duration horizontal burst with gravity frozen, so the fighter floats across
-/// the arc instead of arcing through it. Granted a limited number of times per jump; the counter
-/// lives on the controller and clears on every return to a neutral stance, which includes landing.
-/// After a few frames a buffered air normal may interrupt the dash, which is how an instant air
-/// dash turns into pressure. When the dash ends, part of its speed is carried into the fall.
-/// </summary>
 public class AirDashState : RobotState
 {
     private bool isForward;

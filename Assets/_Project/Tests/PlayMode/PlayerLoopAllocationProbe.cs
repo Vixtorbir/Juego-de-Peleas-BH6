@@ -4,12 +4,6 @@ using UnityEditor.Profiling;
 using UnityEditorInternal;
 using UnityEngine.Profiling;
 
-/// <summary>
-/// Measures the managed memory allocated by game code during a window of frames. The editor's
-/// own per-frame allocations (test runner, asset pipeline, GUI) make whole-frame counters useless
-/// for a zero-allocation budget, so the probe records the profiler and sums only the GC.Alloc
-/// samples nested under the player loop, skipping the test framework's subtree.
-/// </summary>
 public sealed class PlayerLoopAllocationProbe
 {
     private const string PlayerLoopMarker = "PlayerLoop";
@@ -38,13 +32,11 @@ public sealed class PlayerLoopAllocationProbe
         ProfilerDriver.enabled = false;
     }
 
-    /// <summary>Marks the first frame of a window; call before yielding the frames to measure.</summary>
     public void BeginWindow()
     {
         windowStartFrame = ProfilerDriver.lastFrameIndex + 1;
     }
 
-    /// <summary>Accumulates every frame recorded since <see cref="BeginWindow"/>.</summary>
     public void EndWindow()
     {
         int lastFrame = ProfilerDriver.lastFrameIndex;

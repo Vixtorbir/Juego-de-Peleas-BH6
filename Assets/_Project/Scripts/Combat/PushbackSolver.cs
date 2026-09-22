@@ -1,18 +1,6 @@
 using UnityEngine;
 
-/// <summary>
-/// Shared knockback integration for hit and block reactions. Pushes the defender away from the
-/// attacker with combined dry friction and velocity-squared drag, so a strong hit produces a short
-/// violent shove that settles quickly instead of a long slide. The push direction is locked on the
-/// frame the reaction starts, matching how fighting games resolve knockback: a defender never
-/// reverses mid-reaction even if the two bodies cross during the stun.
-/// <para>
-/// Corner rule: once the defender is stopped by a wall it stays pinned there, and the remaining
-/// momentum is handed to the attacker for the rest of the reaction, so cornering an opponent still
-/// costs the attacker their spacing. The transfer only applies to attackers within melee reach; a
-/// projectile fired from full screen never shoves its owner.
-/// </para>
-/// </summary>
+// Knockback slide for hit/blockstun. Momentum left over when the defender hits a wall goes to the attacker.
 public struct PushbackSolver
 {
     private const float Friction = 18f;
@@ -30,13 +18,8 @@ public struct PushbackSolver
 
     public bool IsActive => speed > 0f;
 
-    /// <summary>True once the defender has been stopped by a wall for the rest of this reaction.</summary>
     public bool IsCornered => cornered;
 
-    /// <param name="wallTransferRatio">
-    /// Fraction of the momentum still in flight that carries over to the attacker when the defender
-    /// reaches a wall. 1 preserves the full spacing of an open-field hit.
-    /// </param>
     public PushbackSolver(RobotController defender, RobotController attacker, float initialSpeed, float wallTransferRatio)
     {
         this.defender = defender;
@@ -89,10 +72,7 @@ public struct PushbackSolver
         return Mathf.Abs(attacker.transform.position.x - defender.transform.position.x) <= AttackerTransferRange;
     }
 
-    /// <summary>
-    /// Knockback runs along the combat axis away from the attacker. With no attacker (environmental
-    /// or scripted hits) the defender is pushed backwards relative to its own facing.
-    /// </summary>
+    // No attacker (scripted hit): push back relative to the defender's own facing.
     private static float ResolveAwayDirection(RobotController defender, RobotController attacker)
     {
         float deltaX = attacker != null

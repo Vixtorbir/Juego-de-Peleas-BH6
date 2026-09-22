@@ -1,12 +1,5 @@
 using UnityEngine;
 
-/// <summary>
-/// Airborne state. On takeoff the horizontal component is locked from the stick direction relative
-/// to the opponent, so the arc cannot be steered mid-air; the state is also re-entered after an air
-/// dash or an air attack to continue the fall from the controller's shared air velocity. Once the
-/// capsule clears the air-action height a buffered air normal or air dash may be consumed, which is
-/// what makes jump-ins, air chains and instant air dashes possible.
-/// </summary>
 public class JumpState : RobotState
 {
     public const float StandardJumpForce = 12f;
@@ -22,17 +15,14 @@ public class JumpState : RobotState
 
     public override bool AcceptsCommands => robot.IsAboveAirActionHeight;
 
-    /// <summary>Air normals and air dashes; a locked-out dash still ages here so it never lands as a ground dash.</summary>
     public override bool CanConsume(FighterCommand command) => AcceptsCommands && (IsAttackButton(command) || IsDashCommand(command));
 
-    /// <summary>Next entry leaves the ground with the given vertical speed.</summary>
     public void ConfigureTakeoff(float verticalForce)
     {
         takeoff = true;
         takeoffForce = verticalForce;
     }
 
-    /// <summary>Next entry continues the flight stored in <see cref="RobotController.AirVelocity"/>.</summary>
     public void ConfigureMidair()
     {
         takeoff = false;

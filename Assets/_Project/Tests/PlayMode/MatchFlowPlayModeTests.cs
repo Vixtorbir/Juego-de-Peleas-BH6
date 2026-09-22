@@ -7,15 +7,6 @@ using UnityEngine.InputSystem.LowLevel;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 
-/// <summary>
-/// Play-mode coverage of the match flow driven by real device input: the pause stops scene time,
-/// the round clock, hitstop and the command buffer and lifts cleanly without leaking a stopped time
-/// scale; a pause taken inside the super freeze resumes into the freeze instead of cutting it; and
-/// the dedicated super button activates the super art only on a full gauge and a fully pressed
-/// trigger. Input goes through virtual devices so the tests exercise the same bindings a player does;
-/// device input is routed to play mode regardless of Game view and application focus, which a
-/// headless run never has.
-/// </summary>
 public class MatchFlowPlayModeTests
 {
     private const string ScenePath = "Assets/_Project/Scenes/TrainingRoom.unity";

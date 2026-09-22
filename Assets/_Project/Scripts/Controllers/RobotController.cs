@@ -17,21 +17,10 @@ public enum FighterCommand
     SuperArt
 }
 
-/// <summary>
-/// Central fighter controller. Owns the state machine, translates raw input events into a
-/// short-lived command buffer, resolves facing and pushbox separation against the opponent,
-/// and exposes cached dependencies to the FSM states so they never query components at runtime.
-/// Every state is allocated once in Awake and entered through a typed method that configures
-/// the cached instance, so a full match runs without a single state allocation. Hitstop is a
-/// per-fighter freeze on unscaled time: a frozen fighter skips its state tick and pauses its
-/// animator while the rest of the scene keeps running, so each side of a hit can be held for a
-/// different number of frames. Command normals are decoded from the stick at press time, and the
-/// airborne velocity is shared between the jump, air dash and air attack states so control can
-/// pass between them mid-air without losing momentum. The command buffer is two deep so a quick
-/// string of presses resolves in order, the gameplay facing snaps instantly while the model eases
-/// its turn, and the body is tinted whenever the fighter cannot be hit.
-/// </summary>
+// Owns the fighter state machine, the command buffer, facing and pushbox separation.
 [RequireComponent(typeof(CharacterController))]
+[RequireComponent(typeof(SuperMeterComponent))]
+[RequireComponent(typeof(CombatFlash))]
 public class RobotController : MonoBehaviour
 {
     private static readonly CombatDirection[] QuarterCircleForward =
@@ -165,65 +154,36 @@ public class RobotController : MonoBehaviour
     public ProjectilePool Projectiles { get; private set; }
     public CombatFlash Flash { get; private set; }
 
-    /// <summary>Combat camera, resolved once at startup so states never query the main camera at runtime.</summary>
     public FightingCamera CombatCamera { get; private set; }
     public CombatRules Rules => combatRules;
     public RobotState CurrentState => currentState;
 
-    /// <summary>Second buffered command, promoted to the head once the head is consumed or expires.</summary>
     public FighterCommand QueuedCommand => queuedCommand;
 
-    /// <summary>Capsule radius of the opponent, used to aim the combo micro-step at the body.</summary>
     public float OpponentBodyRadius { get; private set; }
 
-    /// <summary>
-    /// Controller driving <see cref="opponentTarget"/>, resolved once at startup. States that must
-    /// read or write the other fighter directly (the super art's cinematic lock) use it instead of
-    /// searching the hierarchy while the match is running.
-    /// </summary>
     public RobotController Opponent { get; private set; }
 
-    /// <summary>
-    /// Forward speed the next attack starts with. Set by a state that hands its momentum to the
-    /// attack (a dash) and consumed by the attack on entry.
-    /// </summary>
     public float PendingAttackMomentum { get; set; }
 
-    /// <summary>Set by reversal specials for their startup; wake-up invulnerability is added on top.</summary>
     public bool IsInvincible
     {
         get => invincibleByState || invulnerabilityTimer > 0f;
         set => invincibleByState = value;
     }
 
-    /// <summary>
-    /// Velocity carried while airborne (x along the combat axis, y vertical). Written by whichever
-    /// air state is active so the next one continues the motion instead of restarting it.
-    /// </summary>
     public Vector2 AirVelocity { get; set; }
 
-    /// <summary>Air dashes spent since the last takeoff; cleared on every return to a neutral stance.</summary>
     public int AirDashesUsed { get; set; }
 
-    /// <summary>True once the capsule is high enough for an air action to start.</summary>
     public bool IsAboveAirActionHeight => transform.position.y >= combatRules.airActionMinHeight;
 
-    /// <summary>True while this fighter is held in hitstop.</summary>
     public bool IsFrozen => freezeRemaining > 0f;
 
-    /// <summary>Unscaled seconds of hitstop still to serve.</summary>
     public float FreezeRemaining => freezeRemaining;
 
-    /// <summary>
-    /// True while the match is paused. Hitstop and the command buffer run on unscaled time, so the
-    /// whole update is suspended rather than relying on a zero time scale to hold them.
-    /// </summary>
     public bool IsSimulationPaused { get; private set; }
 
-    /// <summary>
-    /// Number of state entries since startup. Re-entering the cached instance of the current state
-    /// (chain cancels, air juggles) counts as a transition even though the reference is unchanged.
-    /// </summary>
     public int TransitionCount { get; private set; }
 
     private RobotState currentState;
@@ -275,6 +235,13 @@ public class RobotController : MonoBehaviour
 
     private void Awake()
     {
+        if (combatRules == null)
+        {
+            Debug.LogError("RobotController has no CombatRules asset assigned; the fighter has been disabled.", this);
+            enabled = false;
+            return;
+        }
+
         if (animator == null) animator = GetComponent<Animator>();
         if (characterController == null) characterController = GetComponent<CharacterController>();
         animator.applyRootMotion = false;
@@ -282,12 +249,9 @@ public class RobotController : MonoBehaviour
         inputBuffer = GetComponent<InputBuffer>();
         Hurtbox = GetComponentInChildren<Hurtbox>();
         Health = GetComponent<HealthComponent>();
-        if (!TryGetComponent(out SuperMeterComponent meter)) meter = gameObject.AddComponent<SuperMeterComponent>();
-        SuperMeter = meter;
-        if (combatRules == null) combatRules = ScriptableObject.CreateInstance<CombatRules>();
+        SuperMeter = GetComponent<SuperMeterComponent>();
+        Flash = GetComponent<CombatFlash>();
         if (wallLayer.value == 0) wallLayer = LayerMask.GetMask(WallLayerName);
-        if (!TryGetComponent(out CombatFlash flash)) flash = gameObject.AddComponent<CombatFlash>();
-        Flash = flash;
 
         Camera mainCamera = Camera.main;
         if (mainCamera != null) CombatCamera = mainCamera.GetComponent<FightingCamera>();
@@ -389,17 +353,14 @@ public class RobotController : MonoBehaviour
 
     public void EnterWalk() => TransitionTo(walkState);
 
-    /// <summary>Takes off with the standard jump.</summary>
     public void EnterJump() => EnterJump(JumpState.StandardJumpForce);
 
-    /// <summary>Takes off with a custom vertical speed; jump cancels use the rules' super-jump force.</summary>
     public void EnterJump(float verticalForce)
     {
         jumpState.ConfigureTakeoff(verticalForce);
         TransitionTo(jumpState);
     }
 
-    /// <summary>Resumes free fall from the current <see cref="AirVelocity"/> after an air dash or air attack.</summary>
     public void EnterAirborne()
     {
         jumpState.ConfigureMidair();
@@ -430,10 +391,6 @@ public class RobotController : MonoBehaviour
 
     public void EnterAttack(AttackData data) => EnterAttack(data, false);
 
-    /// <summary>
-    /// Starts a standing normal. <paramref name="chained"/> marks a chain cancel, which grants the
-    /// combo micro-step and counts towards the rapid-chain limit; a fresh normal clears that count.
-    /// </summary>
     public void EnterAttack(AttackData data, bool chained)
     {
         if (!chained) rapidChainLinks = 0;
@@ -450,10 +407,6 @@ public class RobotController : MonoBehaviour
         TransitionTo(crouchAttackState);
     }
 
-    /// <summary>
-    /// Spends one link of the rapid-chain allowance (a normal chaining into itself). Returns false
-    /// once the string has used them all.
-    /// </summary>
     public bool TryUseRapidLink()
     {
         if (rapidChainLinks >= combatRules.rapidChainLimit) return false;
@@ -474,11 +427,6 @@ public class RobotController : MonoBehaviour
         TransitionTo(shoryukenState);
     }
 
-    /// <summary>
-    /// Starts the super art if the gauge covers it in full. The charge is spent atomically, so a
-    /// refused activation never leaves the player short of meter, and the caller can fall back to
-    /// another move. Returns false when the gauge is short or the move has no data assigned.
-    /// </summary>
     public bool TryEnterSuperArt()
     {
         if (superArtLunge == null || SuperMeter == null) return false;
@@ -513,11 +461,6 @@ public class RobotController : MonoBehaviour
         TransitionTo(knockdownState);
     }
 
-    /// <summary>
-    /// Exits the current state and enters the next one. The same instance may be entered again:
-    /// Exit runs before Enter, so a chained attack or a re-launched juggle restarts cleanly.
-    /// Entering a neutral stance ends any combo the opponent had running on this fighter.
-    /// </summary>
     private void TransitionTo(RobotState nextState)
     {
         currentState?.Exit();
@@ -531,11 +474,7 @@ public class RobotController : MonoBehaviour
         currentState.Enter();
     }
 
-    /// <summary>
-    /// Holds this fighter in hitstop for <paramref name="seconds"/> of unscaled time. A longer
-    /// freeze always extends a shorter one. The animator is paused on its current pose so the
-    /// contact frame stays on screen.
-    /// </summary>
+    // Hitstop runs on unscaled time; a longer freeze always overrides a shorter one.
     public void FreezeFor(float seconds)
     {
         if (seconds <= 0f) return;
@@ -544,24 +483,16 @@ public class RobotController : MonoBehaviour
         animator.speed = 0f;
     }
 
-    /// <summary>Grants strike invulnerability for <paramref name="seconds"/> of gameplay time.</summary>
     public void GrantInvulnerability(float seconds)
     {
         invulnerabilityTimer = Mathf.Max(invulnerabilityTimer, seconds);
     }
 
-    /// <summary>
-    /// Called by the owner's hitbox or projectile when an attack lands or is blocked. Attack states
-    /// read the flag to open their special-cancel window.
-    /// </summary>
     public void NotifyAttackConnected()
     {
         AttackConnected = true;
     }
 
-    /// <summary>
-    /// Consumes the buffered command if it matches, so a single press can only trigger one action.
-    /// </summary>
     public bool TryConsumeCommand(FighterCommand expectedCommand)
     {
         if (bufferedCommand != expectedCommand) return false;
@@ -570,11 +501,7 @@ public class RobotController : MonoBehaviour
         return true;
     }
 
-    /// <summary>
-    /// Grounded normal bound to a buffered command for the given posture, or null for non-attack
-    /// commands. Command normals (launcher, overhead, anti-air) were decoded from the stick when the
-    /// button was pressed, so they resolve regardless of the current posture.
-    /// </summary>
+    // Command normals (launcher, overhead, anti-air) were already decoded from the stick when the button was pressed.
     public AttackData ResolveNormal(FighterCommand command, bool crouching)
     {
         switch (command)
@@ -598,10 +525,6 @@ public class RobotController : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Jumping normal bound to a buffered command, or null for non-attack commands. Direction-decoded
-    /// commands fold back onto their button so a forward press in the air still swings.
-    /// </summary>
     public AttackData ResolveAirNormal(FighterCommand command)
     {
         switch (command)
@@ -627,11 +550,6 @@ public class RobotController : MonoBehaviour
         return attack != null && (attack == crouchPunchBase || attack == crouchSweepBase);
     }
 
-    /// <summary>
-    /// Returns +1 when the opponent lies towards +X and -1 towards -X. The match is played along
-    /// the world X axis and the camera never rolls around it, so this is the screen-right sign
-    /// without any camera dependency. Without an opponent the fighter's own facing is used.
-    /// </summary>
     public float GetScreenFacingSign()
     {
         float deltaX = opponentTarget != null
@@ -641,13 +559,6 @@ public class RobotController : MonoBehaviour
         return deltaX < 0f ? -1f : 1f;
     }
 
-    /// <summary>
-    /// Snaps the fighter to face the opponent along the combat axis only. The match is played on
-    /// the world X axis, so the look direction is clamped to +X or -X and any depth offset between
-    /// the two fighters can never tilt them towards or away from the camera. Hitboxes, pushback and
-    /// input semantics follow the snap at once; the model absorbs the half turn as a yaw offset that
-    /// eases out over the rules' turnaround time, so a cross-up never flips the body in one frame.
-    /// </summary>
     public void FaceOpponent()
     {
         if (opponentTarget == null) return;
@@ -664,10 +575,7 @@ public class RobotController : MonoBehaviour
         ApplyModelYawOffset();
     }
 
-    /// <summary>
-    /// Adjusts the capsule so low attacks can pass over a crouching fighter. The visual pose
-    /// belongs to the Animator; this only affects collision.
-    /// </summary>
+    // Collision only - the crouch pose itself comes from the Animator.
     public void SetCrouchingPosture(bool crouching)
     {
         animator.SetBool(FighterAnimatorParameters.IsCrouching, crouching);
@@ -689,21 +597,12 @@ public class RobotController : MonoBehaviour
         if (inputReader != null) inputReader.enabled = active;
     }
 
-    /// <summary>
-    /// Suspends or resumes the fighter's update. Hitstop, invulnerability and buffered presses are
-    /// held exactly where they were, so resuming continues the frame the pause interrupted. Buttons
-    /// are dropped for the duration; the stick keeps updating so the held direction is current on resume.
-    /// </summary>
     public void SetSimulationPaused(bool paused)
     {
         IsSimulationPaused = paused;
         if (inputReader != null) inputReader.SetButtonsSuppressed(paused);
     }
 
-    /// <summary>
-    /// True when the capsule touches the stage boundary on the side it is travelling towards.
-    /// Only walls count: the opponent's body never reads as a wall.
-    /// </summary>
     public bool IsTouchingWall(float directionSign)
     {
         Vector3 origin = transform.TransformPoint(characterController.center);
@@ -711,10 +610,7 @@ public class RobotController : MonoBehaviour
         return Physics.Raycast(origin, new Vector3(directionSign, 0f, 0f), reach, wallLayer);
     }
 
-    /// <summary>
-    /// Teleports the fighter to its corner, restores health and returns to Idle for the next round.
-    /// The CharacterController must be disabled during the teleport or it will reject the move.
-    /// </summary>
+    // CharacterController has to be disabled for the teleport or it rejects the move.
     public void ResetForNewRound(Vector3 startPosition)
     {
         characterController.enabled = false;
@@ -744,10 +640,6 @@ public class RobotController : MonoBehaviour
         ApplyModelYawOffset();
     }
 
-    /// <summary>
-    /// Visual-only work that runs even while frozen: the invulnerability tint follows the invincible
-    /// flag, and the model finishes any turn the gameplay facing already made.
-    /// </summary>
     private void TickTelegraphs()
     {
         bool invincible = IsInvincible;
@@ -770,7 +662,6 @@ public class RobotController : MonoBehaviour
         modelTransform.localRotation = modelBaseRotation * Quaternion.Euler(0f, modelYawOffset, 0f);
     }
 
-    /// <summary>Returns true while the fighter must stay frozen this frame.</summary>
     private bool TickFreeze()
     {
         if (freezeRemaining <= 0f) return false;
@@ -796,16 +687,7 @@ public class RobotController : MonoBehaviour
         IsGrounded = Physics.Raycast(capsuleCenter, Vector3.down, rayLength, groundLayer);
     }
 
-    /// <summary>
-    /// First-actionable-frame buffering. A press is held, without ageing, through startup,
-    /// recovery, stun and hitstop; once the state accepts commands the leniency window opens and
-    /// the state ticking right after this consumes it. A press older than the hold-through limit
-    /// when the fighter becomes actionable is dropped, so mashing through a long stun stores nothing.
-    /// The buffer is two deep: a press made while the head is occupied waits in the queue and is
-    /// promoted when the head is consumed or expires, so a fast string resolves in press order. The
-    /// head only ages while the current state can consume that command, so a special pressed during
-    /// a jump-in is still waiting when the fighter lands.
-    /// </summary>
+    // A press is held without ageing through startup/recovery/stun; the leniency window only starts once the state can act on it.
     private void TickCommandBuffer()
     {
         if (bufferedCommand == FighterCommand.None)
@@ -834,10 +716,6 @@ public class RobotController : MonoBehaviour
         if (bufferTimer <= 0f) ClearBufferedCommand();
     }
 
-    /// <summary>
-    /// Registers a button press. The head takes it when free; otherwise it waits in the queue, where
-    /// a newer press replaces an older one. Public so tests and AI drivers share the reader's path.
-    /// </summary>
     public void PressCommand(FighterCommand command)
     {
         if (bufferedCommand == FighterCommand.None)
@@ -853,7 +731,6 @@ public class RobotController : MonoBehaviour
         lastPressWasQueued = true;
     }
 
-    /// <summary>Rewrites the most recent press in place, used when two buttons resolve to one macro.</summary>
     private void ReplaceLastPress(FighterCommand command)
     {
         if (lastPressWasQueued && queuedCommand != FighterCommand.None)
@@ -884,10 +761,6 @@ public class RobotController : MonoBehaviour
         if (queuedCommand != FighterCommand.None) PromoteQueuedCommand();
     }
 
-    /// <summary>
-    /// Moves the queued press to the head with its original press time, so the hold-through rule
-    /// still judges it by when the player actually pressed it.
-    /// </summary>
     private void PromoteQueuedCommand()
     {
         bufferedCommand = queuedCommand;
@@ -902,10 +775,6 @@ public class RobotController : MonoBehaviour
 
     private bool IsHoldingDown => MovementInput.y < CommandDownThreshold;
 
-    /// <summary>
-    /// Keeps both fighters from overlapping by pushing this controller away from the opponent
-    /// horizontally whenever the distance between them drops below the pushbox radius.
-    /// </summary>
     private void ResolvePushboxSeparation()
     {
         if (opponentTarget == null) return;
@@ -928,11 +797,6 @@ public class RobotController : MonoBehaviour
 
     private void HandleMove(Vector2 input) => SetMovementInput(input);
 
-    /// <summary>
-    /// Applies a stick vector as if the player had moved it: feeds the states, and detects the
-    /// double tap that buffers a dash. Public so automated tests and AI drivers share the exact path
-    /// the input reader uses.
-    /// </summary>
     public void SetMovementInput(Vector2 input)
     {
         MovementInput = input;
@@ -969,10 +833,7 @@ public class RobotController : MonoBehaviour
         lastTapDirection = 0;
     }
 
-    /// <summary>
-    /// Motion inputs accept the strict sequence and a lenient shortcut that skips the diagonal,
-    /// so a fast stick flick sampled once per frame still reads as the motion.
-    /// </summary>
+    // Also accept the shortcut without the diagonal, since a fast flick can skip it between frames.
     private void HandleLeftPunch()
     {
         if (inputBuffer == null)
@@ -991,16 +852,8 @@ public class RobotController : MonoBehaviour
         PressCommand(motionDetected ? FighterCommand.Hadouken : FighterCommand.LeftPunch);
     }
 
-    /// <summary>
-    /// The super motion is only read while the gauge can pay for it, so a double quarter-circle on a
-    /// short gauge degrades to the fireball its first half already describes instead of being eaten.
-    /// </summary>
     private bool IsSuperArtReady => superArtLunge != null && SuperMeter != null && SuperMeter.IsFull;
 
-    /// <summary>
-    /// Dedicated super button: skips the motion and buffers the super art directly, but only on a
-    /// full gauge. A press on a short gauge is dropped rather than converted into another attack.
-    /// </summary>
     private void HandleSuperArt()
     {
         if (IsSuperArtReady) PressCommand(FighterCommand.SuperArt);
@@ -1012,11 +865,7 @@ public class RobotController : MonoBehaviour
             || inputBuffer.CheckMotionInput(DoubleQuarterCircleForwardShortcut, SuperMotionWindow);
     }
 
-    /// <summary>
-    /// Heavy buttons carry the command normals, decoded from the stick on the press: forward +
-    /// RightPunch is the overhead, forward + RightKick the launcher and down-forward + RightKick the
-    /// anti-air. A dragon punch motion always wins over the direction.
-    /// </summary>
+    // forward+RP = overhead, forward+RK = launcher, down-forward+RK = anti-air. A DP motion always wins.
     private void HandleRightPunch()
     {
         bool motionDetected = inputBuffer != null
@@ -1027,10 +876,7 @@ public class RobotController : MonoBehaviour
         else PressCommand(FighterCommand.RightPunch);
     }
 
-    /// <summary>
-    /// Both kicks within the macro window read as a dash (back when holding away, forward otherwise)
-    /// and the first kick's press is rewritten into it, so the macro never leaks a stray kick.
-    /// </summary>
+    // Both kicks inside the macro window = dash; the first kick press gets rewritten into it.
     private void HandleLeftKick()
     {
         lastLeftKickPressTime = Time.unscaledTime;
@@ -1060,10 +906,6 @@ public class RobotController : MonoBehaviour
         return true;
     }
 
-    /// <summary>
-    /// Scene-view overlay of the two volumes the controller owns: the collision capsule that doubles
-    /// as the hurt volume, and the horizontal pushbox radius that keeps the fighters apart.
-    /// </summary>
     private void OnDrawGizmos()
     {
         CharacterController body = characterController != null ? characterController : GetComponent<CharacterController>();

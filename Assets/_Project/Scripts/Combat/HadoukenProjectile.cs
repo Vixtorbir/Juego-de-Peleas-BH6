@@ -1,16 +1,5 @@
 using UnityEngine;
 
-/// <summary>
-/// Straight-line projectile fired by <see cref="SpecialAttackState"/> from the owner's
-/// <see cref="ProjectilePool"/>. Carries the attack data of the move that launched it and applies
-/// it to the first opposing <see cref="Hurtbox"/> it overlaps. A projectile that is dodged
-/// (invincible frames, height mismatch) keeps flying until it reaches a boundary wall or its
-/// lifetime runs out; either way it returns to the pool by deactivating instead of being destroyed.
-/// The collision matrix limits its contacts to fighter bodies and walls, and the kinematic body on
-/// the prefab makes it a true moving trigger: it advances with <see cref="Rigidbody.MovePosition"/>
-/// on the physics step, so PhysX sweeps the shape between poses and the renderer interpolates it,
-/// instead of teleporting a collider through its transform every frame.
-/// </summary>
 [RequireComponent(typeof(Collider))]
 [RequireComponent(typeof(Rigidbody))]
 public class HadoukenProjectile : MonoBehaviour
@@ -47,9 +36,6 @@ public class HadoukenProjectile : MonoBehaviour
         body.position = origin;
     }
 
-    /// <summary>
-    /// Removes the projectile from play without applying its hit. Safe to call on an idle instance.
-    /// </summary>
     public void Recall()
     {
         remainingLifetime = 0f;

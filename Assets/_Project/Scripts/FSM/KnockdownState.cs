@@ -1,11 +1,5 @@
 using UnityEngine;
 
-/// <summary>
-/// Hard knockdown after a juggle lands or a sweep connects. The body slides out with the hit's
-/// remaining pushback and cannot be struck while down, so a landing never restarts the juggle it
-/// came from; control returns through Idle with a short strike invulnerability so the wake-up is
-/// never a free hit either.
-/// </summary>
 public class KnockdownState : RobotState
 {
     private const float WallTransferRatio = 1f;

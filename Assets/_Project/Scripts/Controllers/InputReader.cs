@@ -6,14 +6,6 @@ using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.Utilities;
 using UnityEngine.Serialization;
 
-/// <summary>
-/// Bridge between the generated <see cref="FighterInputActions"/> asset and gameplay code.
-/// Each instance owns a private copy of the action asset for its player slot. Device routing is
-/// deliberately permissive: Player 1 listens to every connected device until a second controller
-/// shows up, so any pad Windows exposes (XInput, DualShock/DualSense HID, DirectInput joystick or a
-/// generic gamepad) drives the fighter with no reconnect. Only when two controllers are present are
-/// they split by connection order between the two slots, with the keyboard shared by both.
-/// </summary>
 public class InputReader : MonoBehaviour
 {
     public enum PlayerSlot { Player1, Player2 }
@@ -31,6 +23,7 @@ public class InputReader : MonoBehaviour
     [Header("Player Assignment")]
     [FormerlySerializedAs("tipoJugador")]
     public PlayerSlot playerSlot = PlayerSlot.Player1;
+    [SerializeField] private bool logDeviceRouting;
 
     public event Action<Vector2> MoveEvent;
     public event Action LeftPunchEvent;
@@ -121,14 +114,7 @@ public class InputReader : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Decides which devices this slot listens to. With fewer than two controllers Player 1 is left
-    /// unrestricted (every device reaches it) and Player 2 keeps the keyboard only, so a single pad
-    /// never drives both fighters. With two or more controllers each slot gets the keyboard plus the
-    /// controller matching its index in connection order. The routing is only pushed to the asset,
-    /// and only logged, when the resolved device set actually differs from the one in place, so the
-    /// per-round enable/disable cycle driven by the match flow neither allocates nor spams the log.
-    /// </summary>
+    // With fewer than two pads P1 takes every device and P2 keeps the keyboard, so one pad never drives both fighters.
     private void RefreshDeviceRouting()
     {
         CollectConnectedControllers();
@@ -157,7 +143,7 @@ public class InputReader : MonoBehaviour
         if (unrestricted) controls.devices = null;
         else controls.devices = routedDevices;
 
-        LogDeviceRouting();
+        if (logDeviceRouting) LogDeviceRouting();
     }
 
     private static bool IsSameDeviceSet(List<InputDevice> current, InputDevice[] previous)
@@ -172,11 +158,6 @@ public class InputReader : MonoBehaviour
         return true;
     }
 
-    /// <summary>
-    /// Gathers every usable controller regardless of how the platform classified it. XInput and
-    /// native HID pads arrive as <see cref="Gamepad"/>; DirectInput and unrecognised HID pads arrive
-    /// as <see cref="Joystick"/>. Sorted by device id, which follows connection order.
-    /// </summary>
     private void CollectConnectedControllers()
     {
         connectedControllers.Clear();
@@ -212,11 +193,7 @@ public class InputReader : MonoBehaviour
         deviceReport.Append(device.displayName);
     }
 
-    /// <summary>
-    /// Drops button presses while leaving the stick live, so a paused fighter keeps tracking the held
-    /// direction. Cheaper than disabling the action map, which allocates inside the Input System on
-    /// every call.
-    /// </summary>
+    // Cheaper than disabling the action map, which allocates inside the Input System.
     public void SetButtonsSuppressed(bool suppressed)
     {
         buttonsSuppressed = suppressed;
@@ -244,10 +221,7 @@ public class InputReader : MonoBehaviour
         if (!buttonsSuppressed) RightKickEvent?.Invoke();
     }
 
-    /// <summary>
-    /// Bound to <c>performed</c> rather than <c>started</c>: the trigger is analogue, and waiting for
-    /// the press point keeps a resting finger on it from firing the super.
-    /// </summary>
+    // Bound to performed (not started) because the trigger is analogue.
     private void OnSuperArt(InputAction.CallbackContext context)
     {
         if (!buttonsSuppressed) SuperArtEvent?.Invoke();

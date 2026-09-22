@@ -1,10 +1,5 @@
 using UnityEngine;
 
-/// <summary>
-/// Designer-facing catalogue of every combat sound. Each event holds several variations that the
-/// <see cref="AudioManager"/> picks from at random with a small pitch spread, so repeated hits
-/// never sound machine-gunned.
-/// </summary>
 [CreateAssetMenu(fileName = "CombatAudioLibrary", menuName = "Fighting Game/Combat Audio Library")]
 public class CombatAudioLibrary : ScriptableObject
 {

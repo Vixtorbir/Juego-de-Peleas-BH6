@@ -1,13 +1,5 @@
 using UnityEngine;
 
-/// <summary>
-/// Rising uppercut special driven by its <see cref="AttackData"/> frame data. The startup frames
-/// are invincible when the data flags them so the move works as a reversal and anti-air, the
-/// hitbox is live from the end of startup for the active window while the fighter climbs and
-/// drifts forward, and landing is followed by the data's recovery, which leaves a long punishable
-/// window on whiff or block. The leap direction is locked at takeoff: a cross-over during the
-/// rise never reverses the arc mid-air.
-/// </summary>
 public class ShoryukenState : RobotState
 {
     private const float RiseVelocity = 14f;

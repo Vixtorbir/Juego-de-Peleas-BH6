@@ -5,14 +5,6 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 
-/// <summary>
-/// Play-mode performance budget for the training room. Drives a few seconds of scripted combat,
-/// samples the editor render statistics and the game code's managed allocations, logs the
-/// averages so a run doubles as a before/after report, and checks them against fixed budgets.
-/// Render statistics only exist while a Game view is rendering, so the batch and shadow budgets
-/// are enforced in an editor run and skipped headless; allocations are read from the profiler's
-/// player-loop samples through <see cref="PlayerLoopAllocationProbe"/>, which is valid in both.
-/// </summary>
 public class RenderingBudgetPlayModeTests
 {
     private const string ScenePath = "Assets/_Project/Scenes/TrainingRoom.unity";

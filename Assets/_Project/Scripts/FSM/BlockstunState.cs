@@ -1,12 +1,5 @@
 using UnityEngine;
 
-/// <summary>
-/// Reaction to a blocked attack. Shorter than hitstun and with weaker knockback, it preserves
-/// the crouching posture if the block was taken low so the guard is not dropped on exit.
-/// A cornered block hands slightly less momentum back to the attacker than a cornered hit,
-/// which keeps corner pressure and frame traps viable. The guard stays up throughout, so a
-/// string of blocked hits keeps being blocked at the same height.
-/// </summary>
 public class BlockstunState : RobotState
 {
     private const float WallTransferRatio = 0.8f;
@@ -59,10 +52,7 @@ public class BlockstunState : RobotState
             robot.EnterIdle();
     }
 
-    /// <summary>
-    /// Always restores the standing capsule: the state is configured for its next entry before
-    /// this runs, so the flag can no longer be trusted to say how the previous block was taken.
-    /// </summary>
+    // The flag may already be set up for the next entry here, so always stand back up.
     public override void Exit()
     {
         robot.SetCrouchingPosture(false);

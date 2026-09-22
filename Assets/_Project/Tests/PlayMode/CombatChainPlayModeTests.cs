@@ -5,16 +5,6 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 
-/// <summary>
-/// Play-mode coverage of the combat feel rules in the training scene: chain and gatling cancels
-/// produce true combos, launchers put the defender into a juggle whose height decays with every
-/// air hit, a launcher jump-cancels into an air chain that spikes the body into a ground bounce,
-/// an air dash is granted once per jump, an overhead breaks a crouching guard while a mid does not,
-/// every clean hit freezes both fighters on their own timers with the defender held longer, a wall
-/// bounce is granted once per combo, a knockdown cannot be hit off the ground, a press during
-/// recovery fires on the first actionable frame, a cornered defender stays pinned while the attacker
-/// absorbs the pushback, and projectiles land and recycle without growing the scene.
-/// </summary>
 public class CombatChainPlayModeTests
 {
     private const string ScenePath = "Assets/_Project/Scenes/TrainingRoom.unity";

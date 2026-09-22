@@ -1,9 +1,5 @@
 using UnityEngine;
 
-/// <summary>
-/// Freeze applied to each side of a connected hit, in seconds. The defender is held longer than
-/// the attacker so the attacker recovers first and the exchange reads as their advantage.
-/// </summary>
 [System.Serializable]
 public struct HitstopTier
 {
@@ -17,9 +13,6 @@ public struct HitstopTier
     }
 }
 
-/// <summary>
-/// Camera and hitstop response of one impact class, in seconds and metres.
-/// </summary>
 [System.Serializable]
 public struct ImpactTier
 {
@@ -38,12 +31,6 @@ public struct ImpactTier
     }
 }
 
-/// <summary>
-/// Match-wide combat tuning shared by every fighter: proration and hitstun decay that bound combo
-/// length, juggle gravity and bounce limits that bound air routes, per-tier hitstop and camera
-/// response, and the input buffer leniency. One asset, cached by each <see cref="RobotController"/>
-/// at startup, so a designer can retune the whole game's feel without touching code or attacks.
-/// </summary>
 [CreateAssetMenu(fileName = "CombatRules", menuName = "Fighting Game/Combat Rules")]
 public class CombatRules : ScriptableObject
 {
@@ -166,25 +153,21 @@ public class CombatRules : ScriptableObject
     [Tooltip("Both kicks pressed within this window buffer a dash instead of a kick.")]
     public float dashMacroWindow = 2f * Frame;
 
-    /// <summary>Damage multiplier of hit <paramref name="hitNumber"/> (1-based) before route proration.</summary>
     public float ComboScaling(int hitNumber)
     {
         return Mathf.Max(Mathf.Pow(comboScalingFactor, hitNumber - 1), minComboScaling);
     }
 
-    /// <summary>Hitstun multiplier of hit <paramref name="hitNumber"/> (1-based).</summary>
     public float HitstunScale(int hitNumber)
     {
         return Mathf.Max(1f - hitstunDecayPerHit * (hitNumber - 1), minHitstunScale);
     }
 
-    /// <summary>Gravity multiplier after <paramref name="juggleHits"/> air hits.</summary>
     public float GravityScale(int juggleHits)
     {
         return 1f + juggleGravityPerHit * juggleHits;
     }
 
-    /// <summary>Launch force multiplier for the air hit following <paramref name="juggleHits"/> previous air hits.</summary>
     public float RelaunchScale(int juggleHits)
     {
         return Mathf.Max(Mathf.Pow(relaunchDecay, juggleHits), minRelaunchScale);

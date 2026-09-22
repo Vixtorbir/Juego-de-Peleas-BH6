@@ -1,7 +1,3 @@
-/// <summary>
-/// Crouching stance. Lowers the collision capsule so High attacks whiff, and routes punches to
-/// the crouch jab and kicks to the sweep.
-/// </summary>
 public class CrouchState : RobotState
 {
     private const float StandUpInputThreshold = -0.2f;

@@ -1,13 +1,5 @@
 using UnityEngine;
 
-/// <summary>
-/// Presenter for the arcade combat HUD. Binds the life bars, combo counters, round clock and
-/// announcement banner to the match and the two fighters through their events, so the HUD never
-/// polls gameplay state. Numeric readouts come from string tables built once, keeping the combat
-/// loop free of managed allocations. The presenter is ordered after the gameplay scripts so it
-/// enables once the fighters have resolved their components, yet before the match raises its
-/// first events from Start.
-/// </summary>
 [DefaultExecutionOrder(ExecutionOrder)]
 public class CombatHudController : MonoBehaviour
 {
@@ -89,9 +81,6 @@ public class CombatHudController : MonoBehaviour
         if (p2Combo != null) p2Combo.Unbind();
     }
 
-    /// <summary>
-    /// Each combo counter belongs to the attacker, so it listens to the opponent's hurtbox.
-    /// </summary>
     private void BindFighters()
     {
         if (p1HealthBar != null && player1 != null) p1HealthBar.Bind(player1.Health);
@@ -134,10 +123,6 @@ public class CombatHudController : MonoBehaviour
         timerTransform.localScale = new Vector3(scale, scale, 1f);
     }
 
-    /// <summary>
-    /// The label text comes from the prebuilt table; the colour swaps between two cached values
-    /// when the clock crosses the critical threshold, so the tick never allocates.
-    /// </summary>
     private void HandleTimerTick(int seconds)
     {
         if (timerLabel == null) return;

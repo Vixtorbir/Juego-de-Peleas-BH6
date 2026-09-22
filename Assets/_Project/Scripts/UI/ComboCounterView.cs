@@ -1,13 +1,5 @@
 using UnityEngine;
 
-/// <summary>
-/// Impact readout for the hits one fighter lands on the other. Every registered strike, from the
-/// very first, pops a per-hit damage number with an optional COUNTER or CHIP tag so no contact ever
-/// goes unacknowledged; from the second clean hit the panel is promoted to the combo counter, whose
-/// hit and damage labels re-fire an elastic scale punch on each hit and fade out when the defender
-/// regains control. All text comes from string tables built once, and all motion runs on unscaled
-/// time on RectTransforms, so the readout keeps animating through hitstop without allocating.
-/// </summary>
 public class ComboCounterView : MonoBehaviour
 {
     private const int MinDisplayedHits = 2;
@@ -62,10 +54,6 @@ public class ComboCounterView : MonoBehaviour
     public string ReadoutText => hitDamageLabel != null ? hitDamageLabel.text : string.Empty;
     public string ReadoutTag => hitTagLabel != null ? hitTagLabel.text : string.Empty;
 
-    /// <summary>
-    /// Listens to the hurtbox of the fighter being hit; the readout therefore belongs to the
-    /// attacker, which is why the HUD binds each view to the opposite fighter's hurtbox.
-    /// </summary>
     public void Bind(Hurtbox hurtbox)
     {
         Unbind();
@@ -149,10 +137,6 @@ public class ComboCounterView : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Hit confirm: the per-hit number pops on every registered strike, tagged and tinted for
-    /// counter hits and chip so the cause of the damage reads at a glance.
-    /// </summary>
     private void HandleHitRegistered(HitFeedback feedback)
     {
         int damage = Mathf.Clamp(Mathf.RoundToInt(feedback.Damage), 0, MaxDamage);

@@ -1,11 +1,5 @@
 using UnityEngine;
 
-/// <summary>
-/// Fixed-duration burst of movement towards or away from the opponent, triggered by a double tap
-/// on the horizontal axis or the two-kick macro. The burst stays glued to the floor so a dash never
-/// lifts the capsule off its ground contact. After a few frames a buffered normal or special may
-/// interrupt it; a normal started from a forward dash inherits a share of the dash speed.
-/// </summary>
 public class DashState : RobotState
 {
     private const float DashDuration = 0.18f;

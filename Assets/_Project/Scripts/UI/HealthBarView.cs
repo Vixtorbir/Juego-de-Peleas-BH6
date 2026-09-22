@@ -1,14 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>
-/// Life bar for one fighter: a foreground fill that snaps to the current health, a ghost fill
-/// that lingers on the previous value before draining down so the size of a hit stays readable
-/// through hitstop, a white impact flash over the lost segment, and the round-win pips. Fill
-/// direction and the angled silhouette are authored on the images in the scene (Player 1 drains
-/// towards the left edge, Player 2 towards the right), so the view only writes fill amounts,
-/// colours and alphas and never touches layout. Every animation runs on unscaled time.
-/// </summary>
 public class HealthBarView : MonoBehaviour
 {
     private const float LowHealthRatio = 0.25f;
@@ -49,10 +41,6 @@ public class HealthBarView : MonoBehaviour
     public float FlashAlpha => damageFlash != null ? damageFlash.color.a : 0f;
     public float GhostDelay => ghostDelay;
 
-    /// <summary>
-    /// Subscribes to the fighter's health and mirrors its current value at once, so the bar is
-    /// correct even when the fighter took damage before the HUD came up.
-    /// </summary>
     public void Bind(HealthComponent health)
     {
         Unbind();
@@ -129,10 +117,6 @@ public class HealthBarView : MonoBehaviour
         SetFlashAlpha(flashDuration > 0f ? flashTimer / flashDuration : 0f);
     }
 
-    /// <summary>
-    /// Below a quarter of the life bar the foreground breathes towards the low-health colour so the
-    /// danger reads without a separate warning element.
-    /// </summary>
     private void TickLowHealthPulse()
     {
         if (foregroundHealthBar == null) return;
@@ -154,10 +138,6 @@ public class HealthBarView : MonoBehaviour
         SetFill(fill, healed);
     }
 
-    /// <summary>
-    /// Damage leaves the ghost where it was, starts the hold and flashes the bar; healing (round
-    /// reset) snaps both fills so a fresh round never opens with a draining bar.
-    /// </summary>
     private void SetFill(float fill, bool snapGhost)
     {
         if (foregroundHealthBar != null) foregroundHealthBar.fillAmount = fill;

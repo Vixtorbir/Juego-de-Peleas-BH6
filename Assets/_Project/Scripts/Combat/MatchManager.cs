@@ -5,15 +5,7 @@ using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.Controls;
 using UnityEngine.InputSystem.Utilities;
 
-/// <summary>
-/// Drives the round flow of a match: places both fighters, locks input during the intro, runs
-/// the round clock, reacts to knockouts through each fighter's <see cref="HealthComponent.OnDeath"/>
-/// or to time over, and tallies round wins until one side reaches <see cref="roundsToWin"/>.
-/// Every transition is broadcast through C# events so presentation layers (HUD, announcer) bind
-/// once instead of polling. Fighters are injected so a future
-/// character select can call <see cref="InitializeMatch"/>. While fighting, Start (or Escape and
-/// Enter) toggles the pause; once the match is over, Start or Enter restarts it from round one.
-/// </summary>
+// Round flow: intro, clock, KO / time over, round wins and match reset.
 public class MatchManager : MonoBehaviour
 {
     private const float IntroDuration = 2f;
@@ -35,31 +27,20 @@ public class MatchManager : MonoBehaviour
     public RobotController player1;
     public RobotController player2;
 
-    /// <summary>Raised when a match is (re)initialised, before the first round's intro.</summary>
     public event Action OnMatchReset;
 
-    /// <summary>Raised with the 1-based round number when a round's intro begins.</summary>
     public event Action<int> OnRoundStart;
 
-    /// <summary>Raised when the intro ends and both fighters regain control.</summary>
     public event Action OnFightStart;
 
-    /// <summary>Raised whenever the whole-second value of the round clock changes.</summary>
     public event Action<int> OnTimerTick;
 
-    /// <summary>Raised when the round clock expires, immediately before the round end is announced.</summary>
     public event Action OnTimeOver;
 
-    /// <summary>
-    /// Raised once a round is decided; the tallies are already updated. The winner is null when the
-    /// round ended in a draw, in which case both fighters are credited.
-    /// </summary>
     public event Action<RobotController> OnRoundEnd;
 
-    /// <summary>Raised with the match winner (null for a drawn match) after the final round's end pause.</summary>
     public event Action<RobotController> OnMatchOver;
 
-    /// <summary>Raised with the new value whenever the match is paused or resumed.</summary>
     public event Action<bool> OnPauseChanged;
 
     public MatchState CurrentState { get; private set; }
@@ -71,7 +52,6 @@ public class MatchManager : MonoBehaviour
     public int SecondsRemaining { get; private set; }
     public bool IsPaused { get; private set; }
 
-    /// <summary>Highest round number the match can reach with the current tallies.</summary>
     public int FinalRoundNumber => roundsToWin * 2 - 1;
 
     private readonly WaitForSeconds introWait = new WaitForSeconds(IntroDuration);
@@ -92,10 +72,7 @@ public class MatchManager : MonoBehaviour
         Instance = this;
     }
 
-    /// <summary>
-    /// A pause must never outlive the manager, or the next scene would load with time stopped.
-    /// Unity always disables before destroying, so this also covers scene unloads.
-    /// </summary>
+    // Never leave the game paused when this object goes away (scene unload included).
     private void OnDisable()
     {
         if (IsPaused) SetPaused(false);
@@ -152,31 +129,18 @@ public class MatchManager : MonoBehaviour
         StartCoroutine(RoundFlowRoutine());
     }
 
-    /// <summary>
-    /// Restarts the current pairing from round one. Exposed for HUD buttons alongside the input
-    /// shortcut handled in <see cref="Update"/>.
-    /// </summary>
     public void RestartMatch()
     {
         if (player1 == null || player2 == null) return;
         InitializeMatch(player1, player2);
     }
 
-    /// <summary>
-    /// Pauses or resumes the fight. Only honoured while <see cref="MatchState.Fighting"/>: the intro
-    /// and round-end beats are short, scripted and already lock input.
-    /// </summary>
     public void TogglePause()
     {
         if (CurrentState != MatchState.Fighting) return;
         SetPaused(!IsPaused);
     }
 
-    /// <summary>
-    /// Scene time goes through <see cref="CombatEffectsManager"/> when present so a pause taken
-    /// during a slow-motion beat resumes into that beat. Fighters drop button presses and suspend
-    /// their own unscaled timers (hitstop, command buffer) for the duration.
-    /// </summary>
     private void SetPaused(bool paused)
     {
         IsPaused = paused;
@@ -191,10 +155,6 @@ public class MatchManager : MonoBehaviour
         OnPauseChanged?.Invoke(paused);
     }
 
-    /// <summary>
-    /// Overrides the running round clock, for training options and automated tests that need to
-    /// reach time over without waiting out a full round.
-    /// </summary>
     public void SetRemainingTime(float seconds)
     {
         roundTimeRemaining = Mathf.Max(0f, seconds);
@@ -217,10 +177,7 @@ public class MatchManager : MonoBehaviour
 
     private void HandlePlayer2Knockout() => EndRound(player1);
 
-    /// <summary>
-    /// Closes the round for <paramref name="winner"/>. A knockout arriving once the round is already
-    /// decided (both fighters dropping on the same physics step) is ignored, so a round can only end once.
-    /// </summary>
+    // Double KO on the same physics step would call this twice; only the first one counts.
     private void EndRound(RobotController winner)
     {
         if (CurrentState != MatchState.Fighting) return;
@@ -245,10 +202,7 @@ public class MatchManager : MonoBehaviour
         OnFightStart?.Invoke();
     }
 
-    /// <summary>
-    /// The clock runs on scaled time, so hitstop and any pause freeze it for free. The tick event
-    /// only fires when the displayed whole second changes.
-    /// </summary>
+    // Scaled time, so hitstop and pause freeze the clock automatically.
     private void TickRoundClock()
     {
         roundTimeRemaining -= Time.deltaTime;
@@ -273,9 +227,6 @@ public class MatchManager : MonoBehaviour
         OnTimerTick?.Invoke(seconds);
     }
 
-    /// <summary>
-    /// Time over goes to the fighter with the larger share of their life bar; an exact tie is a draw.
-    /// </summary>
     private RobotController ResolveTimeOverWinner()
     {
         float p1Ratio = p1Health != null ? p1Health.CurrentHealth / p1Health.MaxHealth : 0f;
@@ -322,7 +273,6 @@ public class MatchManager : MonoBehaviour
         player2.SetControlsActive(active);
     }
 
-    /// <summary>Escape toggles the pause alongside the Start and Enter shortcuts.</summary>
     private static bool WasPauseTogglePressed()
     {
         Keyboard keyboard = Keyboard.current;
@@ -331,12 +281,7 @@ public class MatchManager : MonoBehaviour
         return WasStartPressed();
     }
 
-    /// <summary>
-    /// Keyboard Enter or Start on any connected pad. Face buttons are deliberately excluded so
-    /// mashing after a knockout cannot restart the match. Devices are read directly rather than
-    /// through the fighters' action maps, which drop buttons while paused and are disabled once the
-    /// match ends.
-    /// </summary>
+    // Face buttons are left out on purpose so mashing after a KO does not restart the match.
     private static bool WasStartPressed()
     {
         Keyboard keyboard = Keyboard.current;
@@ -351,10 +296,7 @@ public class MatchManager : MonoBehaviour
         return WasJoystickButtonPressed(JoystickStartButton);
     }
 
-    /// <summary>
-    /// DirectInput pads such as the Logitech RumblePad 2 enumerate as <see cref="Joystick"/> rather than
-    /// <see cref="Gamepad"/>, so their buttons are only reachable by HID control name.
-    /// </summary>
+    // DirectInput pads show up as Joystick, not Gamepad, so buttons are read by HID control name.
     private static bool WasJoystickButtonPressed(string controlName)
     {
         ReadOnlyArray<Joystick> joysticks = Joystick.all;

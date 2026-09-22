@@ -1,11 +1,6 @@
 using System;
 using UnityEngine;
 
-/// <summary>
-/// Health pool for a fighter. Broadcasts changes for UI binding and raises <see cref="OnDeath"/>
-/// once when health reaches zero; further damage is ignored until the next round resets it. A
-/// damage floor above zero makes the pool non-lethal, which training mode uses for its dummy.
-/// </summary>
 public class HealthComponent : MonoBehaviour
 {
     [Header("Health Settings")]
@@ -47,7 +42,6 @@ public class HealthComponent : MonoBehaviour
         }
     }
 
-    /// <summary>Restores up to <paramref name="amount"/> health. A knocked-out fighter stays down.</summary>
     public void Heal(float amount)
     {
         if (IsDead || amount <= 0f || currentHealth >= maxHealth) return;
@@ -56,10 +50,6 @@ public class HealthComponent : MonoBehaviour
         OnHealthChanged?.Invoke(currentHealth, maxHealth);
     }
 
-    /// <summary>
-    /// Sets the lowest value damage can take the pool to. Zero restores normal lethal damage; any
-    /// positive floor keeps the fighter standing however hard it is hit.
-    /// </summary>
     public void SetDamageFloor(float floor)
     {
         damageFloor = Mathf.Clamp(floor, 0f, maxHealth);

@@ -1,15 +1,6 @@
 using UnityEngine;
 using UnityEngine.Serialization;
 
-/// <summary>
-/// Side-view combat camera. Tracks the midpoint between both fighters, pulls back as they
-/// separate and guarantees both stay inside a horizontal safe area of the viewport even when the
-/// stage bounds pin the camera against a corner. Vertically the camera is anchored to the floor:
-/// walking, crouching and short hops never move it, while a launched fighter lifts it with slower
-/// damping and a hard ceiling so the floor stays in frame. Impact feedback runs on unscaled time so
-/// hitstop never freezes it: a damped directional shake with a subtle roll, and a field-of-view
-/// punch that springs back to the base lens on heavy hits.
-/// </summary>
 [RequireComponent(typeof(Camera))]
 public class FightingCamera : MonoBehaviour
 {
@@ -101,18 +92,11 @@ public class FightingCamera : MonoBehaviour
         RefreshLensExtents();
     }
 
-    /// <summary>
-    /// Starts an omnidirectional shake. A stronger shake replaces a weaker one in progress.
-    /// </summary>
     public void ShakeCamera(float duration, float magnitude)
     {
         ShakeCamera(duration, magnitude, Vector3.zero);
     }
 
-    /// <summary>
-    /// Starts a shake whose main oscillation runs along <paramref name="direction"/> (screen space),
-    /// so a punch pushes the camera the same way the defender is knocked.
-    /// </summary>
     public void ShakeCamera(float duration, float magnitude, Vector3 direction)
     {
         if (magnitude < shakeMagnitude * (shakeTimer / Mathf.Max(shakeDuration, MinSmoothTime))) return;
@@ -123,10 +107,6 @@ public class FightingCamera : MonoBehaviour
         shakeDirection = direction.sqrMagnitude > 0.0001f ? direction.normalized : Vector3.zero;
     }
 
-    /// <summary>
-    /// Kicks the field of view by <paramref name="fovDelta"/> degrees (negative tightens the lens)
-    /// and springs it back over <see cref="zoomPunchDuration"/>. A larger punch replaces a smaller one.
-    /// </summary>
     public void PunchZoom(float fovDelta)
     {
         if (Mathf.Abs(fovDelta) < Mathf.Abs(zoomPunchDelta) * ComputeZoomPunchEnvelope()) return;
@@ -135,11 +115,6 @@ public class FightingCamera : MonoBehaviour
         zoomPunchTimer = zoomPunchDuration;
     }
 
-    /// <summary>
-    /// Kicks the camera <paramref name="meters"/> along <paramref name="direction"/> (screen space)
-    /// and lets a critically damped spring bring it back, so a hit nudges the frame the way the
-    /// defender is knocked before the shake takes over. Punches accumulate; the spring settles them.
-    /// </summary>
     public void Punch(Vector3 direction, float meters)
     {
         if (meters <= 0f || direction.sqrMagnitude < 0.0001f) return;
@@ -169,11 +144,7 @@ public class FightingCamera : MonoBehaviour
         AdvanceZoomPunch(unscaledDelta);
     }
 
-    /// <summary>
-    /// The baseline sits a fixed height above the floor. Only the highest fighter can lift it, and
-    /// only by the share of their height beyond the deadzone, so hops keep the horizon still while
-    /// a full juggle raises the frame just enough to keep the airborne fighter in view.
-    /// </summary>
+    // Only the highest fighter lifts the frame, and only past the deadzone, so small hops keep the horizon still.
     private float ComputeTargetHeight(float p1Height, float p2Height)
     {
         float baseline = groundHeight + baseOffset.y;
@@ -183,12 +154,7 @@ public class FightingCamera : MonoBehaviour
         return baseline + Mathf.Min(lift, maxElevation);
     }
 
-    /// <summary>
-    /// Depth is the further of two demands: the separation zoom that gives the neutral game its
-    /// breathing room, and the distance at which the fighter furthest from the camera axis still
-    /// lands inside the horizontal safe area. The second only differs from the first when the
-    /// stage bounds hold the camera short of the midpoint, which is exactly the corner situation.
-    /// </summary>
+    // Pull back far enough for the separation zoom and to keep the outer fighter inside the safe area.
     private float ComputeTargetDepth(Vector3 p1, Vector3 p2, float cameraX, float cameraY)
     {
         float separation = Mathf.Abs(p1.x - p2.x);
@@ -227,10 +193,6 @@ public class FightingCamera : MonoBehaviour
         offset += shakeDirection * (Mathf.Sin(time * ShakeFrequency) * amplitude);
     }
 
-    /// <summary>
-    /// The envelope reads zero once the timer expires, so the final write of a punch lands exactly
-    /// on the base lens and no further writes happen while the lens is at rest.
-    /// </summary>
     private void AdvanceZoomPunch(float unscaledDelta)
     {
         if (zoomPunchTimer <= 0f) return;
@@ -247,10 +209,6 @@ public class FightingCamera : MonoBehaviour
         return normalizedRemaining * normalizedRemaining;
     }
 
-    /// <summary>
-    /// Horizontal lens extent derived from the base vertical field of view, so the framing rule is
-    /// unaffected by a zoom punch in progress. Headless runs report no aspect and fall back to 16:9.
-    /// </summary>
     private void RefreshLensExtents()
     {
         float aspect = attachedCamera.aspect;

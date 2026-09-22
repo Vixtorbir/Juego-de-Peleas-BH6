@@ -1,9 +1,5 @@
 using UnityEngine;
 
-/// <summary>
-/// Neutral standing state. Resets combo scaling on the defender side and dispatches buffered
-/// commands with the priority specials > dashes > normals > jump/crouch > walk.
-/// </summary>
 public class IdleState : RobotState
 {
     private const float VerticalInputThreshold = 0.6f;

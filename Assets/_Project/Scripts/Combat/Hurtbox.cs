@@ -1,10 +1,6 @@
 using System;
 using UnityEngine;
 
-/// <summary>
-/// Why an incoming strike did not connect. Deflections (the body could not be hit) consume the
-/// strike and get their own feedback; a height whiff is a genuine miss and leaves the strike live.
-/// </summary>
 public enum HitRejection
 {
     None,
@@ -14,11 +10,6 @@ public enum HitRejection
     HeightWhiff
 }
 
-/// <summary>
-/// What a single registered strike did to this body, for presentation. Hit numbers count from 1,
-/// so the HUD can show a per-hit readout on the very first contact and promote to a combo counter
-/// from the second. Chip damage arrives with <see cref="Blocked"/> set and <see cref="HitNumber"/> 0.
-/// </summary>
 public struct HitFeedback
 {
     public int HitNumber;
@@ -27,10 +18,6 @@ public struct HitFeedback
     public bool Blocked;
 }
 
-/// <summary>
-/// Running state of the combo being landed on a fighter. A plain struct on the hurtbox so combo
-/// tracking, bounce limits and route proration never touch the heap.
-/// </summary>
 public struct ComboState
 {
     public int Hits;
@@ -43,17 +30,7 @@ public struct ComboState
     public static ComboState Fresh => new ComboState { Proration = 1f };
 }
 
-/// <summary>
-/// Damage receiver for a fighter. Resolves the guard matrix (attack height versus posture),
-/// counter hits, aerial juggles, chip damage, combo damage scaling and hitstun decay, then hands
-/// the resulting reaction to the owner's state machine. Whether a guard can be raised and at which
-/// height is read from the current state rather than from the stick: a fighter in hitstun or
-/// mid-attack cannot block, so a chain that connects is a true combo, and a standing fighter
-/// holding down is still hit high. Every impact freezes the two fighters for their own tier
-/// durations from <see cref="CombatRules"/>, so the defender is always held a little longer than
-/// the attacker. Combo progress is broadcast so the HUD can present the hit count and accumulated
-/// damage without polling.
-/// </summary>
+// Resolves every incoming hit: guard, counter hit, juggles, damage scaling and the reaction state.
 public class Hurtbox : MonoBehaviour
 {
     private enum GuardResult { Hit, Blocked, Whiffed, GuardBroken }
@@ -74,13 +51,10 @@ public class Hurtbox : MonoBehaviour
     private Collider hurtCollider;
     private ComboState combo = ComboState.Fresh;
 
-    /// <summary>Raised after every clean hit of a combo with the running hit count and scaled damage total.</summary>
     public event Action<int, float> OnComboHit;
 
-    /// <summary>Raised for every strike that registered on this body, hits and blocked chip alike, before the reaction state changes.</summary>
     public event Action<HitFeedback> OnHitRegistered;
 
-    /// <summary>Raised once when a combo in progress ends because the defender regained control.</summary>
     public event Action OnComboEnd;
 
     public RobotController Owner => controller;
@@ -88,7 +62,6 @@ public class Hurtbox : MonoBehaviour
     public int ComboHitCount => combo.Hits;
     public float TotalComboDamage => combo.Damage;
 
-    /// <summary>Strikes deflected by this body since startup; exposed for tests and telemetry.</summary>
     public int DeflectCount { get; private set; }
 
     private CombatRules Rules => controller.Rules;
@@ -106,31 +79,17 @@ public class Hurtbox : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Entry point for every incoming attack, whether from a melee <see cref="Hitbox"/> or a projectile.
-    /// Returns true when the attack connected (clean hit or block) so the attacker can open its
-    /// cancel window; false when it was dodged, whiffed by height or the defender is already down.
-    /// </summary>
     public bool ReceiveHit(AttackData attack, RobotController attacker)
     {
         Vector3 chest = hurtCollider != null ? hurtCollider.bounds.center : transform.position;
         return ReceiveHit(attack, attacker, chest, true);
     }
 
-    /// <summary>
-    /// Overload taking the world-space contact point so the impact flash can be placed where the
-    /// strike actually met the body. <paramref name="freezeAttacker"/> is false for projectiles:
-    /// a fireball landing from full screen never stalls the fighter who threw it.
-    /// </summary>
     public bool ReceiveHit(AttackData attack, RobotController attacker, Vector3 contactPoint, bool freezeAttacker)
     {
         return TryReceiveHit(attack, attacker, contactPoint, freezeAttacker, out _);
     }
 
-    /// <summary>
-    /// Same as <see cref="ReceiveHit(AttackData, RobotController, Vector3, bool)"/> but reports why a
-    /// strike was refused, so the striker can tell a deflection from a whiff.
-    /// </summary>
     public bool TryReceiveHit(AttackData attack, RobotController attacker, Vector3 contactPoint, bool freezeAttacker, out HitRejection rejection)
     {
         rejection = HitRejection.None;
@@ -203,10 +162,6 @@ public class Hurtbox : MonoBehaviour
         OnComboEnd?.Invoke();
     }
 
-    /// <summary>
-    /// Feedback for a strike this body deflected: a silver spark at the contact point, the deflect
-    /// sound, a body pop and a small camera kick. No hitstop on either side, nothing connected.
-    /// </summary>
     public void NotifyDeflected(Vector3 contactPoint, RobotController attacker)
     {
         DeflectCount++;
@@ -223,10 +178,6 @@ public class Hurtbox : MonoBehaviour
         if (AudioManager.Instance != null) AudioManager.Instance.PlayDeflect();
     }
 
-    /// <summary>
-    /// Impact feedback for a rebound resolved by the juggle state: the bounce tier freezes the
-    /// body, shakes the camera along the rebound and pays the route proration.
-    /// </summary>
     public void NotifyBounce(BounceMode bounce, RobotController attacker)
     {
         ImpactTier tier = Rules.bounceImpact;
@@ -251,11 +202,7 @@ public class Hurtbox : MonoBehaviour
         if (AudioManager.Instance != null) AudioManager.Instance.PlayBounce();
     }
 
-    /// <summary>
-    /// Guard matrix. Overheads (jumping attacks, the overhead command normal) must be blocked
-    /// standing and break a crouching guard. Otherwise High attacks pass over a crouching guard,
-    /// Mid attacks are blocked in either posture, and Low attacks must be blocked crouching.
-    /// </summary>
+    // Overheads must be blocked standing, lows crouching, mids either way; highs whiff on a crouching body.
     private static GuardResult ResolveGuard(AttackHeight height, bool overhead, bool crouching)
     {
         if (overhead) return crouching ? GuardResult.GuardBroken : GuardResult.Blocked;
@@ -281,14 +228,7 @@ public class Hurtbox : MonoBehaviour
         return towardsOpponent < BlockInputThreshold;
     }
 
-    /// <summary>
-    /// Hitstop, shake and camera punch come from the attack's <see cref="CombatRules"/> tier. Both
-    /// fighters freeze on their own timers: the defender for the tier plus any counter-hit bonus, the
-    /// attacker for the shorter attacker time. Launchers and counter hits step up to the launcher tier
-    /// with a shake along the knockback and a lens punch; blocks soften the freeze and the shake and
-    /// never punch the lens. The flash is spawned at the contact point and keeps animating through
-    /// the freeze.
-    /// </summary>
+    // Defender freezes for the full tier (+ counter-hit bonus), attacker for the shorter attacker time.
     private void PlayImpactFeedback(AttackData attack, RobotController attacker, bool counterHit, bool blocked, Vector3 contactPoint, bool freezeAttacker)
     {
         CombatRules rules = Rules;
@@ -369,10 +309,7 @@ public class Hurtbox : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Damage is scaled by the combo position and by the route proration paid on launchers and
-    /// bounces, so a long juggle route deals less than a short grounded string of the same hits.
-    /// </summary>
+    // Scaled by combo position and by the proration paid on launchers/bounces.
     private void ApplyDamage(float rawDamage, RobotController attacker, bool counterHit)
     {
         if (health == null) return;
@@ -393,9 +330,7 @@ public class Hurtbox : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Blocked attacks still deal a fraction of their damage, but chip can never finish a round.
-    /// </summary>
+    // Chip damage can never finish a round.
     private void ApplyChipDamage(float rawDamage, RobotController attacker)
     {
         if (health == null || health.IsDead) return;
@@ -415,10 +350,7 @@ public class Hurtbox : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Both fighters bank charge from the same strike, the attacker at the higher rate, so meter
-    /// tracks who is applying pressure rather than who is absorbing it.
-    /// </summary>
+    // Attacker gets meter at a higher rate than the defender so pressure is rewarded.
     private void AwardSuperMeter(float damage, RobotController attacker, bool blocked)
     {
         if (controller != null && controller.SuperMeter != null) controller.SuperMeter.AwardForDamageTaken(damage, blocked);
@@ -467,12 +399,7 @@ public class Hurtbox : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Air hits re-launch the defender with juggle decay: every air hit lowers the next launch and
-    /// steepens gravity, so the body sinks out of reach after a few reps. A wall bounce is granted
-    /// once per combo and falls back to a plain relaunch; a spent ground bounce still slams the body
-    /// down, straight into the knockdown.
-    /// </summary>
+    // Each air hit lowers the next relaunch and raises gravity, so juggles run out after a few reps.
     private void ApplyAirborneReaction(AttackData attack, bool counterHit, RobotController attacker)
     {
         if (health != null && health.IsDead) return;
@@ -510,12 +437,6 @@ public class Hurtbox : MonoBehaviour
         controller.EnterAirborneHurt(launchForce, drift, attacker, BounceMode.None, attack.bounceForce);
     }
 
-    /// <summary>
-    /// Launchers relaunch with their own force. A grounded attacker's normal pops the body by the
-    /// air-reset force; an airborne attacker's normal instead carries the body along the attacker's
-    /// current vertical speed plus a small pop, so an air chain keeps both fighters on the same arc
-    /// instead of firing the defender away from a falling attacker. Juggle decay scales the pop.
-    /// </summary>
     private float ResolveRelaunchForce(AttackData attack, RobotController attacker, float launchMultiplier)
     {
         if (attack.isLauncher) return attack.launchForce * launchMultiplier;

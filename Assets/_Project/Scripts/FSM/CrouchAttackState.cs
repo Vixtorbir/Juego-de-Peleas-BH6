@@ -1,8 +1,3 @@
-/// <summary>
-/// Crouching normal attack. Shares the startup/active/recovery timeline and the on-connect special
-/// and chain cancel rules of <see cref="AttackState"/>, but keeps the collision capsule crouched
-/// for the whole duration and returns to the crouch when the stick is still held down.
-/// </summary>
 public class CrouchAttackState : AttackState
 {
     private const float StayCrouchedInputThreshold = -0.2f;

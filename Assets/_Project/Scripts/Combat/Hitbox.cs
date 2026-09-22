@@ -1,16 +1,5 @@
 using UnityEngine;
 
-/// <summary>
-/// Trigger volume enabled only during an attack's active frames. The box is reshaped on every
-/// activation from the attack's authored offset and size (fighter space, +Z towards the opponent),
-/// so a jab, a roundhouse and a sweep each project their own reach instead of sharing one volume
-/// parked in front of the chest. On the first valid contact it forwards the attack data to the
-/// opponent's <see cref="Hurtbox"/> and disables itself so a single swing cannot hit more than once.
-/// The owner's own capsule is excluded from the pair on every activation, so the physics step never
-/// reports the swing overlapping the body it belongs to. The holder carries a kinematic Rigidbody
-/// so the volume is a kinematic trigger that PhysX tracks as a moving actor, rather than a static
-/// shape dragged around by its parent transform.
-/// </summary>
 [RequireComponent(typeof(BoxCollider))]
 [RequireComponent(typeof(Rigidbody))]
 public class Hitbox : MonoBehaviour
@@ -33,20 +22,14 @@ public class Hitbox : MonoBehaviour
         hitboxCollider.isTrigger = true;
         hitboxCollider.enabled = false;
 
-        if (!TryGetComponent(out Rigidbody body)) body = gameObject.AddComponent<Rigidbody>();
+        Rigidbody body = GetComponent<Rigidbody>();
         body.isKinematic = true;
         body.useGravity = false;
 
         attackerController = GetComponentInParent<RobotController>();
     }
 
-    /// <summary>
-    /// Enables the volume for the attack's active window. Activation happens on the render frame
-    /// that crosses the startup threshold, while the overlap itself is resolved by the next physics
-    /// step: with the fixed step pinned to 60 Hz and the frame rate locked to match, the contact is
-    /// reported at most one frame after the hitbox goes live, the same tick on which the animation
-    /// reaches its extension pose.
-    /// </summary>
+    // Box is reshaped per attack from its authored offset/size (fighter space, +Z towards the opponent).
     public void Activate(AttackData data)
     {
         currentAttackData = data;
@@ -77,12 +60,7 @@ public class Hitbox : MonoBehaviour
         ResolveRejection(target, rejection, contactPoint);
     }
 
-    /// <summary>
-    /// A strike into an invulnerable or downed body is deflected: it is spent, like hitting armour,
-    /// and the defender's hurtbox plays the deflect feedback. A height whiff is a genuine miss, so the
-    /// volume stays live for the rest of its active frames and the whiff sound follows as usual.
-    /// A dead body simply absorbs the strike.
-    /// </summary>
+    // Deflected strikes are spent like hitting armour; a height whiff keeps the box live.
     private void ResolveRejection(Hurtbox target, HitRejection rejection, Vector3 contactPoint)
     {
         switch (rejection)
@@ -98,10 +76,7 @@ public class Hitbox : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// The ignore pair is re-applied after each enable because PhysX drops it whenever either
-    /// collider is disabled, which happens on every attack and on round resets.
-    /// </summary>
+    // PhysX drops ignore pairs when a collider is disabled, so this has to be re-applied on every activation.
     private void IgnoreOwnerBody()
     {
         if (attackerController == null) return;
@@ -110,10 +85,6 @@ public class Hitbox : MonoBehaviour
         if (ownerBody != null && ownerBody.enabled) Physics.IgnoreCollision(hitboxCollider, ownerBody, true);
     }
 
-    /// <summary>
-    /// Point on the defender's volume nearest the centre of the striking box, so the impact flash
-    /// lands on the limb's reach rather than inside either body.
-    /// </summary>
     private Vector3 ComputeContactPoint(Collider defender)
     {
         Vector3 strikeCentre = hitboxCollider.bounds.center;

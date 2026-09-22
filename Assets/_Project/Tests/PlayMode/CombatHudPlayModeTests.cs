@@ -5,13 +5,6 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 
-/// <summary>
-/// Play-mode coverage of the combat HUD in the training room: life bars snap on damage, flash,
-/// and let the ghost fill hold before it drains; every hit pops a per-hit damage readout from the
-/// first contact and the combo counter takes over from the second hit and fades when the defender
-/// recovers; the round clock counts down, turns critical and resolves time over by remaining life;
-/// and game code with an active HUD allocates nothing measurable inside the player loop.
-/// </summary>
 public class CombatHudPlayModeTests
 {
     private const string ScenePath = "Assets/_Project/Scenes/TrainingRoom.unity";
@@ -141,10 +134,6 @@ public class CombatHudPlayModeTests
         Assert.AreEqual("TIME OVER", hud.Banner.MainText, "Banner should announce time over.");
     }
 
-    /// <summary>
-    /// Allocations are read from the profiler's player-loop samples, so the editor harness's own
-    /// per-frame garbage never leaks into the figure. Idle and combat windows are both reported.
-    /// </summary>
     [UnityTest]
     public IEnumerator ActiveHudAddsNoAllocationsToCombatLoop()
     {

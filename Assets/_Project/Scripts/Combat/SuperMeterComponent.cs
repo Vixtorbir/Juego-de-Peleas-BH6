@@ -1,14 +1,6 @@
 using System;
 using UnityEngine;
 
-/// <summary>
-/// Super gauge for a fighter. Charge is awarded by the damage resolver on every registered strike:
-/// the attacker is paid more than the defender so offence builds the meter faster than turtling,
-/// and blocked chip pays both sides a fraction of the hit rate. Specials are free; the gauge is
-/// reserved for the super art, which drains it in full, so a single clean combo is enough to bank
-/// one. Changes are broadcast for UI binding in the same shape as
-/// <see cref="HealthComponent.OnHealthChanged"/>.
-/// </summary>
 public class SuperMeterComponent : MonoBehaviour
 {
     [Header("Capacity")]
@@ -24,10 +16,8 @@ public class SuperMeterComponent : MonoBehaviour
 
     private float currentCharge;
 
-    /// <summary>Raised with the current and maximum charge whenever the gauge moves.</summary>
     public event Action<float, float> OnChargeChanged;
 
-    /// <summary>Raised when the gauge reaches capacity, for the full-meter telegraph on the HUD.</summary>
     public event Action OnChargeFull;
 
     public float CurrentCharge => currentCharge;
@@ -35,7 +25,6 @@ public class SuperMeterComponent : MonoBehaviour
     public float NormalizedCharge => maxCharge > 0f ? currentCharge / maxCharge : 0f;
     public bool IsFull => currentCharge >= maxCharge;
 
-    /// <summary>Charge a super art drains: the whole gauge.</summary>
     public float SuperArtCost => maxCharge;
 
     private void Start()
@@ -53,10 +42,6 @@ public class SuperMeterComponent : MonoBehaviour
         Award(damage * chargePerDamageTaken, blocked);
     }
 
-    /// <summary>
-    /// Drains up to <paramref name="cost"/> and reports whether the gauge could cover it in full.
-    /// Callers that do not gate on the return value still get the partial drain.
-    /// </summary>
     public bool TrySpend(float cost)
     {
         if (cost <= 0f) return true;
@@ -66,10 +51,7 @@ public class SuperMeterComponent : MonoBehaviour
         return covered;
     }
 
-    /// <summary>
-    /// Atomic spend: the gauge is drained only when it covers <paramref name="cost"/> in full, so a
-    /// move gated on its own cost never leaves the player paying for an activation that was refused.
-    /// </summary>
+    // Only drains if the full cost is available, so a refused super never costs meter.
     public bool TrySpendExact(float cost)
     {
         if (cost > currentCharge) return false;
@@ -78,7 +60,6 @@ public class SuperMeterComponent : MonoBehaviour
         return true;
     }
 
-    /// <summary>Tops the gauge up to capacity. Used by training mode to rehearse the super art.</summary>
     public void FillCharge()
     {
         SetCharge(maxCharge);

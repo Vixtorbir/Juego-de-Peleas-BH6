@@ -1,7 +1,4 @@
-/// <summary>
-/// Joystick direction expressed relative to the opponent (numpad notation), so motion inputs
-/// remain valid regardless of which side of the screen the fighter is standing on.
-/// </summary>
+// Numpad-style directions relative to the opponent, so motions work on both sides.
 public enum CombatDirection
 {
     Neutral,
@@ -15,9 +12,6 @@ public enum CombatDirection
     UpBack
 }
 
-/// <summary>
-/// Timestamped directional input stored by <see cref="InputBuffer"/> for motion detection.
-/// </summary>
 public readonly struct BufferedDirection
 {
     public readonly CombatDirection Direction;

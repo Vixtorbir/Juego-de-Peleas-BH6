@@ -1,13 +1,6 @@
 using UnityEngine;
 
-/// <summary>
-/// Body tint telegraph for a fighter. Drives the renderers' base colour through one cached
-/// <see cref="MaterialPropertyBlock"/>, so the shared materials are never instanced and nothing is
-/// allocated per frame. Two layers share the block: a pulse held while the fighter cannot be hit
-/// (wake-up, reversal startup) and a one-shot pop for events such as a deflected strike. Both run on
-/// unscaled time so they stay readable through hitstop, and the block is cleared once idle so the
-/// renderers return to the SRP Batcher.
-/// </summary>
+// Body tint through a MaterialPropertyBlock so materials are never instanced.
 [DisallowMultipleComponent]
 public class CombatFlash : MonoBehaviour
 {
@@ -29,7 +22,6 @@ public class CombatFlash : MonoBehaviour
 
     private bool applied;
 
-    /// <summary>True while any tint is being drawn on the body.</summary>
     public bool IsFlashing => pulsing || pulseTailRemaining > 0f || popRemaining > 0f;
 
     private void Awake()
@@ -89,10 +81,7 @@ public class CombatFlash : MonoBehaviour
         Apply(color, intensity);
     }
 
-    /// <summary>
-    /// Starts or stops the invulnerability pulse. Stopping lets the pulse fade over
-    /// <paramref name="minVisible"/> so a pulse shorter than a few frames still registers.
-    /// </summary>
+    // minVisible makes very short pulses still readable by fading out instead of cutting.
     public void SetPulse(bool on, Color color, float frequency, float minVisible)
     {
         if (on)
@@ -111,7 +100,6 @@ public class CombatFlash : MonoBehaviour
         pulseTailRemaining = minVisible;
     }
 
-    /// <summary>One-shot tint that decays linearly over <paramref name="duration"/>.</summary>
     public void Pop(Color color, float duration)
     {
         if (duration <= 0f) return;

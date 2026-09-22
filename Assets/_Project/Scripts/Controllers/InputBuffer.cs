@@ -1,14 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// Records discrete directional inputs relative to the opponent and matches them against
-/// motion sequences (quarter-circle, dragon punch, double quarter-circle) using reverse sequence
-/// matching. Inputs older than <see cref="inputLifeTime"/> are pruned every frame without
-/// allocating. The history spans the longest motion in the game, while each lookup applies its own
-/// age limit, so a six-step super motion gets the window it needs without making every single
-/// quarter-circle that lenient.
-/// </summary>
+// Short history of stick directions used to detect motion inputs (QCF, DP, double QCF).
 [RequireComponent(typeof(RobotController))]
 public class InputBuffer : MonoBehaviour
 {
@@ -36,20 +29,12 @@ public class InputBuffer : MonoBehaviour
         RecordCurrentDirection();
     }
 
-    /// <summary>
-    /// Returns true if the most recent inputs contain <paramref name="sequence"/> in order,
-    /// allowing intermediate noise between steps, within the default motion window.
-    /// </summary>
     public bool CheckMotionInput(CombatDirection[] sequence)
     {
         return CheckMotionInput(sequence, defaultMotionWindow);
     }
 
-    /// <summary>
-    /// Reverse sequence match bounded by <paramref name="motionWindow"/>: only inputs made within
-    /// that many seconds count, so the whole motion must have been drawn in one go. On success the
-    /// history is cleared so the same motion cannot trigger twice.
-    /// </summary>
+    // Walks the history backwards looking for the sequence in order; noise between steps is allowed.
     public bool CheckMotionInput(CombatDirection[] sequence, float motionWindow)
     {
         if (directionHistory.Count < sequence.Length) return false;
@@ -87,10 +72,7 @@ public class InputBuffer : MonoBehaviour
         directionHistory.Add(new BufferedDirection(currentDirection, Time.time));
     }
 
-    /// <summary>
-    /// The history is chronological, so expired entries always form a contiguous prefix.
-    /// A single RemoveRange keeps this Zero-GC, unlike RemoveAll with a predicate.
-    /// </summary>
+    // History is chronological, so expired entries are always a prefix -> one RemoveRange, no allocations.
     private void PruneExpiredInputs()
     {
         float expirationTime = Time.time - inputLifeTime;

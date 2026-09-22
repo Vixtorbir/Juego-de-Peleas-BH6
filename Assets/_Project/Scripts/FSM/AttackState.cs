@@ -1,18 +1,6 @@
 using UnityEngine;
 
-/// <summary>
-/// Standing normal attack driven by <see cref="AttackData"/> frame data: startup (counter-hit
-/// vulnerable), active (hitbox enabled) and recovery. The moment the attack connects, hit or
-/// block, the cancel window opens: a buffered special interrupts into the special, holding up on a
-/// jump-cancelable attack launches a super jump to chase the opponent, a buffered chain command
-/// interrupts into the matching <see cref="ComboBranch"/> or the next gatling tier, and a buffered
-/// dash on a dash-cancelable attack interrupts into the dash. The window stays open until the
-/// attack's cancel point, so a slightly late press still chains. A chained normal micro-steps
-/// towards a target that pushback carried just out of reach, and a normal started from a dash keeps
-/// a decaying share of the dash speed, so strings and dash attacks slide instead of stopping dead.
-/// Crouching and jumping variants derive from this class and override only posture, motion and the
-/// stance they return to.
-/// </summary>
+// Startup -> active -> recovery from AttackData. Cancels open as soon as the attack connects (hit or block).
 public class AttackState : RobotState
 {
     private const float JumpCancelInputThreshold = 0.6f;
@@ -29,10 +17,8 @@ public class AttackState : RobotState
 
     public AttackData Data => data;
 
-    /// <summary>The buffer only ages while the cancel window is open, so a press during startup or after the window closes waits for the next actionable state.</summary>
     public override bool AcceptsCommands => IsCancelWindowOpen;
 
-    /// <summary>Chain buttons always; specials and dashes only when the attack allows that cancel.</summary>
     public override bool CanConsume(FighterCommand command)
     {
         if (!AcceptsCommands) return false;
@@ -103,12 +89,6 @@ public class AttackState : RobotState
         robot.hitboxBase.Deactivate();
     }
 
-    /// <summary>
-    /// Moves the fighter for this frame. Grounded attacks stay glued to the floor and slide with any
-    /// dash momentum still in flight plus the micro-step that keeps a chained strike on its target.
-    /// Returns true when the motion ended the attack (an air attack touching the ground), so the
-    /// timeline stops.
-    /// </summary>
     protected virtual bool IntegrateMotion()
     {
         float forward = CurrentDriftSpeed() * Time.deltaTime + MicroStepDistance(Time.deltaTime);
@@ -123,10 +103,6 @@ public class AttackState : RobotState
         return false;
     }
 
-    /// <summary>
-    /// Dash momentum handed over by the controller decays linearly to zero by the end of the active
-    /// frames. A chained normal instead receives a micro-step budget it may spend during startup.
-    /// </summary>
     private void ConfigureDrift()
     {
         driftSpeed = 0f;
@@ -153,13 +129,7 @@ public class AttackState : RobotState
         return driftSpeed * (1f - stateTimer / driftEndTime);
     }
 
-    /// <summary>
-    /// Combo micro-step. During the startup of a chained normal the attacker closes on the target
-    /// whenever pushback has carried it beyond the strike's reach, tracking the slide frame by frame
-    /// because the defender is often still frozen in hitstop when the chain starts. The step is paid
-    /// from a budget capped by the rules and only within the micro-step range, so a string dropped at
-    /// distance stays dropped and nothing moves when the target is already in reach.
-    /// </summary>
+    // Chained normals step in during startup if pushback carried the attacker out of range.
     private float MicroStepDistance(float deltaTime)
     {
         if (microStepBudget <= 0f || data == null || stateTimer >= data.startupTime) return 0f;
@@ -177,9 +147,7 @@ public class AttackState : RobotState
         return step;
     }
 
-    /// <summary>
-    /// Cancel priority once the attack has connected: special, jump, chain, dash. Returns true on transition.
-    /// </summary>
+    // Priority: special > jump > chain > dash.
     protected virtual bool TryCancels()
     {
         if (TrySpecialCancel(data)) return true;
@@ -188,19 +156,11 @@ public class AttackState : RobotState
         return TryDashCancel();
     }
 
-    /// <summary>
-    /// Stance the fighter settles into once the recovery frames elapse. Standing attacks always
-    /// return to Idle; crouching attacks override this to honour a held-down stick.
-    /// </summary>
     protected virtual void ExitToStance()
     {
         robot.EnterIdle();
     }
 
-    /// <summary>
-    /// Ends the active window. A swing that never touched the opponent plays the whiff sound when
-    /// <paramref name="reportWhiff"/> is set.
-    /// </summary>
     protected void DeactivateHitbox(bool reportWhiff)
     {
         if (!hitboxActive) return;
@@ -211,10 +171,6 @@ public class AttackState : RobotState
         if (reportWhiff && !robot.AttackConnected && AudioManager.Instance != null) AudioManager.Instance.PlayWhiff();
     }
 
-    /// <summary>
-    /// Jump cancel: a connected jump-cancelable attack with the stick held up launches the super
-    /// jump immediately, so the attacker rises with the body it just launched.
-    /// </summary>
     private bool TryJumpCancel()
     {
         if (!data.jumpCancelable || !robot.AttackConnected || robot.MovementInput.y <= JumpCancelInputThreshold) return false;
@@ -223,7 +179,6 @@ public class AttackState : RobotState
         return true;
     }
 
-    /// <summary>Dash cancel: a connected dash-cancelable attack yields to a buffered dash.</summary>
     private bool TryDashCancel()
     {
         if (!data.dashCancelable || !robot.AttackConnected) return false;

@@ -5,13 +5,6 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 
-/// <summary>
-/// Framing invariant of the training stage: wherever the fighting camera goes, including the lift
-/// and pull-back of a full juggle and the widest corner separation, the bottom edge of its frame
-/// lands on the grid floor and never on the void in front of or beside it. The sky above the wall is
-/// part of the stage's look and is not a leak. The check is pure geometry on the camera pose and
-/// vertical field of view, so it holds headless and is independent of the game view aspect.
-/// </summary>
 public class StageFramingPlayModeTests
 {
     private const string ScenePath = "Assets/_Project/Scenes/TrainingRoom.unity";
@@ -77,10 +70,6 @@ public class StageFramingPlayModeTests
         }
     }
 
-    /// <summary>
-    /// Casts the bottom edge of the vertical field of view onto the floor plane and requires the
-    /// hit to fall inside the grid floor.
-    /// </summary>
     private void AssertBottomEdgeOnFloor()
     {
         Transform camera = stageCamera.transform;

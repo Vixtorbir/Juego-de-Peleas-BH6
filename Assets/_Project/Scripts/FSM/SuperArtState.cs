@@ -1,28 +1,8 @@
 using UnityEngine;
 
-/// <summary>
-/// Super art, spent from a full gauge and played in four beats: a cinematic freeze, a rushing
-/// lunge, a locked multi-hit string and a launching finisher.
-/// <para>
-/// The freeze stops the whole scene through <see cref="CombatEffectsManager"/> while the camera,
-/// the body flash and this state's own timeline keep running on unscaled time, which is what makes
-/// the activation read as a beat of its own rather than as a slow frame. Only the lunge is a real
-/// attack: it projects the lunge data's hitbox and can be blocked or whiffed, and either outcome
-/// drops straight into a recovery long enough to be punished. Once it connects clean, the defender
-/// is locked in hitstun for the rest of the sequence and the remaining beats are resolved straight
-/// through the hurtbox, so each one pays the usual damage proration, hitspark and impact sound
-/// without depending on a volume that pushback could have carried out of reach. The defender is
-/// held at striking distance by a capped pull rather than by a teleport, and the finisher launches
-/// them into the juggle state, whose landing is the hard knockdown.
-/// </para>
-/// </summary>
+// Super art in four beats: freeze, lunge, locked multi-hit string, launching finisher.
 public class SuperArtState : RobotState
 {
-    /// <summary>
-    /// Ground the rush covers before it gives up on reaching the opponent. Authored rather than
-    /// left to fall out of the lunge speed and its startup, so the range at which the super stops
-    /// being a threat is a design value the defender can learn and space against.
-    /// </summary>
     public const float LungeReach = 4.5f;
 
     private const float FreezeDuration = 0.4f;
@@ -62,10 +42,8 @@ public class SuperArtState : RobotState
 
     public SuperArtState(RobotController robot) : base(robot) { }
 
-    /// <summary>Beats resolved so far, exposed for tests and telemetry.</summary>
     public int BeatsResolved => beatIndex;
 
-    /// <summary>True once the lunge connected clean and the defender is locked in the string.</summary>
     public bool IsCinematic => phase == Phase.Cinematic;
 
     public void Configure(AttackData lunge, AttackData[] cinematicBeats)
@@ -123,10 +101,6 @@ public class SuperArtState : RobotState
         DeactivateHitbox();
     }
 
-    /// <summary>
-    /// The activation beat. Gameplay time is stopped, so the timeline runs unscaled and the pose the
-    /// fighter was holding stays on screen until the lunge takes over.
-    /// </summary>
     private void TickFreeze()
     {
         phaseTimer += Time.unscaledDeltaTime;
@@ -138,10 +112,7 @@ public class SuperArtState : RobotState
         PlayAttackAnimation(lungeData);
     }
 
-    /// <summary>
-    /// The only punishable part of the move. The fighter drives forward through the lunge's active
-    /// frames; a block or a whiff ends the super in recovery, a clean hit opens the cinematic.
-    /// </summary>
+    // The lunge is the only punishable part: block or whiff ends the super, a clean hit starts the cinematic.
     private void TickLunge()
     {
         phaseTimer += Time.deltaTime;
@@ -168,10 +139,6 @@ public class SuperArtState : RobotState
         if (phaseTimer >= lungeData.ActiveEndTime) EnterRecovery();
     }
 
-    /// <summary>
-    /// A blocked lunge registers as connected just like a hit, so the defender's reaction state is
-    /// what separates the two: only a guard puts them in blockstun.
-    /// </summary>
     private bool ConnectedClean()
     {
         RobotController opponent = robot.Opponent;
@@ -191,11 +158,6 @@ public class SuperArtState : RobotState
         }
     }
 
-    /// <summary>
-    /// Drives the rush forward. It stops at striking distance rather than running the fighter into
-    /// the opponent's pushbox, and never covers more than <see cref="LungeReach"/>, so a super
-    /// thrown from outside that range falls short instead of chasing across the stage.
-    /// </summary>
     private void Move()
     {
         float forward = Mathf.Min(LungeSpeed * Time.deltaTime, LungeReach - lungeTravelled);
@@ -214,10 +176,6 @@ public class SuperArtState : RobotState
         robot.characterController.Move(velocity);
     }
 
-    /// <summary>
-    /// Locks the defender for the whole string before the first beat lands, so a body the lunge
-    /// caught in the air is brought back down into hitstun and every beat resolves the same way.
-    /// </summary>
     private void EnterCinematic()
     {
         if (beats == null || beats.Length == 0)
@@ -265,11 +223,7 @@ public class SuperArtState : RobotState
         else beatTimer = BeatInterval;
     }
 
-    /// <summary>
-    /// Pulls the defender back to striking distance at a capped speed. The anchor sits just outside
-    /// the pushbox radius, so the separation solver never works against it, and the body is moved
-    /// through its own controller rather than by writing a transform, keeping the capsule authoritative.
-    /// </summary>
+    // Anchor sits just outside the pushbox radius so the separation solver never fights it.
     private void HoldDefenderInReach(RobotController opponent)
     {
         float anchorX = robot.transform.position.x + lungeSign * CinematicRange;
@@ -280,12 +234,6 @@ public class SuperArtState : RobotState
         opponent.characterController.Move(new Vector3(step, 0f, 0f));
     }
 
-    /// <summary>
-    /// Resolves one beat straight through the defender's hurtbox. The defender is locked out of
-    /// guarding, so the strike always registers, and routing it this way keeps the damage scaling,
-    /// meter gain, hitspark and impact sound identical to any other hit. The attacker is never
-    /// frozen, so the string keeps its rhythm while each impact still holds the defender.
-    /// </summary>
     private void ResolveBeat(RobotController opponent, AttackData beat, bool finisher)
     {
         if (beat == null || opponent.Hurtbox == null) return;

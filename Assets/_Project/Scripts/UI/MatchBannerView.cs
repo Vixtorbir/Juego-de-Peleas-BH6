@@ -1,13 +1,5 @@
 using UnityEngine;
 
-/// <summary>
-/// Centre-screen announcements driven by <see cref="MatchManager"/> events: the round call,
-/// the fight call, the knockout or time-over stamp, the pause notice and the match result with its
-/// rematch hint.
-/// Each announcement scales in from an authored punch and either fades after a hold or stays
-/// until the next one replaces it. Motion runs on unscaled time so the stamps land during the
-/// knockout hitstop.
-/// </summary>
 public class MatchBannerView : MonoBehaviour
 {
     private const float RoundCallStartScale = 1.6f;
@@ -159,10 +151,6 @@ public class MatchBannerView : MonoBehaviour
         Show(result, RematchHint, ResultStartScale, PersistentHold, fadeDuration);
     }
 
-    /// <summary>
-    /// The notice stays up for the whole pause. Resuming clears it outright instead of fading, so
-    /// play restarts on a clean screen; the fight call it may have interrupted has served its purpose.
-    /// </summary>
     private void HandlePauseChanged(bool paused)
     {
         if (paused)
@@ -183,9 +171,6 @@ public class MatchBannerView : MonoBehaviour
         if (bannerTransform != null) bannerTransform.localScale = Vector3.one;
     }
 
-    /// <summary>
-    /// A negative hold keeps the banner on screen until the next announcement replaces it.
-    /// </summary>
     private void Show(string main, string sub, float scaleFrom, float hold, float fade)
     {
         if (mainBannerText != null) mainBannerText.text = main;
@@ -199,11 +184,6 @@ public class MatchBannerView : MonoBehaviour
         activeFadeDuration = Mathf.Max(fade, 0.0001f);
     }
 
-    /// <summary>
-    /// TMP grows its glyph buffers to fit the longest text it has parsed. Parsing every label once
-    /// at load moves that growth out of the fight, so the first pause or result stamp allocates nothing.
-    /// Whatever the label already shows (the round call may land before this runs) is put back.
-    /// </summary>
     private void WarmTextBuffers()
     {
         WarmText(mainBannerText, FixedMainLabels, RoundLookup);

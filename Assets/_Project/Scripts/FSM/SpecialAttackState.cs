@@ -1,12 +1,5 @@
 using UnityEngine;
 
-/// <summary>
-/// Projectile special (quarter-circle forward + punch). The fighter is rooted for the attack's
-/// full frame data: the projectile is released from the owner's <see cref="ProjectilePool"/> once
-/// the startup frames elapse, and the recovery frames leave the move punishable up close. The
-/// startup is calibrated to the clip frame on which the hands lock out and the spawn point sits at
-/// the palms on that frame, so the shot sound, the launch and the pose coincide on the same tick.
-/// </summary>
 public class SpecialAttackState : RobotState
 {
     private const float ProjectileSpeed = 12f;
