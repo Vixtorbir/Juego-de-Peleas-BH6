@@ -400,6 +400,17 @@ public partial class @FighterInputActions: IInputActionCollection2, IDisposable
                     ""action"": ""SuperArt"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""8e1f4c2a-6b3d-4a7e-9c15-2d0f7a93b6e4"",
+                    ""path"": ""<Joystick>/button8"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": "";Joystick"",
+                    ""action"": ""SuperArt"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
                 }
             ]
         },
@@ -712,6 +723,17 @@ public partial class @FighterInputActions: IInputActionCollection2, IDisposable
                     ""interactions"": """",
                     ""processors"": """",
                     ""groups"": "";Mando"",
+                    ""action"": ""SuperArt"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""c7a2d9e5-3f41-4b8c-a6d0-91e5b4f27c38"",
+                    ""path"": ""<Joystick>/button8"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": "";Joystick"",
                     ""action"": ""SuperArt"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false

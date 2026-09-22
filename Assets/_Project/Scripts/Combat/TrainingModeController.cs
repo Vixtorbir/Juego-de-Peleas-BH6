@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.Controls;
 using UnityEngine.InputSystem.Utilities;
 
 /// <summary>
@@ -11,6 +12,9 @@ using UnityEngine.InputSystem.Utilities;
 /// </summary>
 public class TrainingModeController : MonoBehaviour
 {
+    private const string JoystickFillMeterButton = "button12";
+    private const string JoystickRestoreHealthButton = "button9";
+
     [SerializeField] private MatchManager matchManager;
 
     [Header("Hotkeys")]
@@ -119,7 +123,7 @@ public class TrainingModeController : MonoBehaviour
             if (gamepads[i].rightStickButton.wasPressedThisFrame) return true;
         }
 
-        return false;
+        return WasJoystickButtonPressed(JoystickFillMeterButton);
     }
 
     private static bool WasRestoreHealthPressed(Key key)
@@ -131,6 +135,22 @@ public class TrainingModeController : MonoBehaviour
         for (int i = 0; i < gamepads.Count; i++)
         {
             if (gamepads[i].selectButton.wasPressedThisFrame) return true;
+        }
+
+        return WasJoystickButtonPressed(JoystickRestoreHealthButton);
+    }
+
+    /// <summary>
+    /// DirectInput pads such as the Logitech RumblePad 2 enumerate as <see cref="Joystick"/> rather than
+    /// <see cref="Gamepad"/>, so their buttons are only reachable by HID control name.
+    /// </summary>
+    private static bool WasJoystickButtonPressed(string controlName)
+    {
+        ReadOnlyArray<Joystick> joysticks = Joystick.all;
+        for (int i = 0; i < joysticks.Count; i++)
+        {
+            ButtonControl button = joysticks[i].TryGetChildControl<ButtonControl>(controlName);
+            if (button != null && button.wasPressedThisFrame) return true;
         }
 
         return false;

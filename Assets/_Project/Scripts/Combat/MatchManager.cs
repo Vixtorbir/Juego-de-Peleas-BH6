@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.Controls;
 using UnityEngine.InputSystem.Utilities;
 
 /// <summary>
@@ -17,6 +18,7 @@ public class MatchManager : MonoBehaviour
 {
     private const float IntroDuration = 2f;
     private const float RoundEndDuration = 4f;
+    private const string JoystickStartButton = "button10";
 
     public enum MatchState { Intro, Fighting, RoundEnd, MatchOver }
 
@@ -344,6 +346,22 @@ public class MatchManager : MonoBehaviour
         for (int i = 0; i < gamepads.Count; i++)
         {
             if (gamepads[i].startButton.wasPressedThisFrame) return true;
+        }
+
+        return WasJoystickButtonPressed(JoystickStartButton);
+    }
+
+    /// <summary>
+    /// DirectInput pads such as the Logitech RumblePad 2 enumerate as <see cref="Joystick"/> rather than
+    /// <see cref="Gamepad"/>, so their buttons are only reachable by HID control name.
+    /// </summary>
+    private static bool WasJoystickButtonPressed(string controlName)
+    {
+        ReadOnlyArray<Joystick> joysticks = Joystick.all;
+        for (int i = 0; i < joysticks.Count; i++)
+        {
+            ButtonControl button = joysticks[i].TryGetChildControl<ButtonControl>(controlName);
+            if (button != null && button.wasPressedThisFrame) return true;
         }
 
         return false;
