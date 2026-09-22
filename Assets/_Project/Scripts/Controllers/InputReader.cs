@@ -23,6 +23,7 @@ public class InputReader : MonoBehaviour
     private const string RightPunchActionName = "RightPunch";
     private const string LeftKickActionName = "LeftKick";
     private const string RightKickActionName = "RightKick";
+    private const string SuperArtActionName = "SuperArt";
     private const int MaxControllersPerRefresh = 8;
 
     private static readonly Comparison<InputDevice> DeviceIdOrder = CompareByDeviceId;
@@ -36,6 +37,7 @@ public class InputReader : MonoBehaviour
     public event Action RightPunchEvent;
     public event Action LeftKickEvent;
     public event Action RightKickEvent;
+    public event Action SuperArtEvent;
 
     private FighterInputActions controls;
     private InputActionMap actionMap;
@@ -44,6 +46,7 @@ public class InputReader : MonoBehaviour
     private InputAction rightPunchAction;
     private InputAction leftKickAction;
     private InputAction rightKickAction;
+    private InputAction superArtAction;
 
     private readonly List<InputDevice> connectedControllers = new List<InputDevice>(MaxControllersPerRefresh);
     private readonly List<InputDevice> listenedDevices = new List<InputDevice>(MaxControllersPerRefresh + 1);
@@ -51,6 +54,7 @@ public class InputReader : MonoBehaviour
 
     private InputDevice[] routedDevices;
     private bool routedUnrestricted;
+    private bool buttonsSuppressed;
 
     private void Awake()
     {
@@ -62,6 +66,7 @@ public class InputReader : MonoBehaviour
         rightPunchAction = actionMap[RightPunchActionName];
         leftKickAction = actionMap[LeftKickActionName];
         rightKickAction = actionMap[RightKickActionName];
+        superArtAction = actionMap[SuperArtActionName];
     }
 
     private void OnEnable()
@@ -72,6 +77,7 @@ public class InputReader : MonoBehaviour
         rightPunchAction.started += OnRightPunch;
         leftKickAction.started += OnLeftKick;
         rightKickAction.started += OnRightKick;
+        superArtAction.performed += OnSuperArt;
 
         RefreshDeviceRouting();
         actionMap.Enable();
@@ -89,6 +95,7 @@ public class InputReader : MonoBehaviour
         rightPunchAction.started -= OnRightPunch;
         leftKickAction.started -= OnLeftKick;
         rightKickAction.started -= OnRightKick;
+        superArtAction.performed -= OnSuperArt;
 
         actionMap.Disable();
         MoveEvent?.Invoke(Vector2.zero);
@@ -205,9 +212,44 @@ public class InputReader : MonoBehaviour
         deviceReport.Append(device.displayName);
     }
 
+    /// <summary>
+    /// Drops button presses while leaving the stick live, so a paused fighter keeps tracking the held
+    /// direction. Cheaper than disabling the action map, which allocates inside the Input System on
+    /// every call.
+    /// </summary>
+    public void SetButtonsSuppressed(bool suppressed)
+    {
+        buttonsSuppressed = suppressed;
+    }
+
     private void OnMove(InputAction.CallbackContext context) => MoveEvent?.Invoke(context.ReadValue<Vector2>());
-    private void OnLeftPunch(InputAction.CallbackContext context) => LeftPunchEvent?.Invoke();
-    private void OnRightPunch(InputAction.CallbackContext context) => RightPunchEvent?.Invoke();
-    private void OnLeftKick(InputAction.CallbackContext context) => LeftKickEvent?.Invoke();
-    private void OnRightKick(InputAction.CallbackContext context) => RightKickEvent?.Invoke();
+
+    private void OnLeftPunch(InputAction.CallbackContext context)
+    {
+        if (!buttonsSuppressed) LeftPunchEvent?.Invoke();
+    }
+
+    private void OnRightPunch(InputAction.CallbackContext context)
+    {
+        if (!buttonsSuppressed) RightPunchEvent?.Invoke();
+    }
+
+    private void OnLeftKick(InputAction.CallbackContext context)
+    {
+        if (!buttonsSuppressed) LeftKickEvent?.Invoke();
+    }
+
+    private void OnRightKick(InputAction.CallbackContext context)
+    {
+        if (!buttonsSuppressed) RightKickEvent?.Invoke();
+    }
+
+    /// <summary>
+    /// Bound to <c>performed</c> rather than <c>started</c>: the trigger is analogue, and waiting for
+    /// the press point keeps a resting finger on it from firing the super.
+    /// </summary>
+    private void OnSuperArt(InputAction.CallbackContext context)
+    {
+        if (!buttonsSuppressed) SuperArtEvent?.Invoke();
+    }
 }

@@ -10,8 +10,8 @@ using UnityEngine.InputSystem.Utilities;
 /// or to time over, and tallies round wins until one side reaches <see cref="roundsToWin"/>.
 /// Every transition is broadcast through C# events so presentation layers (HUD, announcer) bind
 /// once instead of polling. Fighters are injected so a future
-/// character select can call <see cref="InitializeMatch"/>. Once the match is over, any player
-/// can restart it from the keyboard or from a controller's Start or South button.
+/// character select can call <see cref="InitializeMatch"/>. While fighting, Start (or Escape and
+/// Enter) toggles the pause; once the match is over, Start or Enter restarts it from round one.
 /// </summary>
 public class MatchManager : MonoBehaviour
 {
@@ -57,6 +57,9 @@ public class MatchManager : MonoBehaviour
     /// <summary>Raised with the match winner (null for a drawn match) after the final round's end pause.</summary>
     public event Action<RobotController> OnMatchOver;
 
+    /// <summary>Raised with the new value whenever the match is paused or resumed.</summary>
+    public event Action<bool> OnPauseChanged;
+
     public MatchState CurrentState { get; private set; }
     public int RoundNumber { get; private set; }
     public int Player1RoundsWon { get; private set; }
@@ -64,6 +67,7 @@ public class MatchManager : MonoBehaviour
     public RobotController MatchWinner { get; private set; }
     public float RoundDuration => roundDuration;
     public int SecondsRemaining { get; private set; }
+    public bool IsPaused { get; private set; }
 
     /// <summary>Highest round number the match can reach with the current tallies.</summary>
     public int FinalRoundNumber => roundsToWin * 2 - 1;
@@ -86,6 +90,15 @@ public class MatchManager : MonoBehaviour
         Instance = this;
     }
 
+    /// <summary>
+    /// A pause must never outlive the manager, or the next scene would load with time stopped.
+    /// Unity always disables before destroying, so this also covers scene unloads.
+    /// </summary>
+    private void OnDisable()
+    {
+        if (IsPaused) SetPaused(false);
+    }
+
     private void OnDestroy()
     {
         UnbindFighterHealth();
@@ -104,11 +117,14 @@ public class MatchManager : MonoBehaviour
     {
         if (CurrentState == MatchState.MatchOver)
         {
-            if (WasRestartPressed()) RestartMatch();
+            if (WasStartPressed()) RestartMatch();
             return;
         }
 
         if (CurrentState != MatchState.Fighting) return;
+
+        if (WasPauseTogglePressed()) TogglePause();
+        if (IsPaused) return;
 
         TickRoundClock();
     }
@@ -121,6 +137,8 @@ public class MatchManager : MonoBehaviour
         p1Health = p1.GetComponent<HealthComponent>();
         p2Health = p2.GetComponent<HealthComponent>();
         BindFighterHealth();
+
+        if (IsPaused) SetPaused(false);
 
         RoundNumber = 0;
         Player1RoundsWon = 0;
@@ -140,6 +158,35 @@ public class MatchManager : MonoBehaviour
     {
         if (player1 == null || player2 == null) return;
         InitializeMatch(player1, player2);
+    }
+
+    /// <summary>
+    /// Pauses or resumes the fight. Only honoured while <see cref="MatchState.Fighting"/>: the intro
+    /// and round-end beats are short, scripted and already lock input.
+    /// </summary>
+    public void TogglePause()
+    {
+        if (CurrentState != MatchState.Fighting) return;
+        SetPaused(!IsPaused);
+    }
+
+    /// <summary>
+    /// Scene time goes through <see cref="CombatEffectsManager"/> when present so a pause taken
+    /// during a slow-motion beat resumes into that beat. Fighters drop button presses and suspend
+    /// their own unscaled timers (hitstop, command buffer) for the duration.
+    /// </summary>
+    private void SetPaused(bool paused)
+    {
+        IsPaused = paused;
+
+        CombatEffectsManager effects = CombatEffectsManager.Instance;
+        if (effects != null) effects.SetPaused(paused);
+        else Time.timeScale = paused ? 0f : 1f;
+
+        if (player1 != null) player1.SetSimulationPaused(paused);
+        if (player2 != null) player2.SetSimulationPaused(paused);
+
+        OnPauseChanged?.Invoke(paused);
     }
 
     /// <summary>
@@ -273,11 +320,22 @@ public class MatchManager : MonoBehaviour
         player2.SetControlsActive(active);
     }
 
+    /// <summary>Escape toggles the pause alongside the Start and Enter shortcuts.</summary>
+    private static bool WasPauseTogglePressed()
+    {
+        Keyboard keyboard = Keyboard.current;
+        if (keyboard != null && keyboard.escapeKey.wasPressedThisFrame) return true;
+
+        return WasStartPressed();
+    }
+
     /// <summary>
-    /// Keyboard Enter or, on any connected pad, Start or the South face button. Devices are read
-    /// directly rather than through the fighters' action maps, which are disabled once the match ends.
+    /// Keyboard Enter or Start on any connected pad. Face buttons are deliberately excluded so
+    /// mashing after a knockout cannot restart the match. Devices are read directly rather than
+    /// through the fighters' action maps, which drop buttons while paused and are disabled once the
+    /// match ends.
     /// </summary>
-    private static bool WasRestartPressed()
+    private static bool WasStartPressed()
     {
         Keyboard keyboard = Keyboard.current;
         if (keyboard != null && keyboard.enterKey.wasPressedThisFrame) return true;
@@ -285,8 +343,7 @@ public class MatchManager : MonoBehaviour
         ReadOnlyArray<Gamepad> gamepads = Gamepad.all;
         for (int i = 0; i < gamepads.Count; i++)
         {
-            Gamepad gamepad = gamepads[i];
-            if (gamepad.startButton.wasPressedThisFrame || gamepad.buttonSouth.wasPressedThisFrame) return true;
+            if (gamepads[i].startButton.wasPressedThisFrame) return true;
         }
 
         return false;

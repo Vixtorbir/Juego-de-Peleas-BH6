@@ -136,6 +136,15 @@ public partial class @FighterInputActions: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""SuperArt"",
+                    ""type"": ""Button"",
+                    ""id"": ""f91d2bfb-a85c-4539-9018-944791b16909"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
                 }
             ],
             ""bindings"": [
@@ -369,6 +378,28 @@ public partial class @FighterInputActions: IInputActionCollection2, IDisposable
                     ""action"": ""RightPunch"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""2cc6eed6-489a-432d-b6ec-e2c0a7c3a4c9"",
+                    ""path"": ""<Keyboard>/u"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": "";Teclado_P1"",
+                    ""action"": ""SuperArt"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""5f89a7c5-6d90-4e9e-96f8-b15931162031"",
+                    ""path"": ""<Gamepad>/rightTrigger"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": "";Mando"",
+                    ""action"": ""SuperArt"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
                 }
             ]
         },
@@ -416,6 +447,15 @@ public partial class @FighterInputActions: IInputActionCollection2, IDisposable
                     ""name"": ""RightKick"",
                     ""type"": ""Button"",
                     ""id"": ""e3f9ae43-739e-49ab-8926-5cc0953071b8"",
+                    ""expectedControlType"": """",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""SuperArt"",
+                    ""type"": ""Button"",
+                    ""id"": ""d8e0f767-3d32-4deb-808c-0e3f616feefc"",
                     ""expectedControlType"": """",
                     ""processors"": """",
                     ""interactions"": """",
@@ -653,6 +693,28 @@ public partial class @FighterInputActions: IInputActionCollection2, IDisposable
                     ""action"": ""RightPunch"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""7a0c93d6-5bfa-4973-8fd7-28938b0da581"",
+                    ""path"": ""<Keyboard>/numpad9"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": "";Teclado_P2"",
+                    ""action"": ""SuperArt"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""02378c39-a321-45a2-b559-cd487e211bb1"",
+                    ""path"": ""<Gamepad>/rightTrigger"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": "";Mando"",
+                    ""action"": ""SuperArt"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
                 }
             ]
         }
@@ -699,6 +761,7 @@ public partial class @FighterInputActions: IInputActionCollection2, IDisposable
         m_Player1_RightPunch = m_Player1.FindAction("RightPunch", throwIfNotFound: true);
         m_Player1_LeftKick = m_Player1.FindAction("LeftKick", throwIfNotFound: true);
         m_Player1_RightKick = m_Player1.FindAction("RightKick", throwIfNotFound: true);
+        m_Player1_SuperArt = m_Player1.FindAction("SuperArt", throwIfNotFound: true);
         // Player2
         m_Player2 = asset.FindActionMap("Player2", throwIfNotFound: true);
         m_Player2_Movement = m_Player2.FindAction("Movement", throwIfNotFound: true);
@@ -706,6 +769,7 @@ public partial class @FighterInputActions: IInputActionCollection2, IDisposable
         m_Player2_RightPunch = m_Player2.FindAction("RightPunch", throwIfNotFound: true);
         m_Player2_LeftKick = m_Player2.FindAction("LeftKick", throwIfNotFound: true);
         m_Player2_RightKick = m_Player2.FindAction("RightKick", throwIfNotFound: true);
+        m_Player2_SuperArt = m_Player2.FindAction("SuperArt", throwIfNotFound: true);
     }
 
     ~@FighterInputActions()
@@ -792,6 +856,7 @@ public partial class @FighterInputActions: IInputActionCollection2, IDisposable
     private readonly InputAction m_Player1_RightPunch;
     private readonly InputAction m_Player1_LeftKick;
     private readonly InputAction m_Player1_RightKick;
+    private readonly InputAction m_Player1_SuperArt;
     /// <summary>
     /// Provides access to input actions defined in input action map "Player1".
     /// </summary>
@@ -823,6 +888,10 @@ public partial class @FighterInputActions: IInputActionCollection2, IDisposable
         /// Provides access to the underlying input action "Player1/RightKick".
         /// </summary>
         public InputAction @RightKick => m_Wrapper.m_Player1_RightKick;
+        /// <summary>
+        /// Provides access to the underlying input action "Player1/SuperArt".
+        /// </summary>
+        public InputAction @SuperArt => m_Wrapper.m_Player1_SuperArt;
         /// <summary>
         /// Provides access to the underlying input action map instance.
         /// </summary>
@@ -864,6 +933,9 @@ public partial class @FighterInputActions: IInputActionCollection2, IDisposable
             @RightKick.started += instance.OnRightKick;
             @RightKick.performed += instance.OnRightKick;
             @RightKick.canceled += instance.OnRightKick;
+            @SuperArt.started += instance.OnSuperArt;
+            @SuperArt.performed += instance.OnSuperArt;
+            @SuperArt.canceled += instance.OnSuperArt;
         }
 
         /// <summary>
@@ -890,6 +962,9 @@ public partial class @FighterInputActions: IInputActionCollection2, IDisposable
             @RightKick.started -= instance.OnRightKick;
             @RightKick.performed -= instance.OnRightKick;
             @RightKick.canceled -= instance.OnRightKick;
+            @SuperArt.started -= instance.OnSuperArt;
+            @SuperArt.performed -= instance.OnSuperArt;
+            @SuperArt.canceled -= instance.OnSuperArt;
         }
 
         /// <summary>
@@ -932,6 +1007,7 @@ public partial class @FighterInputActions: IInputActionCollection2, IDisposable
     private readonly InputAction m_Player2_RightPunch;
     private readonly InputAction m_Player2_LeftKick;
     private readonly InputAction m_Player2_RightKick;
+    private readonly InputAction m_Player2_SuperArt;
     /// <summary>
     /// Provides access to input actions defined in input action map "Player2".
     /// </summary>
@@ -963,6 +1039,10 @@ public partial class @FighterInputActions: IInputActionCollection2, IDisposable
         /// Provides access to the underlying input action "Player2/RightKick".
         /// </summary>
         public InputAction @RightKick => m_Wrapper.m_Player2_RightKick;
+        /// <summary>
+        /// Provides access to the underlying input action "Player2/SuperArt".
+        /// </summary>
+        public InputAction @SuperArt => m_Wrapper.m_Player2_SuperArt;
         /// <summary>
         /// Provides access to the underlying input action map instance.
         /// </summary>
@@ -1004,6 +1084,9 @@ public partial class @FighterInputActions: IInputActionCollection2, IDisposable
             @RightKick.started += instance.OnRightKick;
             @RightKick.performed += instance.OnRightKick;
             @RightKick.canceled += instance.OnRightKick;
+            @SuperArt.started += instance.OnSuperArt;
+            @SuperArt.performed += instance.OnSuperArt;
+            @SuperArt.canceled += instance.OnSuperArt;
         }
 
         /// <summary>
@@ -1030,6 +1113,9 @@ public partial class @FighterInputActions: IInputActionCollection2, IDisposable
             @RightKick.started -= instance.OnRightKick;
             @RightKick.performed -= instance.OnRightKick;
             @RightKick.canceled -= instance.OnRightKick;
+            @SuperArt.started -= instance.OnSuperArt;
+            @SuperArt.performed -= instance.OnSuperArt;
+            @SuperArt.canceled -= instance.OnSuperArt;
         }
 
         /// <summary>
@@ -1157,6 +1243,13 @@ public partial class @FighterInputActions: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnRightKick(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "SuperArt" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnSuperArt(InputAction.CallbackContext context);
     }
     /// <summary>
     /// Interface to implement callback methods for all input action callbacks associated with input actions defined by "Player2" which allows adding and removing callbacks.
@@ -1200,5 +1293,12 @@ public partial class @FighterInputActions: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnRightKick(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "SuperArt" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnSuperArt(InputAction.CallbackContext context);
     }
 }

@@ -50,6 +50,15 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
+                },
+                {
+                    "name": "SuperArt",
+                    "type": "Button",
+                    "id": "f91d2bfb-a85c-4539-9018-944791b16909",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -283,6 +292,28 @@
                     "action": "RightPunch",
                     "isComposite": false,
                     "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "2cc6eed6-489a-432d-b6ec-e2c0a7c3a4c9",
+                    "path": "<Keyboard>/u",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Teclado_P1",
+                    "action": "SuperArt",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "5f89a7c5-6d90-4e9e-96f8-b15931162031",
+                    "path": "<Gamepad>/rightTrigger",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Mando",
+                    "action": "SuperArt",
+                    "isComposite": false,
+                    "isPartOfComposite": false
                 }
             ]
         },
@@ -330,6 +361,15 @@
                     "name": "RightKick",
                     "type": "Button",
                     "id": "e3f9ae43-739e-49ab-8926-5cc0953071b8",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "SuperArt",
+                    "type": "Button",
+                    "id": "d8e0f767-3d32-4deb-808c-0e3f616feefc",
                     "expectedControlType": "",
                     "processors": "",
                     "interactions": "",
@@ -565,6 +605,28 @@
                     "processors": "",
                     "groups": ";Joystick",
                     "action": "RightPunch",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "7a0c93d6-5bfa-4973-8fd7-28938b0da581",
+                    "path": "<Keyboard>/numpad9",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Teclado_P2",
+                    "action": "SuperArt",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "02378c39-a321-45a2-b559-cd487e211bb1",
+                    "path": "<Gamepad>/rightTrigger",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Mando",
+                    "action": "SuperArt",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

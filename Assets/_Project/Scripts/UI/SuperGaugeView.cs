@@ -53,6 +53,7 @@ public class SuperGaugeView : MonoBehaviour
         if (boundMeter == null) return;
 
         boundMeter.OnChargeChanged += HandleChargeChanged;
+        WarmLabelBuffers();
         SetCharge(boundMeter.NormalizedCharge, true);
     }
 
@@ -137,6 +138,20 @@ public class SuperGaugeView : MonoBehaviour
 
         displayedPercent = percent;
         chargeLabel.SetText(PercentLookup[percent]);
+    }
+
+    /// <summary>
+    /// TMP grows its glyph buffers to the longest text it has parsed, and "100" is the only
+    /// three-digit label. Parsing it once at bind time keeps that growth out of the first full
+    /// gauge of the fight; the snap that follows publishes the real value.
+    /// </summary>
+    private void WarmLabelBuffers()
+    {
+        if (chargeLabel == null) return;
+
+        chargeLabel.SetText(PercentLookup[PercentSteps - 1]);
+        chargeLabel.ForceMeshUpdate(true, true);
+        displayedPercent = -1;
     }
 
     private static string[] BuildPercentLookup()

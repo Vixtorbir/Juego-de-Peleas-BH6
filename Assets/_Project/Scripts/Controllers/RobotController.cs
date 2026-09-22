@@ -215,6 +215,12 @@ public class RobotController : MonoBehaviour
     public float FreezeRemaining => freezeRemaining;
 
     /// <summary>
+    /// True while the match is paused. Hitstop and the command buffer run on unscaled time, so the
+    /// whole update is suspended rather than relying on a zero time scale to hold them.
+    /// </summary>
+    public bool IsSimulationPaused { get; private set; }
+
+    /// <summary>
     /// Number of state entries since startup. Re-entering the cached instance of the current state
     /// (chain cancels, air juggles) counts as a transition even though the reference is unchanged.
     /// </summary>
@@ -317,6 +323,7 @@ public class RobotController : MonoBehaviour
             inputReader.RightPunchEvent += HandleRightPunch;
             inputReader.LeftKickEvent += HandleLeftKick;
             inputReader.RightKickEvent += HandleRightKick;
+            inputReader.SuperArtEvent += HandleSuperArt;
         }
 
         if (opponentTarget != null && opponentTarget.TryGetComponent(out CharacterController opponentBody))
@@ -338,10 +345,13 @@ public class RobotController : MonoBehaviour
         inputReader.RightPunchEvent -= HandleRightPunch;
         inputReader.LeftKickEvent -= HandleLeftKick;
         inputReader.RightKickEvent -= HandleRightKick;
+        inputReader.SuperArtEvent -= HandleSuperArt;
     }
 
     private void Update()
     {
+        if (IsSimulationPaused) return;
+
         TickTelegraphs();
         if (TickFreeze()) return;
 
@@ -680,6 +690,17 @@ public class RobotController : MonoBehaviour
     }
 
     /// <summary>
+    /// Suspends or resumes the fighter's update. Hitstop, invulnerability and buffered presses are
+    /// held exactly where they were, so resuming continues the frame the pause interrupted. Buttons
+    /// are dropped for the duration; the stick keeps updating so the held direction is current on resume.
+    /// </summary>
+    public void SetSimulationPaused(bool paused)
+    {
+        IsSimulationPaused = paused;
+        if (inputReader != null) inputReader.SetButtonsSuppressed(paused);
+    }
+
+    /// <summary>
     /// True when the capsule touches the stage boundary on the side it is travelling towards.
     /// Only walls count: the opponent's body never reads as a wall.
     /// </summary>
@@ -915,6 +936,7 @@ public class RobotController : MonoBehaviour
     public void SetMovementInput(Vector2 input)
     {
         MovementInput = input;
+        if (IsSimulationPaused) return;
 
         if (Mathf.Abs(input.x) < DirectionReleaseThreshold)
         {
@@ -974,6 +996,15 @@ public class RobotController : MonoBehaviour
     /// short gauge degrades to the fireball its first half already describes instead of being eaten.
     /// </summary>
     private bool IsSuperArtReady => superArtLunge != null && SuperMeter != null && SuperMeter.IsFull;
+
+    /// <summary>
+    /// Dedicated super button: skips the motion and buffers the super art directly, but only on a
+    /// full gauge. A press on a short gauge is dropped rather than converted into another attack.
+    /// </summary>
+    private void HandleSuperArt()
+    {
+        if (IsSuperArtReady) PressCommand(FighterCommand.SuperArt);
+    }
 
     private bool MatchesDoubleQuarterCircle()
     {

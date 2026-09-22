@@ -2,7 +2,8 @@ using UnityEngine;
 
 /// <summary>
 /// Centre-screen announcements driven by <see cref="MatchManager"/> events: the round call,
-/// the fight call, the knockout or time-over stamp and the match result with its rematch hint.
+/// the fight call, the knockout or time-over stamp, the pause notice and the match result with its
+/// rematch hint.
 /// Each announcement scales in from an authored punch and either fades after a hold or stays
 /// until the next one replaces it. Motion runs on unscaled time so the stamps land during the
 /// knockout hitstop.
@@ -16,6 +17,7 @@ public class MatchBannerView : MonoBehaviour
     private const float FightCallFade = 0.25f;
     private const float StampStartScale = 1.8f;
     private const float ResultStartScale = 1.4f;
+    private const float PauseStartScale = 1.2f;
     private const float PersistentHold = -1f;
     private const int MaxRoundLabels = 9;
 
@@ -27,8 +29,12 @@ public class MatchBannerView : MonoBehaviour
     private const string Player2WinsText = "PLAYER 2 WINS";
     private const string DrawText = "DRAW";
     private const string RematchHint = "PRESS START TO REMATCH";
+    private const string PauseText = "PAUSE";
+    private const string ResumeHint = "PRESS START TO RESUME";
 
     private static readonly string[] RoundLookup = BuildRoundLookup();
+    private static readonly string[] FixedMainLabels = { FinalRoundText, FightText, KnockoutText, TimeOverText, Player1WinsText, Player2WinsText, DrawText, PauseText };
+    private static readonly string[] SubLabels = { RematchHint, ResumeHint };
 
     [Header("References")]
     [SerializeField] private CanvasGroup canvasGroup;
@@ -62,6 +68,7 @@ public class MatchBannerView : MonoBehaviour
         boundMatch.OnTimeOver += HandleTimeOver;
         boundMatch.OnRoundEnd += HandleRoundEnd;
         boundMatch.OnMatchOver += HandleMatchOver;
+        boundMatch.OnPauseChanged += HandlePauseChanged;
     }
 
     public void Unbind()
@@ -73,12 +80,18 @@ public class MatchBannerView : MonoBehaviour
         boundMatch.OnTimeOver -= HandleTimeOver;
         boundMatch.OnRoundEnd -= HandleRoundEnd;
         boundMatch.OnMatchOver -= HandleMatchOver;
+        boundMatch.OnPauseChanged -= HandlePauseChanged;
         boundMatch = null;
     }
 
     private void Awake()
     {
         if (canvasGroup != null) canvasGroup.alpha = 0f;
+    }
+
+    private void Start()
+    {
+        WarmTextBuffers();
     }
 
     private void OnDisable()
@@ -147,6 +160,30 @@ public class MatchBannerView : MonoBehaviour
     }
 
     /// <summary>
+    /// The notice stays up for the whole pause. Resuming clears it outright instead of fading, so
+    /// play restarts on a clean screen; the fight call it may have interrupted has served its purpose.
+    /// </summary>
+    private void HandlePauseChanged(bool paused)
+    {
+        if (paused)
+        {
+            Show(PauseText, ResumeHint, PauseStartScale, PersistentHold, fadeDuration);
+            return;
+        }
+
+        Hide();
+    }
+
+    private void Hide()
+    {
+        punchTimer = 0f;
+        holdTimer = 0f;
+        fadeTimer = 0f;
+        if (canvasGroup != null) canvasGroup.alpha = 0f;
+        if (bannerTransform != null) bannerTransform.localScale = Vector3.one;
+    }
+
+    /// <summary>
     /// A negative hold keeps the banner on screen until the next announcement replaces it.
     /// </summary>
     private void Show(string main, string sub, float scaleFrom, float hold, float fade)
@@ -160,6 +197,38 @@ public class MatchBannerView : MonoBehaviour
         holdTimer = hold;
         fadeTimer = 0f;
         activeFadeDuration = Mathf.Max(fade, 0.0001f);
+    }
+
+    /// <summary>
+    /// TMP grows its glyph buffers to fit the longest text it has parsed. Parsing every label once
+    /// at load moves that growth out of the fight, so the first pause or result stamp allocates nothing.
+    /// Whatever the label already shows (the round call may land before this runs) is put back.
+    /// </summary>
+    private void WarmTextBuffers()
+    {
+        WarmText(mainBannerText, FixedMainLabels, RoundLookup);
+        WarmText(subBannerText, SubLabels, null);
+    }
+
+    private static void WarmText(TMPro.TMP_Text label, string[] texts, string[] extraTexts)
+    {
+        if (label == null) return;
+
+        string shown = label.text;
+        ParseAll(label, texts);
+        if (extraTexts != null) ParseAll(label, extraTexts);
+
+        label.text = shown;
+        label.ForceMeshUpdate(true, true);
+    }
+
+    private static void ParseAll(TMPro.TMP_Text label, string[] texts)
+    {
+        for (int i = 0; i < texts.Length; i++)
+        {
+            label.text = texts[i];
+            label.ForceMeshUpdate(true, true);
+        }
     }
 
     private static float EaseOutCubic(float t)
