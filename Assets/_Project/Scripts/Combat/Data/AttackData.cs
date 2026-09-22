@@ -1,10 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>
-/// Guard height an attack must be blocked at. High attacks whiff on crouching opponents,
-/// Mid attacks are blocked standing only, Low attacks are blocked crouching only.
-/// </summary>
 public enum AttackHeight
 {
     High,
@@ -12,10 +8,6 @@ public enum AttackHeight
     Low
 }
 
-/// <summary>
-/// Impact class of an attack. Drives hitstop length and screen shake so light pokes feel crisp
-/// and heavy hits feel weighty, independently of the raw damage number.
-/// </summary>
 public enum AttackWeight
 {
     Light,
@@ -23,21 +15,6 @@ public enum AttackWeight
     Heavy
 }
 
-/// <summary>
-/// How the timing calibrator reads the strike out of the clip. Extension strikes connect just
-/// before the limb is fully out; FullExtension strikes (projectile releases) fire at the furthest
-/// point; Rising strikes go live almost immediately and stay live until the limb tops out.
-/// </summary>
-public enum StrikeTiming
-{
-    Extension,
-    FullExtension,
-    Rising
-}
-
-/// <summary>
-/// Which impact family the attack plays when it lands. Punches additionally split by weight.
-/// </summary>
 public enum AttackImpactSound
 {
     Punch,
@@ -45,29 +22,15 @@ public enum AttackImpactSound
     Energy
 }
 
-/// <summary>
-/// What a connected hit does to the defender's body. Grounded and airborne defenders resolve their
-/// own reaction, so a heavy kick can knock a standing opponent back but send an airborne one into
-/// the wall.
-/// </summary>
 public enum HitReaction
 {
-    /// <summary>Standing stun with knockback; on an airborne defender, a relaunch.</summary>
     Hitstun,
-    /// <summary>Launch into a juggle with the attack's launch force.</summary>
     Launch,
-    /// <summary>Send the body flying into the nearest wall; it rebounds once per combo.</summary>
     WallBounce,
-    /// <summary>Slam the body into the floor; it pops back up once per combo.</summary>
     GroundBounce,
-    /// <summary>Hard knockdown: the defender cannot be hit while down and wakes up invulnerable.</summary>
     Knockdown
 }
 
-/// <summary>
-/// Chain link from one attack to the next. Explicit links are target combos: they take priority
-/// over the universal gatling rule and may chain within or below the current tier.
-/// </summary>
 [System.Serializable]
 public struct ComboBranch
 {
@@ -75,23 +38,17 @@ public struct ComboBranch
     public AttackData nextAttack;
 }
 
-/// <summary>
-/// Designer-authored frame data and hit properties for a single attack.
-/// Timings are expressed in seconds so they remain frame-rate independent.
-/// </summary>
 [CreateAssetMenu(fileName = "NewAttackData", menuName = "Fighting Game/Attack Data")]
 public class AttackData : ScriptableObject
 {
     [Header("Animation")]
-    [Tooltip("Name of the Animator state played for this attack. Also used as the state name when the controller is generated.")]
+    [Tooltip("Name of the Animator state played for this attack.")]
     public string animationTrigger = "LeftPunch";
     [Tooltip("Clip played for this attack at its authored pace. Frame data below is tuned to the clip, never the other way round.")]
     public AnimationClip animationClip;
     [Tooltip("Playback multiplier kept within a human range; use it for a slightly snappier light attack, not to fit a slow clip.")]
     [Range(1f, 1.15f)] public float animationSpeed = 1f;
-    [Tooltip("Where in the swing the calibrator places the active frames.")]
-    public StrikeTiming strikeTiming = StrikeTiming.Extension;
-    [Tooltip("Animator layer that owns this attack's state. Aerial normals run on a masked layer so the jump keeps the lower body; the controller generator writes this index.")]
+    [Tooltip("Animator layer that owns this attack's state. Aerial normals use the masked upper-body layer so the jump keeps the legs.")]
     public int animationLayer;
 
     [Header("Frame Data (seconds)")]
@@ -157,10 +114,6 @@ public class AttackData : ScriptableObject
     [System.NonSerialized] private int animationStateHash;
     [System.NonSerialized] private string hashedStateName;
 
-    /// <summary>
-    /// Animator state hash for <see cref="animationTrigger"/>, computed once per asset and refreshed
-    /// only if the name is edited, so no string hashing happens during the match.
-    /// </summary>
     public int AnimationStateHash
     {
         get
@@ -175,21 +128,15 @@ public class AttackData : ScriptableObject
         }
     }
 
-    /// <summary>Furthest point of the hitbox from the fighter root along the facing axis.</summary>
     public float Reach => hitboxOffset.z + hitboxSize.z * 0.5f;
 
     public float ActiveEndTime => startupTime + activeTime;
     public float TotalDuration => startupTime + activeTime + recoveryTime;
 
-    /// <summary>Time from the attack start at which its cancel window closes.</summary>
     public float CancelWindowEnd => cancelWindowEnd > 0f ? cancelWindowEnd : TotalDuration;
 
-    /// <summary>
-    /// Position on the gatling ladder: Light (0), Medium (1), Heavy (2), Launcher (3). A connected
-    /// normal may chain into any normal of a strictly higher tier.
-    /// </summary>
+    // Light 0, Medium 1, Heavy 2, Launcher 3. A normal can chain into any higher tier.
     public int GatlingTier => isLauncher ? 3 : (int)weight;
 
-    /// <summary>Grounded reaction with the launcher flag folded in for assets authored before reactions existed.</summary>
     public HitReaction ResolvedGroundedReaction => groundedReaction == HitReaction.Hitstun && isLauncher ? HitReaction.Launch : groundedReaction;
 }
