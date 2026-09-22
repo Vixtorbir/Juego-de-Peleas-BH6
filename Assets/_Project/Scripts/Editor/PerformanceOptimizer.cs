@@ -166,7 +166,7 @@ public static class PerformanceOptimizer
         {
             GameObject target = collider.gameObject;
             if (target.GetComponentInParent<RobotController>() != null) continue;
-            if (SceneHierarchyOrganizer.IsUnderDecor(target.transform, ArenaSceneSetup.ArenaRootName)) continue;
+            if (SceneHierarchyOrganizer.IsUnderDecor(target.transform, StageSceneSetup.StageRootName)) continue;
 
             if (collider is MeshCollider) target.layer = CombatLayers.GroundLayer;
             else if (collider is BoxCollider) target.layer = CombatLayers.WallLayer;

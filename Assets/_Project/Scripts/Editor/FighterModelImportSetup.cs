@@ -4,27 +4,34 @@ using UnityEditor;
 using UnityEngine;
 
 /// <summary>
-/// Applies the import settings the fighter art needs. Character FBX files (Mixamo Y Bot / X Bot)
-/// become Humanoid rigs with a generated avatar and project materials remapped onto the Mixamo
-/// material slots. Animation FBX files (skeleton-only Mixamo clips) are imported as Humanoid using
-/// the Y Bot avatar as their rig definition: a skeleton-only export has no T-pose of its own (its
-/// rest pose is the first animation frame), so an avatar generated from it carries a wrong muscle
-/// reference and the retargeted body ends up twisted. Each take is renamed after its file,
-/// locomotion clips loop, and root motion is baked into the pose so the CharacterController stays
-/// the only authority over the fighter's position. Frame ranges already trimmed by the attack
-/// timing calibrator are preserved across re-runs.
+/// Applies the import settings the fighter art needs. The playable characters are the Explosive
+/// LLC fighter rigs: each becomes a Humanoid with its own generated avatar and its single material
+/// slot remapped to a project URP material that keeps the pack's texture under a player tint, so
+/// both fighters share the SRP Batcher path and read as blue and red at a glance. The pack's own
+/// animation FBX files (idle and walks, full-body exports) import as Humanoid with clean clip names
+/// and looping locomotion. The Mixamo combat library imports as Humanoid against the Y Bot avatar:
+/// a skeleton-only export has no T-pose of its own (its rest pose is the first animation frame), so
+/// an avatar generated from it carries a wrong muscle reference and the retargeted body ends up
+/// twisted; Y Bot therefore remains in the project purely as that reference rig. Each take is
+/// renamed after its file, locomotion clips loop, and root motion is baked into the pose so the
+/// CharacterController stays the only authority over the fighter's position. Frame ranges already
+/// trimmed by the attack timing calibrator are preserved across re-runs.
 /// </summary>
 public static class FighterModelImportSetup
 {
-    public const string CharactersRoot = "Assets/_Project/Art/Characters";
+    public const string FighterPackRoot = "Assets/ExplosiveLLC/Fighter Pack Bundle FREE/Fighters";
+    public const string Player1ModelPath = FighterPackRoot + "/Male Fighter Mecanim Animation Pack FREE/Characters/Male.FBX";
+    public const string Player2ModelPath = FighterPackRoot + "/Heavy Fighter Mecanim Animation Pack FREE/Characters/Heavy.FBX";
+    public const string PackAnimationsRoot = FighterPackRoot + "/Male Fighter Mecanim Animation Pack FREE/Animations";
+    public const string ReferenceRigRoot = "Assets/_Project/Art/Characters";
     public const string AnimationsRoot = "Assets/_Project/Art/Animations";
-    public const string ReferenceAvatarModelPath = CharactersRoot + "/Mixamo/Y_Bot.fbx";
+    public const string ReferenceAvatarModelPath = ReferenceRigRoot + "/Mixamo/Y_Bot.fbx";
 
     private const string MaterialsRoot = "Assets/_Project/Art/Materials";
     private const string LitShaderName = "Universal Render Pipeline/Lit";
-    private const string JointsMaterialName = "M_FighterJoints";
-    private const string JointsMaterialKeyword = "Joints";
+    private const char PackClipSeparator = '@';
 
+    private static readonly int BaseMapId = Shader.PropertyToID("_BaseMap");
     private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
     private static readonly int SmoothnessId = Shader.PropertyToID("_Smoothness");
     private static readonly int MetallicId = Shader.PropertyToID("_Metallic");
@@ -33,45 +40,78 @@ public static class FighterModelImportSetup
 
     private readonly struct FighterSkin
     {
-        public readonly string ModelName;
+        public readonly string ModelPath;
+        public readonly string SourceMaterialName;
+        public readonly string TextureName;
         public readonly string BodyMaterialName;
-        public readonly Color BodyColor;
-        public readonly string[] SourceMaterialNames;
+        public readonly Color Tint;
 
-        public FighterSkin(string modelName, string bodyMaterialName, Color bodyColor, params string[] sourceMaterialNames)
+        public FighterSkin(string modelPath, string sourceMaterialName, string textureName, string bodyMaterialName, Color tint)
         {
-            ModelName = modelName;
+            ModelPath = modelPath;
+            SourceMaterialName = sourceMaterialName;
+            TextureName = textureName;
             BodyMaterialName = bodyMaterialName;
-            BodyColor = bodyColor;
-            SourceMaterialNames = sourceMaterialNames;
+            Tint = tint;
         }
     }
 
     /// <summary>
-    /// Material slot names as authored inside each Mixamo FBX. Slots containing "Joints" receive the
-    /// shared dark joints material; every other slot receives the fighter's body colour.
+    /// Material slot names as authored inside each pack FBX, each redirected to a tinted copy of the
+    /// pack's own texture so Player 1 reads blue and Player 2 red without touching vendor assets.
     /// </summary>
     private static readonly FighterSkin[] Skins =
     {
-        new FighterSkin("Y_Bot", "M_FighterBody_P1", new Color(0.16f, 0.42f, 0.85f), "Alpha_Body_MAT", "Alpha_Joints_MAT"),
-        new FighterSkin("X_Bot", "M_FighterBody_P2", new Color(0.82f, 0.22f, 0.18f), "Beta_HighLimbsGeoSG3", "Beta_Joints_MAT1")
+        new FighterSkin(Player1ModelPath, "Male", "Male", "M_FighterMale_P1", new Color(0.55f, 0.72f, 1f)),
+        new FighterSkin(Player2ModelPath, "Heavy", "Heavy", "M_FighterHeavy_P2", new Color(1f, 0.5f, 0.45f))
     };
 
     [MenuItem("Fighting Game/Configure Fighter Models (Humanoid)", priority = 10)]
     public static void ConfigureFighterModels()
     {
-        int characters = ConfigureFolder(CharactersRoot, isAnimationLibrary: false);
-        int animations = ConfigureFolder(AnimationsRoot, isAnimationLibrary: true);
+        int characters = ConfigurePlayableCharacters();
+        int packClips = ConfigureFolder(PackAnimationsRoot, ImportRole.PackAnimation);
+        int referenceRigs = ConfigureFolder(ReferenceRigRoot, ImportRole.ReferenceRig);
+        int libraryClips = ConfigureFolder(AnimationsRoot, ImportRole.LibraryAnimation);
 
-        Debug.Log($"[FighterModelImportSetup] Configured {characters} character model(s) and {animations} animation file(s).");
+        Debug.Log($"[FighterModelImportSetup] Configured {characters} playable character(s), {packClips} pack clip(s), {referenceRigs} reference rig(s) and {libraryClips} library clip(s).");
     }
 
-    private static int ConfigureFolder(string root, bool isAnimationLibrary)
+    private enum ImportRole
+    {
+        PlayableCharacter,
+        PackAnimation,
+        ReferenceRig,
+        LibraryAnimation
+    }
+
+    private static int ConfigurePlayableCharacters()
+    {
+        int configured = 0;
+        foreach (FighterSkin skin in Skins)
+        {
+            if (AssetImporter.GetAtPath(skin.ModelPath) is not ModelImporter importer)
+            {
+                Debug.LogError($"[FighterModelImportSetup] Fighter model not found at '{skin.ModelPath}'.");
+                continue;
+            }
+
+            ConfigureCharacterImporter(importer);
+            RemapMaterial(importer, skin);
+            importer.SaveAndReimport();
+            LogAvatarStatus(skin.ModelPath);
+            configured++;
+        }
+
+        return configured;
+    }
+
+    private static int ConfigureFolder(string root, ImportRole role)
     {
         if (!AssetDatabase.IsValidFolder(root)) return 0;
 
-        Avatar referenceAvatar = isAnimationLibrary ? FindAvatar(ReferenceAvatarModelPath) : null;
-        if (isAnimationLibrary && referenceAvatar == null)
+        Avatar referenceAvatar = role == ImportRole.LibraryAnimation ? FindAvatar(ReferenceAvatarModelPath) : null;
+        if (role == ImportRole.LibraryAnimation && referenceAvatar == null)
             Debug.LogError($"[FighterModelImportSetup] Reference avatar not found in '{ReferenceAvatarModelPath}'; animation clips will fall back to self-generated avatars.");
 
         int configured = 0;
@@ -80,17 +120,37 @@ public static class FighterModelImportSetup
             string path = AssetDatabase.GUIDToAssetPath(guid);
             if (AssetImporter.GetAtPath(path) is not ModelImporter importer) continue;
 
-            if (isAnimationLibrary) ConfigureAnimationImporter(importer, path, referenceAvatar);
-            else ConfigureCharacterImporter(importer, path);
+            switch (role)
+            {
+                case ImportRole.PackAnimation:
+                    ConfigureAnimationImporter(importer, PackClipName(path), null);
+                    break;
+                case ImportRole.ReferenceRig:
+                    ConfigureCharacterImporter(importer);
+                    ClearMaterialRemaps(importer);
+                    importer.materialImportMode = ModelImporterMaterialImportMode.None;
+                    break;
+                default:
+                    ConfigureAnimationImporter(importer, Path.GetFileNameWithoutExtension(path), referenceAvatar);
+                    break;
+            }
 
             importer.SaveAndReimport();
             configured++;
 
-            if (isAnimationLibrary) LogClipStatus(path);
-            else LogAvatarStatus(path);
+            if (role == ImportRole.ReferenceRig) LogAvatarStatus(path);
+            else LogClipStatus(path);
         }
 
         return configured;
+    }
+
+    /// <summary>Pack clips are named "Character@Motion.FBX"; the motion name becomes the clip name.</summary>
+    private static string PackClipName(string path)
+    {
+        string fileName = Path.GetFileNameWithoutExtension(path);
+        int separator = fileName.IndexOf(PackClipSeparator);
+        return separator >= 0 && separator < fileName.Length - 1 ? fileName.Substring(separator + 1) : fileName;
     }
 
     private static Avatar FindAvatar(string modelPath)
@@ -103,42 +163,56 @@ public static class FighterModelImportSetup
         return null;
     }
 
-    private static void ConfigureCharacterImporter(ModelImporter importer, string path)
+    private static void ConfigureCharacterImporter(ModelImporter importer)
     {
         importer.animationType = ModelImporterAnimationType.Human;
         importer.avatarSetup = ModelImporterAvatarSetup.CreateFromThisModel;
         importer.importAnimation = false;
-        importer.materialImportMode = ModelImporterMaterialImportMode.ImportViaMaterialDescription;
-        importer.materialLocation = ModelImporterMaterialLocation.InPrefab;
+        importer.importCameras = false;
+        importer.importLights = false;
         importer.isReadable = false;
-
-        RemapMaterials(importer, Path.GetFileNameWithoutExtension(path));
     }
 
     /// <summary>
-    /// Mixamo characters ship two material slots (body surface and joints). Both are redirected to
-    /// project URP materials so each fighter gets a distinct colour and the SRP Batcher sees shared assets.
+    /// Keeps material import on so the FBX's single slot exists, then redirects that slot to the
+    /// tinted project material. The vendor material asset is left untouched.
     /// </summary>
-    private static void RemapMaterials(ModelImporter importer, string modelName)
+    private static void RemapMaterial(ModelImporter importer, FighterSkin skin)
     {
-        int skinIndex = Array.FindIndex(Skins, skin => string.Equals(skin.ModelName, modelName, StringComparison.OrdinalIgnoreCase));
-        if (skinIndex < 0) return;
+        importer.materialImportMode = ModelImporterMaterialImportMode.ImportViaMaterialDescription;
+        importer.materialLocation = ModelImporterMaterialLocation.InPrefab;
 
-        FighterSkin skin = Skins[skinIndex];
-        Material body = LoadOrCreateLitMaterial(skin.BodyMaterialName, skin.BodyColor, 0.55f, 0.1f);
-        Material joints = LoadOrCreateLitMaterial(JointsMaterialName, new Color(0.12f, 0.12f, 0.14f), 0.7f, 0.6f);
+        Texture2D texture = FindPackTexture(skin.ModelPath, skin.TextureName);
+        Material body = LoadOrCreateBodyMaterial(skin.BodyMaterialName, texture, skin.Tint);
 
-        foreach (AssetImporter.SourceAssetIdentifier identifier in importer.GetExternalObjectMap().Keys)
-            importer.RemoveRemap(identifier);
-
-        foreach (string materialName in skin.SourceMaterialNames)
-        {
-            bool isJoints = materialName.IndexOf(JointsMaterialKeyword, StringComparison.OrdinalIgnoreCase) >= 0;
-            importer.AddRemap(new AssetImporter.SourceAssetIdentifier(typeof(Material), materialName), isJoints ? joints : body);
-        }
+        ClearMaterialRemaps(importer);
+        importer.AddRemap(new AssetImporter.SourceAssetIdentifier(typeof(Material), skin.SourceMaterialName), body);
     }
 
-    private static Material LoadOrCreateLitMaterial(string name, Color color, float smoothness, float metallic)
+    private static void ClearMaterialRemaps(ModelImporter importer)
+    {
+        foreach (AssetImporter.SourceAssetIdentifier identifier in importer.GetExternalObjectMap().Keys)
+            importer.RemoveRemap(identifier);
+    }
+
+    /// <summary>The pack keeps each character's texture next to its model under a sibling Textures folder.</summary>
+    private static Texture2D FindPackTexture(string modelPath, string textureName)
+    {
+        string packRoot = Path.GetDirectoryName(Path.GetDirectoryName(modelPath));
+        string texturesFolder = Path.Combine(packRoot, "Textures").Replace('\\', '/');
+
+        foreach (string guid in AssetDatabase.FindAssets($"{textureName} t:Texture2D", new[] { texturesFolder }))
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guid);
+            if (string.Equals(Path.GetFileNameWithoutExtension(path), textureName, StringComparison.OrdinalIgnoreCase))
+                return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+        }
+
+        Debug.LogWarning($"[FighterModelImportSetup] Texture '{textureName}' not found under '{texturesFolder}'; the body material will be a flat tint.");
+        return null;
+    }
+
+    private static Material LoadOrCreateBodyMaterial(string name, Texture2D texture, Color tint)
     {
         if (!AssetDatabase.IsValidFolder(MaterialsRoot))
             AssetDatabase.CreateFolder(Path.GetDirectoryName(MaterialsRoot), Path.GetFileName(MaterialsRoot));
@@ -157,14 +231,16 @@ public static class FighterModelImportSetup
             material.shader = shader;
         }
 
-        material.SetColor(BaseColorId, color);
-        material.SetFloat(SmoothnessId, smoothness);
-        material.SetFloat(MetallicId, metallic);
+        material.SetTexture(BaseMapId, texture);
+        material.SetColor(BaseColorId, tint);
+        material.SetFloat(SmoothnessId, 0.35f);
+        material.SetFloat(MetallicId, 0f);
+        material.enableInstancing = true;
         EditorUtility.SetDirty(material);
         return material;
     }
 
-    private static void ConfigureAnimationImporter(ModelImporter importer, string path, Avatar referenceAvatar)
+    private static void ConfigureAnimationImporter(ModelImporter importer, string clipName, Avatar referenceAvatar)
     {
         importer.animationType = ModelImporterAnimationType.Human;
         importer.avatarSetup = referenceAvatar != null ? ModelImporterAvatarSetup.CopyFromOther : ModelImporterAvatarSetup.CreateFromThisModel;
@@ -176,7 +252,6 @@ public static class FighterModelImportSetup
         importer.importLights = false;
         importer.isReadable = false;
 
-        string clipName = Path.GetFileNameWithoutExtension(path);
         ModelImporterClipAnimation[] clips = importer.clipAnimations.Length > 0 ? importer.clipAnimations : importer.defaultClipAnimations;
 
         for (int i = 0; i < clips.Length; i++)

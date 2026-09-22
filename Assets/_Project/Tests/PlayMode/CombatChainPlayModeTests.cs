@@ -22,7 +22,7 @@ public class CombatChainPlayModeTests
     private const float ContactDistance = 1.25f;
     private const float StepTimeout = 3f;
     private const float RouteTimeout = 6f;
-    private const float CornerX = 14.9f;
+    private const float CornerX = 10.7f;
     private const float WallPinTolerance = 0.08f;
     private const float WallBounceTolerance = 0.2f;
     private const float MinAttackerCornerShove = 0.1f;

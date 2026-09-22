@@ -19,6 +19,7 @@ public static class AnimatorAutoSetup
     public const string ControllerPath = "Assets/_Project/Art/Animations/Robot_Animator.controller";
 
     private const string ClipSearchRoot = "Assets/_Project/Art";
+    private const string PackClipSearchRoot = FighterModelImportSetup.PackAnimationsRoot;
     private const string AttackDataSearchRoot = "Assets/_Project/Attacks";
     private const string CrouchStateName = "Crouch";
     private const string JumpStateName = "Jump";
@@ -72,9 +73,9 @@ public static class AnimatorAutoSetup
         }
     }
 
-    private static readonly string[] IdleClipCandidates = { "Fight_Idle", "Fighting Idle", "Bouncing Fight Idle", "Idle" };
-    private static readonly string[] WalkForwardClipCandidates = { "Walk_Forward", "Walking", "Walk" };
-    private static readonly string[] WalkBackwardClipCandidates = { "Walk_Backward", "Walking Backward", "Walking Backwards" };
+    private static readonly string[] IdleClipCandidates = { "Idle", "Fight_Idle", "Fighting Idle", "Bouncing Fight Idle" };
+    private static readonly string[] WalkForwardClipCandidates = { "WalkForward", "Walk_Forward", "Walking", "Walk" };
+    private static readonly string[] WalkBackwardClipCandidates = { "WalkBackward", "Walk_Backward", "Walking Backward", "Walking Backwards" };
     private static readonly string[] CrouchClipCandidates = { "Crouch_Idle", "Crouching Idle", "Crouch" };
     private static readonly string[] JumpClipCandidates = { "Jump", "Jumping Up", "Jumping" };
     private static readonly string[] DashForwardClipCandidates = { "Dash_Forward", "Step Forward", "Dodge Forward" };
@@ -134,7 +135,7 @@ public static class AnimatorAutoSetup
         EditorUtility.SetDirty(controller);
         AssetDatabase.SaveAssets();
 
-        Debug.Log($"[AnimatorAutoSetup] Rebuilt '{ControllerPath}' with {stateMachine.states.Length} states; {clipLibrary.Count} clips indexed under '{ClipSearchRoot}'.");
+        Debug.Log($"[AnimatorAutoSetup] Rebuilt '{ControllerPath}' with {stateMachine.states.Length} states; {clipLibrary.Count} clips indexed under '{ClipSearchRoot}' and '{PackClipSearchRoot}'.");
     }
 
     /// <summary>
@@ -396,7 +397,7 @@ public static class AnimatorAutoSetup
     private static Dictionary<string, AnimationClip> BuildClipLibrary()
     {
         var library = new Dictionary<string, AnimationClip>(StringComparer.OrdinalIgnoreCase);
-        string[] guids = AssetDatabase.FindAssets("t:AnimationClip", new[] { ClipSearchRoot });
+        string[] guids = AssetDatabase.FindAssets("t:AnimationClip", new[] { ClipSearchRoot, PackClipSearchRoot });
 
         foreach (string guid in guids)
         {

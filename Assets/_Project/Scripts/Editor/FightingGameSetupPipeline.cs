@@ -4,7 +4,7 @@ using UnityEngine;
 /// <summary>
 /// Runs the full scene integration in order: model import settings, combat rules with the authored
 /// attack roster, animator graph (which assigns placeholder clips), attack timing calibration,
-/// projectile release calibration, fighter wiring, training room with lighting and
+/// projectile release calibration, fighter wiring, modular training stage with lighting and
 /// post-processing, combat audio, impact VFX, the combat HUD, the performance profile (shadows, physics layers,
 /// frame pacing) and finally the hierarchy layout with its reference audit.
 /// Exposed as a menu item and as a batch-mode entry point (-executeMethod FightingGameSetupPipeline.RunAll).
@@ -20,7 +20,7 @@ public static class FightingGameSetupPipeline
         AttackTimingCalibrator.CalibrateAttackTiming();
         HadoukenReleaseCalibrator.CalibrateHadoukenRelease();
         FighterSceneSetup.SetupFightersInScene();
-        ArenaSceneSetup.BuildTrainingRoom();
+        StageSceneSetup.BuildTrainingStage();
         AudioSceneSetup.SetupCombatAudio();
         CombatVfxSceneSetup.SetupCombatVfx();
         CombatHudSceneSetup.SetupCombatHud();

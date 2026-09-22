@@ -173,7 +173,7 @@ public static class SceneHierarchyOrganizer
 
         if (keyLight != null)
         {
-            keyLight.name = ArenaSceneSetup.KeyLightName;
+            keyLight.name = StageSceneSetup.KeyLightName;
             keyLight.transform.SetAsFirstSibling();
         }
 
@@ -191,7 +191,7 @@ public static class SceneHierarchyOrganizer
     {
         Transform category = GetOrCreateCategory(EnvironmentCategory);
 
-        GameObject decor = GameObject.Find(ArenaSceneSetup.ArenaRootName);
+        GameObject decor = GameObject.Find(StageSceneSetup.StageRootName);
         if (decor != null) decor.transform.SetParent(category, true);
 
         FileStageCollision(category);
@@ -218,7 +218,7 @@ public static class SceneHierarchyOrganizer
         {
             GameObject target = collider.gameObject;
             if (target.GetComponentInParent<RobotController>() != null) continue;
-            if (IsUnderDecor(target.transform, ArenaSceneSetup.ArenaRootName)) continue;
+            if (IsUnderDecor(target.transform, StageSceneSetup.StageRootName)) continue;
             if (target.GetComponent<HadoukenProjectile>() != null) continue;
 
             switch (collider)

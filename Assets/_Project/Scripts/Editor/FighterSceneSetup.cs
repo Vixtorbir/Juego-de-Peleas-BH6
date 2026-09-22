@@ -9,7 +9,7 @@ using UnityEngine.SceneManagement;
 
 /// <summary>
 /// Replaces the visuals of every fighter in the training scene with a rigged humanoid model of real
-/// combat proportions (Mixamo Y Bot / X Bot) and re-fits the collision capsule, melee hitbox holder
+/// combat proportions (the Explosive LLC Male and Heavy fighters) and re-fits the collision capsule, melee hitbox holder
 /// and projectile anchor to the model. The projectile anchor is placed at the palms measured on the
 /// Hadouken release frame, falling back to a height ratio when the clip cannot be sampled. Works on
 /// the existing fighter GameObjects so every cross reference (opponent, input reader, attack data)
@@ -31,8 +31,8 @@ public static class FighterSceneSetup
 
     private static readonly string[] FighterModelPaths =
     {
-        "Assets/_Project/Art/Characters/Mixamo/Y_Bot.fbx",
-        "Assets/_Project/Art/Characters/Mixamo/X_Bot.fbx"
+        FighterModelImportSetup.Player1ModelPath,
+        FighterModelImportSetup.Player2ModelPath
     };
 
     [MenuItem("Fighting Game/Setup Fighters In Scene", priority = 30)]

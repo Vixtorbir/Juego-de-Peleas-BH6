@@ -49,7 +49,10 @@ public static class SceneScreenshotTool
         RenderTexture previousTarget = camera.targetTexture;
         camera.targetTexture = renderTexture;
         Canvas[] overlays = AttachOverlayCanvases(camera);
+        bool previousAsyncCompilation = ShaderUtil.allowAsyncCompilation;
+        ShaderUtil.allowAsyncCompilation = false;
         camera.Render();
+        ShaderUtil.allowAsyncCompilation = previousAsyncCompilation;
         RestoreOverlayCanvases(overlays);
         camera.targetTexture = previousTarget;
 

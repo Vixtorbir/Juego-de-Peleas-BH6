@@ -6,10 +6,11 @@ using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 
 /// <summary>
-/// Framing invariant of the training hall: wherever the fighting camera goes, including the lift
-/// and pull-back of a full juggle, the top edge of its frame lands on the stage architecture. The
-/// check is pure geometry on the camera pose and vertical field of view, so it holds headless and
-/// is independent of the game view aspect.
+/// Framing invariant of the training stage: wherever the fighting camera goes, including the lift
+/// and pull-back of a full juggle and the widest corner separation, the bottom edge of its frame
+/// lands on the grid floor and never on the void in front of or beside it. The sky above the wall is
+/// part of the stage's look and is not a leak. The check is pure geometry on the camera pose and
+/// vertical field of view, so it holds headless and is independent of the game view aspect.
 /// </summary>
 public class StageFramingPlayModeTests
 {
@@ -17,10 +18,10 @@ public class StageFramingPlayModeTests
     private const float IntroWait = 2.5f;
     private const float ContactDistance = 1.25f;
     private const float StepTimeout = 4f;
-    private const float BackWallZ = 7.2f;
-    private const float EnclosureHeight = 16f;
-    private const float EnclosureMargin = 0.5f;
-    private const float CornerX = 14.9f;
+    private const float FloorHeight = 0f;
+    private const float FloorHalfSize = 30f;
+    private const float FloorMargin = 0.5f;
+    private const float CornerX = 10.7f;
 
     private RobotController player1;
     private RobotController player2;
@@ -38,57 +39,56 @@ public class StageFramingPlayModeTests
         player1 = fighters[0];
         player2 = fighters[1];
         stageCamera = Camera.main;
-        Assert.IsNotNull(stageCamera, "Training room has no main camera.");
+        Assert.IsNotNull(stageCamera, "Training stage has no main camera.");
     }
 
     [UnityTest]
-    public IEnumerator FrameTopStaysInsideEnclosureThroughAJuggle()
+    public IEnumerator FrameBottomLandsOnFloorThroughAJuggle()
     {
         Teleport(player1, -0.5f);
         Teleport(player2, -0.5f + ContactDistance);
         yield return null;
 
-        float highestTop = SampleFrameTop();
+        AssertBottomEdgeOnFloor();
         player1.EnterAttack(player1.launcherBase);
         yield return WaitUntilRealtime(() => player2.CurrentState is AirborneHurtState, "Launcher never connected.");
 
         while (!(player2.CurrentState is KnockdownState))
         {
-            highestTop = Mathf.Max(highestTop, SampleFrameTop());
+            AssertBottomEdgeOnFloor();
             yield return null;
         }
-
-        Assert.Less(highestTop, EnclosureHeight - EnclosureMargin, "Camera frame rose above the stage enclosure during the juggle.");
     }
 
     [UnityTest]
-    public IEnumerator FrameTopStaysInsideEnclosureAtFullSeparation()
+    public IEnumerator FrameBottomLandsOnFloorAtFullSeparation()
     {
         Teleport(player1, -CornerX);
         Teleport(player2, CornerX);
         yield return new WaitForSecondsRealtime(1f);
 
-        float highestTop = 0f;
         for (int i = 0; i < 30; i++)
         {
-            highestTop = Mathf.Max(highestTop, SampleFrameTop());
+            AssertBottomEdgeOnFloor();
             yield return null;
         }
-
-        Assert.Less(highestTop, EnclosureHeight - EnclosureMargin, "Camera frame rose above the stage enclosure at full pull-back.");
     }
 
     /// <summary>
-    /// Height at which the top edge of the vertical field of view meets the back wall plane.
+    /// Casts the bottom edge of the vertical field of view onto the floor plane and requires the
+    /// hit to fall inside the grid floor.
     /// </summary>
-    private float SampleFrameTop()
+    private void AssertBottomEdgeOnFloor()
     {
         Transform camera = stageCamera.transform;
-        Vector3 topDirection = Quaternion.AngleAxis(-stageCamera.fieldOfView * 0.5f, camera.right) * camera.forward;
-        if (topDirection.z <= 0.0001f) return float.MaxValue;
+        Vector3 bottomDirection = Quaternion.AngleAxis(stageCamera.fieldOfView * 0.5f, camera.right) * camera.forward;
+        Assert.Less(bottomDirection.y, 0f, "Bottom edge of the frame does not look down at the floor.");
 
-        float distance = (BackWallZ - camera.position.z) / topDirection.z;
-        return camera.position.y + topDirection.y * distance;
+        float distance = (FloorHeight - camera.position.y) / bottomDirection.y;
+        Vector3 hit = camera.position + bottomDirection * distance;
+
+        Assert.LessOrEqual(Mathf.Abs(hit.x), FloorHalfSize - FloorMargin, "Bottom edge of the frame falls off the side of the floor.");
+        Assert.LessOrEqual(Mathf.Abs(hit.z), FloorHalfSize - FloorMargin, "Bottom edge of the frame falls short of the floor.");
     }
 
     private static void Teleport(RobotController fighter, float x)
