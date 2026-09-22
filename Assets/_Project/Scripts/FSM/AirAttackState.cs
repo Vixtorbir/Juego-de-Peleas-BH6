@@ -16,6 +16,7 @@ public class AirAttackState : AttackState
     private float horizontalVelocity;
     private bool landed;
     private float landingTimer;
+    private int activeAttackLayer = BaseAnimationLayer;
 
     public AirAttackState(RobotController robot) : base(robot) { }
 
@@ -32,6 +33,7 @@ public class AirAttackState : AttackState
         landed = false;
         landingTimer = 0f;
         base.Enter();
+        HoldAttackLayer();
     }
 
     public override void Tick()
@@ -48,6 +50,7 @@ public class AirAttackState : AttackState
     public override void Exit()
     {
         base.Exit();
+        ReleaseAttackLayer();
         robot.AirVelocity = new Vector2(horizontalVelocity, verticalVelocity);
     }
 
@@ -95,6 +98,7 @@ public class AirAttackState : AttackState
         horizontalVelocity = 0f;
         robot.IsInAttackStartup = false;
         DeactivateHitbox(false);
+        ReleaseAttackLayer();
         ReturnToStance(FighterAnimatorParameters.LocomotionState);
     }
 
@@ -107,6 +111,33 @@ public class AirAttackState : AttackState
         verticalVelocity = 0f;
         horizontalVelocity = 0f;
         robot.EnterIdle();
+    }
+
+    /// <summary>
+    /// The swing plays on a masked layer over the jump the base layer holds, so the striking limbs
+    /// come from the attack clip while the rest of the body keeps its airborne pose. The layer is
+    /// silent outside the swing: its weight is raised here and dropped the moment the attack ends,
+    /// whether it ran out, was cancelled or was cut short by the floor.
+    /// </summary>
+    private void HoldAttackLayer()
+    {
+        activeAttackLayer = Data != null ? Data.animationLayer : BaseAnimationLayer;
+        if (robot.animator == null || activeAttackLayer == BaseAnimationLayer) return;
+
+        robot.animator.SetLayerWeight(activeAttackLayer, 1f);
+    }
+
+    /// <summary>
+    /// Silences the layer the swing was playing on. The index is the one raised on entry rather than
+    /// the one the attack data carries now: a chained aerial configures the next attack before the
+    /// current one exits, and a punch chained into a kick moves to a different layer.
+    /// </summary>
+    private void ReleaseAttackLayer()
+    {
+        if (activeAttackLayer == BaseAnimationLayer) return;
+
+        if (robot.animator != null) robot.animator.SetLayerWeight(activeAttackLayer, 0f);
+        activeAttackLayer = BaseAnimationLayer;
     }
 
     private void TickLandingRecovery()

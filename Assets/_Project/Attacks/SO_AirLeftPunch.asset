@@ -16,6 +16,7 @@ MonoBehaviour:
   animationClip: {fileID: -203655887218126122, guid: 4fbcc7de1d7f41c449b1cf9517c48e68, type: 3}
   animationSpeed: 1
   strikeTiming: 0
+  animationLayer: 2
   startupTime: 0.167
   activeTime: 0.083
   recoveryTime: 0.2

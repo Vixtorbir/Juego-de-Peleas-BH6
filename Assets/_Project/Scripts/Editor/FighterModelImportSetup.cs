@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
@@ -37,6 +38,26 @@ public static class FighterModelImportSetup
     private static readonly int MetallicId = Shader.PropertyToID("_Metallic");
 
     private static readonly string[] LoopingClipKeywords = { "Idle", "Walk", "Strafe", "Stance", "Guard" };
+
+    /// <summary>
+    /// Stance and locomotion clips whose body is squared up to the combat axis, with the yaw each
+    /// one keeps once squared. A Mixamo fighting stance is authored bladed, and baking the root
+    /// rotation "based upon original" carries that yaw into the pose, so both fighters end up
+    /// showing the camera a shoulder instead of facing each other. Basing the bake on the body
+    /// orientation instead lets Unity align the average hip and shoulder line with the fighter's
+    /// forward, which gameplay already points at the opponent. The value is the stance blade kept
+    /// on top of that: zero squares the fighter fully, and a small negative angle re-opens the
+    /// guard without ever losing the facing.
+    /// </summary>
+    private static readonly Dictionary<string, float> SquaredStanceClips = new Dictionary<string, float>(StringComparer.OrdinalIgnoreCase)
+    {
+        { "Fight_Idle", 0f },
+        { "Walk_Forward", 0f },
+        { "Walk_Backward", 0f },
+        { "Crouch_Idle", 0f },
+        { "Dash_Forward", 0f },
+        { "Dash_Backward", 0f }
+    };
 
     private readonly struct FighterSkin
     {
@@ -277,7 +298,9 @@ public static class FighterModelImportSetup
             clip.lockRootRotation = true;
             clip.lockRootHeightY = true;
             clip.lockRootPositionXZ = true;
-            clip.keepOriginalOrientation = true;
+            bool squared = SquaredStanceClips.TryGetValue(clipName, out float stanceBlade);
+            clip.keepOriginalOrientation = !squared;
+            clip.rotationOffset = squared ? stanceBlade : 0f;
             clip.keepOriginalPositionY = true;
             clip.keepOriginalPositionXZ = true;
         }

@@ -22,7 +22,10 @@ public static class AnimatorAutoSetup
     private const string PackClipSearchRoot = FighterModelImportSetup.PackAnimationsRoot;
     private const string AttackDataSearchRoot = "Assets/_Project/Attacks";
     private const string CrouchStateName = "Crouch";
-    private const string JumpStateName = "Jump";
+    private const string EmptyStateName = "Empty";
+    private const string AirUpperBodyLayerName = "AirUpperBody";
+    private const string AirKickLeftLayerName = "AirKickLeft";
+    private const string AirKickRightLayerName = "AirKickRight";
 
     private const float LocomotionTransitionDuration = 0.1f;
     private const float ReturnTransitionDuration = 0.1f;
@@ -35,6 +38,8 @@ public static class AnimatorAutoSetup
     private static readonly Vector3 MovementColumnOrigin = new Vector3(700f, -100f, 0f);
     private static readonly Vector3 AttackColumnOrigin = new Vector3(700f, 150f, 0f);
     private static readonly Vector3 ReactionColumnOrigin = new Vector3(700f, 800f, 0f);
+    private static readonly Vector3 AirLayerEmptyPosition = new Vector3(300f, 200f, 0f);
+    private static readonly Vector3 AirLayerColumnOrigin = new Vector3(700f, 150f, 0f);
 
     private enum SpeedSource
     {
@@ -62,14 +67,16 @@ public static class AnimatorAutoSetup
         public readonly string[] ClipCandidates;
         public readonly SpeedSource Speed;
         public readonly ExitRule Exit;
+        public readonly bool FootIk;
 
-        public TriggerStateDefinition(string trigger, AnimationClip explicitClip, string[] clipCandidates, SpeedSource speed, ExitRule exit)
+        public TriggerStateDefinition(string trigger, AnimationClip explicitClip, string[] clipCandidates, SpeedSource speed, ExitRule exit, bool footIk)
         {
             Trigger = trigger;
             ExplicitClip = explicitClip;
             ClipCandidates = clipCandidates;
             Speed = speed;
             Exit = exit;
+            FootIk = footIk;
         }
     }
 
@@ -115,7 +122,8 @@ public static class AnimatorAutoSetup
         AnimatorController controller = LoadOrCreateController();
         Dictionary<string, AnimationClip> clipLibrary = BuildClipLibrary();
 
-        List<TriggerStateDefinition> attackStates = BuildAttackStateDefinitions(clipLibrary);
+        var aerialAttacks = new List<AttackData>();
+        List<TriggerStateDefinition> attackStates = BuildAttackStateDefinitions(clipLibrary, aerialAttacks);
         List<TriggerStateDefinition> movementStates = BuildMovementStateDefinitions();
         List<TriggerStateDefinition> reactionStates = BuildReactionStateDefinitions();
 
@@ -132,10 +140,12 @@ public static class AnimatorAutoSetup
         CreateTriggerStates(stateMachine, locomotion, crouch, attackStates, AttackColumnOrigin, clipLibrary);
         CreateTriggerStates(stateMachine, locomotion, crouch, reactionStates, ReactionColumnOrigin, clipLibrary);
 
+        int airLayers = RebuildAirAttackLayers(controller, aerialAttacks);
+
         EditorUtility.SetDirty(controller);
         AssetDatabase.SaveAssets();
 
-        Debug.Log($"[AnimatorAutoSetup] Rebuilt '{ControllerPath}' with {stateMachine.states.Length} states; {clipLibrary.Count} clips indexed under '{ClipSearchRoot}' and '{PackClipSearchRoot}'.");
+        Debug.Log($"[AnimatorAutoSetup] Rebuilt '{ControllerPath}' with {stateMachine.states.Length} base states and {airLayers} masked aerial layer(s); {clipLibrary.Count} clips indexed under '{ClipSearchRoot}' and '{PackClipSearchRoot}'.");
     }
 
     /// <summary>
@@ -169,7 +179,12 @@ public static class AnimatorAutoSetup
         return AnimatorController.CreateAnimatorControllerAtPath(ControllerPath);
     }
 
-    private static List<TriggerStateDefinition> BuildAttackStateDefinitions(Dictionary<string, AnimationClip> clipLibrary)
+    /// <summary>
+    /// Grounded attack states for the base layer. Aerial normals are collected into
+    /// <paramref name="aerialAttacks"/> instead: their states live on masked layers so the jump
+    /// keeps the lower body while the swing plays on top of it.
+    /// </summary>
+    private static List<TriggerStateDefinition> BuildAttackStateDefinitions(Dictionary<string, AnimationClip> clipLibrary, List<AttackData> aerialAttacks)
     {
         var definitions = new List<TriggerStateDefinition>();
         var seenTriggers = new HashSet<string>(StringComparer.Ordinal);
@@ -188,12 +203,25 @@ public static class AnimatorAutoSetup
 
             if (!seenTriggers.Add(data.animationTrigger)) continue;
 
+            if (data.isAirAttack)
+            {
+                aerialAttacks.Add(data);
+                continue;
+            }
+
+            if (data.animationLayer != 0)
+            {
+                data.animationLayer = 0;
+                EditorUtility.SetDirty(data);
+            }
+
             definitions.Add(new TriggerStateDefinition(
                 data.animationTrigger, data.animationClip, Array.Empty<string>(),
-                SpeedSource.Attack, ExitRule.ReturnByExitTime));
+                SpeedSource.Attack, ExitRule.ReturnByExitTime, true));
         }
 
         definitions.Sort((a, b) => string.CompareOrdinal(a.Trigger, b.Trigger));
+        aerialAttacks.Sort((a, b) => string.CompareOrdinal(a.animationTrigger, b.animationTrigger));
         return definitions;
     }
 
@@ -201,9 +229,9 @@ public static class AnimatorAutoSetup
     {
         return new List<TriggerStateDefinition>
         {
-            new TriggerStateDefinition(FighterAnimatorParameters.JumpTrigger, null, JumpClipCandidates, SpeedSource.None, ExitRule.ReturnWhenGrounded),
-            new TriggerStateDefinition(FighterAnimatorParameters.DashForwardTrigger, null, DashForwardClipCandidates, SpeedSource.Timed, ExitRule.ReturnByExitTime),
-            new TriggerStateDefinition(FighterAnimatorParameters.DashBackwardTrigger, null, DashBackwardClipCandidates, SpeedSource.Timed, ExitRule.ReturnByExitTime)
+            new TriggerStateDefinition(FighterAnimatorParameters.JumpTrigger, null, JumpClipCandidates, SpeedSource.None, ExitRule.ReturnWhenGrounded, false),
+            new TriggerStateDefinition(FighterAnimatorParameters.DashForwardTrigger, null, DashForwardClipCandidates, SpeedSource.Timed, ExitRule.ReturnByExitTime, true),
+            new TriggerStateDefinition(FighterAnimatorParameters.DashBackwardTrigger, null, DashBackwardClipCandidates, SpeedSource.Timed, ExitRule.ReturnByExitTime, true)
         };
     }
 
@@ -211,9 +239,9 @@ public static class AnimatorAutoSetup
     {
         return new List<TriggerStateDefinition>
         {
-            new TriggerStateDefinition(FighterAnimatorParameters.HitstunTrigger, null, HitstunClipCandidates, SpeedSource.Timed, ExitRule.ReturnByExitTime),
-            new TriggerStateDefinition(FighterAnimatorParameters.BlockstunTrigger, null, BlockstunClipCandidates, SpeedSource.Timed, ExitRule.ReturnByExitTime),
-            new TriggerStateDefinition(FighterAnimatorParameters.DeathTrigger, null, DeathClipCandidates, SpeedSource.None, ExitRule.Terminal)
+            new TriggerStateDefinition(FighterAnimatorParameters.HitstunTrigger, null, HitstunClipCandidates, SpeedSource.Timed, ExitRule.ReturnByExitTime, true),
+            new TriggerStateDefinition(FighterAnimatorParameters.BlockstunTrigger, null, BlockstunClipCandidates, SpeedSource.Timed, ExitRule.ReturnByExitTime, true),
+            new TriggerStateDefinition(FighterAnimatorParameters.DeathTrigger, null, DeathClipCandidates, SpeedSource.None, ExitRule.Terminal, false)
         };
     }
 
@@ -302,6 +330,7 @@ public static class AnimatorAutoSetup
         AnimatorState state = stateMachine.AddState(FighterAnimatorParameters.LocomotionStateName, LocomotionPosition);
         state.motion = tree;
         state.writeDefaultValues = false;
+        state.iKOnFeet = true;
         return state;
     }
 
@@ -310,6 +339,7 @@ public static class AnimatorAutoSetup
         AnimatorState crouch = stateMachine.AddState(CrouchStateName, CrouchPosition);
         crouch.motion = ResolveClip(clipLibrary, CrouchClipCandidates, locomotion.motion is BlendTree tree && tree.children.Length > 0 ? tree.children[0].motion as AnimationClip : null);
         crouch.writeDefaultValues = false;
+        crouch.iKOnFeet = true;
 
         AnimatorStateTransition enterCrouch = locomotion.AddTransition(crouch);
         enterCrouch.hasExitTime = false;
@@ -342,6 +372,7 @@ public static class AnimatorAutoSetup
             AnimatorState state = stateMachine.AddState(definition.Trigger, position);
             state.motion = definition.ExplicitClip != null ? definition.ExplicitClip : ResolveClip(clipLibrary, definition.ClipCandidates, null);
             state.writeDefaultValues = false;
+            state.iKOnFeet = definition.FootIk;
             ApplySpeedSource(state, definition.Speed);
 
             switch (definition.Exit)
@@ -357,6 +388,112 @@ public static class AnimatorAutoSetup
                     break;
             }
         }
+    }
+
+    /// <summary>
+    /// Rebuilds the masked layers the aerial normals play on. A jumping attack may not take over the
+    /// whole body: its clip was authored on the ground, so the support leg reaches for a floor that
+    /// is not there and the silhouette stretches. Each aerial state therefore plays on a layer whose
+    /// Avatar Mask passes only the striking limbs, while the base layer holds the jump and keeps the
+    /// legs tucked. Punches share one torso-and-arms layer; a kick gets the layer of the leg it
+    /// actually swings, read out of its clip. The layer index is written back into the attack asset
+    /// so gameplay code cross-fades on the right layer without looking names up at runtime.
+    /// </summary>
+    private static int RebuildAirAttackLayers(AnimatorController controller, List<AttackData> aerialAttacks)
+    {
+        RemoveGeneratedLayers(controller);
+        if (aerialAttacks.Count == 0) return 0;
+
+        int punchLayer = 0;
+        int leftKickLayer = 0;
+        int rightKickLayer = 0;
+
+        foreach (AttackData attack in aerialAttacks)
+        {
+            int layer;
+            if (attack.impactSound == AttackImpactSound.Kick)
+            {
+                AvatarMaskBodyPart leg = FighterAvatarMaskSetup.ResolveStrikingLeg(attack.animationClip);
+                if (leg == AvatarMaskBodyPart.LeftLeg)
+                {
+                    if (leftKickLayer == 0) leftKickLayer = AddMaskedLayer(controller, AirKickLeftLayerName, leg);
+                    layer = leftKickLayer;
+                }
+                else
+                {
+                    if (rightKickLayer == 0) rightKickLayer = AddMaskedLayer(controller, AirKickRightLayerName, leg);
+                    layer = rightKickLayer;
+                }
+            }
+            else
+            {
+                if (punchLayer == 0) punchLayer = AddMaskedLayer(controller, AirUpperBodyLayerName, null);
+                layer = punchLayer;
+            }
+
+            AddAirAttackState(controller, layer, attack);
+
+            if (attack.animationLayer == layer) continue;
+            attack.animationLayer = layer;
+            EditorUtility.SetDirty(attack);
+        }
+
+        return controller.layers.Length - 1;
+    }
+
+    private static void RemoveGeneratedLayers(AnimatorController controller)
+    {
+        for (int i = controller.layers.Length - 1; i >= 1; i--)
+        {
+            AnimatorStateMachine stateMachine = controller.layers[i].stateMachine;
+            controller.RemoveLayer(i);
+
+            if (stateMachine == null) continue;
+            AssetDatabase.RemoveObjectFromAsset(stateMachine);
+            UnityEngine.Object.DestroyImmediate(stateMachine, true);
+        }
+    }
+
+    /// <summary>
+    /// Adds an override layer that starts silent: gameplay raises its weight for the length of a
+    /// swing and drops it again, so a fighter that is not attacking costs nothing but an idle layer.
+    /// </summary>
+    private static int AddMaskedLayer(AnimatorController controller, string name, AvatarMaskBodyPart? strikingLeg)
+    {
+        controller.AddLayer(name);
+
+        AnimatorControllerLayer[] layers = controller.layers;
+        int index = layers.Length - 1;
+        layers[index].avatarMask = FighterAvatarMaskSetup.LoadOrCreateMask(name, strikingLeg);
+        layers[index].blendingMode = AnimatorLayerBlendingMode.Override;
+        layers[index].defaultWeight = 0f;
+        layers[index].iKPass = false;
+        controller.layers = layers;
+
+        AnimatorStateMachine stateMachine = controller.layers[index].stateMachine;
+        AnimatorState empty = stateMachine.AddState(EmptyStateName, AirLayerEmptyPosition);
+        empty.writeDefaultValues = false;
+        stateMachine.defaultState = empty;
+
+        return index;
+    }
+
+    private static void AddAirAttackState(AnimatorController controller, int layerIndex, AttackData attack)
+    {
+        AnimatorStateMachine stateMachine = controller.layers[layerIndex].stateMachine;
+        Vector3 position = AirLayerColumnOrigin + Vector3.up * (RowSpacing * (stateMachine.states.Length - 1));
+
+        AnimatorState state = stateMachine.AddState(attack.animationTrigger, position);
+        state.motion = attack.animationClip;
+        state.writeDefaultValues = false;
+        state.iKOnFeet = false;
+        ApplySpeedSource(state, SpeedSource.Attack);
+
+        AnimatorStateTransition transition = state.AddTransition(stateMachine.defaultState);
+        transition.hasExitTime = true;
+        transition.exitTime = ReturnExitTime;
+        transition.hasFixedDuration = true;
+        transition.duration = ReturnTransitionDuration;
     }
 
     private static AnimatorStateTransition AddReturnTransition(AnimatorState from, AnimatorState to, AnimatorConditionMode crouchCondition, float exitTime)

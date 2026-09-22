@@ -13,6 +13,9 @@ public abstract class RobotState
     protected const float FallVelocity = -9.81f;
     protected const float CrouchInputThreshold = -0.5f;
 
+    /// <summary>Layer holding the full-body graph; the stances always settle back onto it.</summary>
+    protected const int BaseAnimationLayer = 0;
+
     protected readonly RobotController robot;
 
     protected RobotState(RobotController robot)
@@ -93,11 +96,12 @@ public abstract class RobotState
     /// are entered this way instead of through trigger parameters: a trigger can be swallowed by a
     /// transition already in flight or by interruption rules, whereas a cross-fade always starts
     /// the requested state from its first frame, including when re-entering the same state.
+    /// Aerial normals pass their own layer, which masks the swing onto the jump the base layer holds.
     /// </summary>
-    protected void PlayAnimationState(int stateHash)
+    protected void PlayAnimationState(int stateHash, int layer = BaseAnimationLayer)
     {
         if (robot.animator == null) return;
-        robot.animator.CrossFadeInFixedTime(stateHash, FighterAnimatorParameters.EntryCrossFadeDuration, 0, 0f);
+        robot.animator.CrossFadeInFixedTime(stateHash, FighterAnimatorParameters.EntryCrossFadeDuration, layer, 0f);
     }
 
     /// <summary>
@@ -110,7 +114,7 @@ public abstract class RobotState
         if (robot.animator == null || data == null || data.AnimationStateHash == 0) return;
 
         robot.animator.SetFloat(FighterAnimatorParameters.AttackSpeed, data.animationSpeed);
-        PlayAnimationState(data.AnimationStateHash);
+        PlayAnimationState(data.AnimationStateHash, data.animationLayer);
     }
 
     /// <summary>
@@ -120,10 +124,10 @@ public abstract class RobotState
     protected void ReturnToStance(int stanceStateHash)
     {
         if (robot.animator == null) return;
-        if (robot.animator.GetCurrentAnimatorStateInfo(0).shortNameHash == stanceStateHash) return;
-        if (robot.animator.GetNextAnimatorStateInfo(0).shortNameHash == stanceStateHash) return;
+        if (robot.animator.GetCurrentAnimatorStateInfo(BaseAnimationLayer).shortNameHash == stanceStateHash) return;
+        if (robot.animator.GetNextAnimatorStateInfo(BaseAnimationLayer).shortNameHash == stanceStateHash) return;
 
-        robot.animator.CrossFadeInFixedTime(stanceStateHash, FighterAnimatorParameters.ReturnCrossFadeDuration, 0, 0f);
+        robot.animator.CrossFadeInFixedTime(stanceStateHash, FighterAnimatorParameters.ReturnCrossFadeDuration, BaseAnimationLayer, 0f);
     }
 
     /// <summary>
@@ -148,7 +152,7 @@ public abstract class RobotState
         if (robot.animator == null) return;
 
         robot.animator.SetFloat(FighterAnimatorParameters.TimedSpeed, FighterAnimatorParameters.FitPlaybackSpeed(clip, duration));
-        robot.animator.Play(stateHash, 0, 0f);
+        robot.animator.Play(stateHash, BaseAnimationLayer, 0f);
         robot.animator.Update(0f);
     }
 

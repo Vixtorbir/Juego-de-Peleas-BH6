@@ -91,6 +91,8 @@ public class AttackData : ScriptableObject
     [Range(1f, 1.15f)] public float animationSpeed = 1f;
     [Tooltip("Where in the swing the calibrator places the active frames.")]
     public StrikeTiming strikeTiming = StrikeTiming.Extension;
+    [Tooltip("Animator layer that owns this attack's state. Aerial normals run on a masked layer so the jump keeps the lower body; the controller generator writes this index.")]
+    public int animationLayer;
 
     [Header("Frame Data (seconds)")]
     public float startupTime = 0.15f;
