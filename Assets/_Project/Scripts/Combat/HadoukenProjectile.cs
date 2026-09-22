@@ -81,9 +81,18 @@ public class HadoukenProjectile : MonoBehaviour
         }
 
         if (target.Owner == owner) return;
-        if (!target.ReceiveHit(attackData, owner, other.bounds.ClosestPoint(transform.position), false)) return;
 
-        owner.NotifyAttackConnected();
+        Vector3 contactPoint = other.bounds.ClosestPoint(transform.position);
+        if (target.TryReceiveHit(attackData, owner, contactPoint, false, out HitRejection rejection))
+        {
+            owner.NotifyAttackConnected();
+            Recall();
+            return;
+        }
+
+        if (rejection != HitRejection.Invulnerable && rejection != HitRejection.Down) return;
+
+        target.NotifyDeflected(contactPoint, owner);
         Recall();
     }
 }

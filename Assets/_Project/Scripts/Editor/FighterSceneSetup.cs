@@ -125,6 +125,7 @@ public static class FighterSceneSetup
         ConfigureAnimator(fighter, modelPath, controller);
         ConfigureCharacterController(fighter, height);
         EnsureComponent<Hurtbox>(root);
+        EnsureComponent<CombatFlash>(root);
 
         fighter.hitboxBase = ConfigureMeleeHitbox(fighter);
         fighter.hadoukenSpawnPoint = ConfigureProjectileSpawn(fighter, height, palmAnchor);

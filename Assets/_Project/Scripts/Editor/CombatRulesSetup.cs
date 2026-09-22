@@ -84,16 +84,16 @@ public static class CombatRulesSetup
             12f, 0.4f, 0.3f, 1.5f, 3f, new Vector3(0f, 1.9f, 0.7f), new Vector3(0.5f, 1f, 0.7f),
             false, false, true, true, true, true, HitReaction.Launch, HitReaction.Launch),
         new AttackSpec("SO_AirLeftPunch", "AirLeftPunch", AttackWeight.Light, AttackImpactSound.Punch,
-            5f, 0.3f, 0.17f, 1f, 1.5f, new Vector3(0f, 0.6f, 0.9f), new Vector3(0.5f, 1.3f, 0.8f),
+            5f, 0.3f, 0.17f, 1f, 1.5f, new Vector3(0f, 0.6f, 1f), new Vector3(0.6f, 1.6f, 1f),
             true, true, false, false, false, false, HitReaction.Hitstun, HitReaction.Hitstun),
         new AttackSpec("SO_AirLeftKick", "AirLeftKick", AttackWeight.Light, AttackImpactSound.Kick,
-            7f, 0.33f, 0.18f, 1.5f, 2.5f, new Vector3(0f, 0.5f, 1f), new Vector3(0.5f, 1.3f, 0.9f),
+            7f, 0.33f, 0.18f, 1.5f, 2.5f, new Vector3(0f, 0.5f, 1.1f), new Vector3(0.6f, 1.6f, 1.1f),
             true, true, false, false, false, false, HitReaction.Hitstun, HitReaction.Hitstun),
         new AttackSpec("SO_AirRightPunch", "AirRightPunch", AttackWeight.Medium, AttackImpactSound.Punch,
-            10f, 0.4f, 0.25f, 1.2f, 3f, new Vector3(0f, 0.6f, 1f), new Vector3(0.5f, 1.4f, 0.8f),
+            10f, 0.4f, 0.25f, 1.2f, 3f, new Vector3(0f, 0.6f, 1.1f), new Vector3(0.6f, 1.6f, 1f),
             true, true, false, false, false, false, HitReaction.Hitstun, HitReaction.Hitstun),
         new AttackSpec("SO_AirRightKick", "AirRightKick", AttackWeight.Heavy, AttackImpactSound.Kick,
-            14f, 0.5f, 0.3f, 2f, 4f, new Vector3(0f, 0.5f, 1.1f), new Vector3(0.6f, 1.4f, 0.9f),
+            14f, 0.5f, 0.3f, 2f, 4f, new Vector3(0f, 0.5f, 1.2f), new Vector3(0.7f, 1.6f, 1.1f),
             true, true, false, false, false, false, HitReaction.Knockdown, HitReaction.GroundBounce)
     };
 
@@ -197,26 +197,29 @@ public static class CombatRulesSetup
             AssetDatabase.CreateAsset(attack, path);
         }
 
-        LinkAirTargetCombo();
+        EnsureBranch("SO_AirLeftPunch", FighterCommand.LeftKick, "SO_AirLeftKick");
+        EnsureBranch("SO_LeftPunch", FighterCommand.LeftPunch, "SO_LeftPunch");
     }
 
     /// <summary>
-    /// j.LP and j.LK share the light tier, so the light-to-light air link is an explicit target combo.
+    /// Adds an explicit target-combo link when it is missing. Same-tier links that the gatling rule
+    /// cannot express live here: the light-to-light air link and the rapid jab, whose repetition is
+    /// bounded at runtime by the rules' rapid-chain limit.
     /// </summary>
-    private static void LinkAirTargetCombo()
+    private static void EnsureBranch(string fromName, FighterCommand command, string toName)
     {
-        AttackData airLeftPunch = LoadAttack("SO_AirLeftPunch");
-        AttackData airLeftKick = LoadAttack("SO_AirLeftKick");
-        if (airLeftPunch == null || airLeftKick == null) return;
+        AttackData from = LoadAttack(fromName);
+        AttackData to = LoadAttack(toName);
+        if (from == null || to == null) return;
 
-        airLeftPunch.comboBranches ??= new List<ComboBranch>();
-        foreach (ComboBranch existing in airLeftPunch.comboBranches)
+        from.comboBranches ??= new List<ComboBranch>();
+        foreach (ComboBranch existing in from.comboBranches)
         {
-            if (existing.nextAttack == airLeftKick) return;
+            if (existing.inputCommand == command && existing.nextAttack == to) return;
         }
 
-        airLeftPunch.comboBranches.Add(new ComboBranch { inputCommand = FighterCommand.LeftKick, nextAttack = airLeftKick });
-        EditorUtility.SetDirty(airLeftPunch);
+        from.comboBranches.Add(new ComboBranch { inputCommand = command, nextAttack = to });
+        EditorUtility.SetDirty(from);
     }
 
     private static void AssignCancelFlags()

@@ -5,9 +5,10 @@ using UnityEngine;
 /// <see cref="AttackState"/>, but keeps falling through the swing with the momentum inherited from
 /// the jump: gravity integrates every frame and the horizontal speed is carried unchanged. Cancels
 /// resolve on the aerial ladder (j.L > j.M > j.H) and into an air dash while one is left this
-/// jump; there are no aerial specials or jump cancels. Touching the floor mid-swing cuts the attack
-/// into a short landing recovery, so a jump-in that lands early is not stuck in its recovery frames.
-/// A swing that finishes in the air returns to free fall with the current velocity.
+/// jump; there are no aerial specials or jump cancels. Touching the floor mid-swing cuts the attack:
+/// a swing that connected land-cancels straight into the stance, so a jump-in flows into a ground
+/// string or a guard, while a swing that missed pays a short landing recovery (trip guard) and
+/// stays punishable. A swing that finishes in the air returns to free fall with the current velocity.
 /// </summary>
 public class AirAttackState : AttackState
 {
@@ -20,6 +21,9 @@ public class AirAttackState : AttackState
 
     /// <summary>Landing recovery accepts nothing; the cancel window rule applies while airborne.</summary>
     public override bool AcceptsCommands => !landed && base.AcceptsCommands;
+
+    /// <summary>Air chains and the air-dash cancel; a special pressed here waits for the landing.</summary>
+    public override bool CanConsume(FighterCommand command) => AcceptsCommands && (IsAttackButton(command) || IsDashCommand(command));
 
     public override void Enter()
     {
@@ -57,6 +61,12 @@ public class AirAttackState : AttackState
 
         if (!HasLanded(verticalVelocity)) return false;
 
+        if (robot.AttackConnected)
+        {
+            LandCancel();
+            return true;
+        }
+
         BeginLandingRecovery();
         return true;
     }
@@ -86,6 +96,17 @@ public class AirAttackState : AttackState
         robot.IsInAttackStartup = false;
         DeactivateHitbox(false);
         ReturnToStance(FighterAnimatorParameters.LocomotionState);
+    }
+
+    /// <summary>
+    /// A connected air normal lands with no recovery: control returns at once, and the buffered
+    /// ground normal fires on the stance's first tick.
+    /// </summary>
+    private void LandCancel()
+    {
+        verticalVelocity = 0f;
+        horizontalVelocity = 0f;
+        robot.EnterIdle();
     }
 
     private void TickLandingRecovery()

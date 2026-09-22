@@ -23,6 +23,8 @@ public class AudioManager : MonoBehaviour
     private const float KnockoutDuckHold = 1.6f;
     private const float KnockoutDuckRelease = 0.8f;
     private const float HeavyThumpVolumeRatio = 0.35f;
+    private const float DeflectFallbackPitch = 0.35f;
+    private const float DeflectFallbackVolume = 0.6f;
 
     public static AudioManager Instance { get; private set; }
 
@@ -149,6 +151,18 @@ public class AudioManager : MonoBehaviour
         if (library != null) PlayEvent(in library.block);
     }
 
+    /// <summary>
+    /// Strike deflected by an invulnerable or downed body. Uses the deflect event when the library has
+    /// clips for it, otherwise a pitched-up block so the metallic read exists before the asset does.
+    /// </summary>
+    public void PlayDeflect()
+    {
+        if (library == null) return;
+
+        if (library.deflect.HasClips) PlayEvent(in library.deflect);
+        else PlayEvent(in library.block, DeflectFallbackVolume, DeflectFallbackPitch);
+    }
+
     /// <summary>Wall or ground rebound of a juggled body: the heavy impact layer with the music ducked.</summary>
     public void PlayBounce()
     {
@@ -201,7 +215,7 @@ public class AudioManager : MonoBehaviour
         duckActive = true;
     }
 
-    private void PlayEvent(in CombatAudioLibrary.SoundEvent soundEvent, float volumeScale = 1f)
+    private void PlayEvent(in CombatAudioLibrary.SoundEvent soundEvent, float volumeScale = 1f, float pitchOffset = 0f)
     {
         if (!soundEvent.HasClips) return;
 
@@ -211,7 +225,7 @@ public class AudioManager : MonoBehaviour
         AudioSource source = sfxSources[nextSfxSource];
         nextSfxSource = (nextSfxSource + 1) % sfxSources.Length;
 
-        source.pitch = 1f + Random.Range(-soundEvent.pitchSpread, soundEvent.pitchSpread);
+        source.pitch = 1f + pitchOffset + Random.Range(-soundEvent.pitchSpread, soundEvent.pitchSpread);
         source.PlayOneShot(clip, soundEvent.volume * volumeScale);
     }
 

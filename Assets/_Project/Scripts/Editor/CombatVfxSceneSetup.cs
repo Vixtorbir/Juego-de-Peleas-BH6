@@ -17,6 +17,7 @@ public static class CombatVfxSceneSetup
     private static readonly Color HitColor = new Color(1f, 0.82f, 0.45f) * 5f;
     private static readonly Color BlockColor = new Color(0.45f, 0.85f, 1f) * 4f;
     private static readonly Color CounterHitColor = new Color(1f, 0.35f, 0.2f) * 6f;
+    private static readonly Color DeflectColor = new Color(0.85f, 0.9f, 1f) * 3f;
 
     [MenuItem("Fighting Game/Setup Combat VFX", priority = 45)]
     public static void SetupCombatVfx()
@@ -28,6 +29,7 @@ public static class CombatVfxSceneSetup
         Material hit = CreateFlashMaterial("M_HitsparkHit", HitColor);
         Material block = CreateFlashMaterial("M_HitsparkBlock", BlockColor);
         Material counter = CreateFlashMaterial("M_HitsparkCounter", CounterHitColor);
+        Material deflect = CreateFlashMaterial("M_HitsparkDeflect", DeflectColor);
 
         HitsparkPool pool = Object.FindFirstObjectByType<HitsparkPool>();
         if (pool == null)
@@ -41,12 +43,13 @@ public static class CombatVfxSceneSetup
         serialized.FindProperty("hitMaterial").objectReferenceValue = hit;
         serialized.FindProperty("blockMaterial").objectReferenceValue = block;
         serialized.FindProperty("counterHitMaterial").objectReferenceValue = counter;
+        serialized.FindProperty("deflectMaterial").objectReferenceValue = deflect;
         serialized.ApplyModifiedPropertiesWithoutUndo();
 
         EditorSceneManager.MarkSceneDirty(scene);
         EditorSceneManager.SaveScene(scene);
         AssetDatabase.SaveAssets();
-        Debug.Log("[CombatVfxSceneSetup] Hitspark pool installed with hit, block and counter-hit materials.");
+        Debug.Log("[CombatVfxSceneSetup] Hitspark pool installed with hit, block, counter-hit and deflect materials.");
     }
 
     private static Material CreateFlashMaterial(string name, Color hdrColor)

@@ -8,7 +8,8 @@ public enum HitsparkKind
 {
     Hit,
     Block,
-    CounterHit
+    CounterHit,
+    Deflect
 }
 
 /// <summary>
@@ -39,6 +40,7 @@ public class HitsparkPool : MonoBehaviour
     [SerializeField] private Material hitMaterial;
     [SerializeField] private Material blockMaterial;
     [SerializeField] private Material counterHitMaterial;
+    [SerializeField] private Material deflectMaterial;
 
     private struct Spark
     {
@@ -119,6 +121,7 @@ public class HitsparkPool : MonoBehaviour
         {
             case HitsparkKind.Block: return blockMaterial;
             case HitsparkKind.CounterHit: return counterHitMaterial;
+            case HitsparkKind.Deflect: return deflectMaterial != null ? deflectMaterial : blockMaterial;
             default: return hitMaterial;
         }
     }

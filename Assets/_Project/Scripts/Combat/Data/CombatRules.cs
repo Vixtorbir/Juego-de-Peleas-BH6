@@ -74,7 +74,7 @@ public class CombatRules : ScriptableObject
     [Tooltip("Horizontal drift of a non-launcher air hit.")]
     public float airHitDrift = 1.5f;
     [Tooltip("Vertical speed added above the attacker's own when an airborne attacker hits an airborne defender, so air chains carry the body along the attacker's arc.")]
-    public float airToAirPop = 1.5f;
+    public float airToAirPop = 1f;
     public int maxWallBounces = 1;
     public int maxGroundBounces = 1;
     [Tooltip("Fraction of horizontal speed kept when the body rebounds off a wall.")]
@@ -127,11 +127,44 @@ public class CombatRules : ScriptableObject
     [Tooltip("Recovery after landing during an air attack before control returns.")]
     public float airLandingRecovery = 4f * Frame;
 
+    [Header("Combo Ergonomics")]
+    [Tooltip("Furthest the attacker steps forward during the startup of a chained normal to bring the target back into reach.")]
+    public float comboMicroStepMax = 0.7f;
+    [Tooltip("Depth inside the attack's reach the micro-step aims for, so the strike lands on the body rather than on its edge.")]
+    public float comboMicroStepMargin = 0.15f;
+    [Tooltip("No micro-step when the target is further than this; a dropped combo at range stays dropped.")]
+    public float comboMicroStepRange = 2.5f;
+    [Tooltip("Times the same normal may chain into itself in one string (rapid jabs).")]
+    public int rapidChainLimit = 2;
+
+    [Header("Dash Attacks")]
+    [Tooltip("Frames into a ground dash before a normal may interrupt it.")]
+    public float dashAttackDelay = 3f * Frame;
+    [Tooltip("Fraction of the forward dash speed carried into a normal started during the dash, decaying to zero by the end of its active frames.")]
+    [Range(0f, 1f)] public float dashAttackCarryRatio = 0.6f;
+
+    [Header("Telegraphs")]
+    [Tooltip("Body tint pulsed while the fighter cannot be hit (wake-up, reversal startup).")]
+    public Color invulnerableFlashColor = new Color(0.92f, 0.96f, 1f);
+    [Tooltip("Pulses per second of the invulnerability tint.")]
+    public float invulnerableFlashFrequency = 12f;
+    [Tooltip("Shortest time the tint stays visible, so a six-frame wake-up still reads.")]
+    public float invulnerableFlashMinDuration = 0.15f;
+    [Tooltip("Body tint popped when a strike is deflected by an invulnerable or downed body.")]
+    public Color deflectFlashColor = new Color(0.8f, 0.85f, 0.9f);
+    public float deflectFlashDuration = 0.12f;
+    [Tooltip("Camera kick on a deflected strike; no hitstop is applied since nothing connected.")]
+    public float deflectCameraPunch = 0.04f;
+    [Tooltip("Seconds the model takes to visually turn around after the gameplay facing snaps on a cross-up.")]
+    public float turnaroundDuration = 0.12f;
+
     [Header("Input Buffer")]
     [Tooltip("Frames an input stays valid once the fighter becomes actionable.")]
     public float linkLeniency = 5f * Frame;
     [Tooltip("A press older than this when the fighter becomes actionable is discarded, so mashing through a long stun never stores a stale input.")]
     public float holdThrough = 0.5f;
+    [Tooltip("Both kicks pressed within this window buffer a dash instead of a kick.")]
+    public float dashMacroWindow = 2f * Frame;
 
     /// <summary>Damage multiplier of hit <paramref name="hitNumber"/> (1-based) before route proration.</summary>
     public float ComboScaling(int hitNumber)

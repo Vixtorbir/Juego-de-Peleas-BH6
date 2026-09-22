@@ -2,6 +2,19 @@ using System;
 using UnityEngine;
 
 /// <summary>
+/// Why an incoming strike did not connect. Deflections (the body could not be hit) consume the
+/// strike and get their own feedback; a height whiff is a genuine miss and leaves the strike live.
+/// </summary>
+public enum HitRejection
+{
+    None,
+    Invulnerable,
+    Down,
+    Dead,
+    HeightWhiff
+}
+
+/// <summary>
 /// Running state of the combo being landed on a fighter. A plain struct on the hurtbox so combo
 /// tracking, bounce limits and route proration never touch the heap.
 /// </summary>
@@ -59,6 +72,9 @@ public class Hurtbox : MonoBehaviour
     public int ComboHitCount => combo.Hits;
     public float TotalComboDamage => combo.Damage;
 
+    /// <summary>Strikes deflected by this body since startup; exposed for tests and telemetry.</summary>
+    public int DeflectCount { get; private set; }
+
     private CombatRules Rules => controller.Rules;
 
     private void Awake()
@@ -92,9 +108,29 @@ public class Hurtbox : MonoBehaviour
     /// </summary>
     public bool ReceiveHit(AttackData attack, RobotController attacker, Vector3 contactPoint, bool freezeAttacker)
     {
+        return TryReceiveHit(attack, attacker, contactPoint, freezeAttacker, out _);
+    }
+
+    /// <summary>
+    /// Same as <see cref="ReceiveHit(AttackData, RobotController, Vector3, bool)"/> but reports why a
+    /// strike was refused, so the striker can tell a deflection from a whiff.
+    /// </summary>
+    public bool TryReceiveHit(AttackData attack, RobotController attacker, Vector3 contactPoint, bool freezeAttacker, out HitRejection rejection)
+    {
+        rejection = HitRejection.None;
         if (controller == null || attack == null) return false;
-        if (health != null && health.IsDead) return false;
-        if (controller.IsInvincible) return false;
+
+        if (health != null && health.IsDead)
+        {
+            rejection = HitRejection.Dead;
+            return false;
+        }
+
+        if (controller.IsInvincible)
+        {
+            rejection = HitRejection.Invulnerable;
+            return false;
+        }
 
         RobotState posture = controller.CurrentState;
         bool counterHit = controller.IsInAttackStartup;
@@ -107,7 +143,11 @@ public class Hurtbox : MonoBehaviour
             return true;
         }
 
-        if (posture != null && posture.IgnoresGroundedHits) return false;
+        if (posture != null && posture.IgnoresGroundedHits)
+        {
+            rejection = HitRejection.Down;
+            return false;
+        }
 
         bool crouching = posture != null && posture.IsCrouchingPosture;
         bool blocking = !counterHit && posture != null && posture.CanGuard && IsHoldingBack();
@@ -116,6 +156,7 @@ public class Hurtbox : MonoBehaviour
         switch (result)
         {
             case GuardResult.Whiffed:
+                rejection = HitRejection.HeightWhiff;
                 return false;
 
             case GuardResult.Blocked:
@@ -144,6 +185,26 @@ public class Hurtbox : MonoBehaviour
 
         combo = ComboState.Fresh;
         OnComboEnd?.Invoke();
+    }
+
+    /// <summary>
+    /// Feedback for a strike this body deflected: a silver spark at the contact point, the deflect
+    /// sound, a body pop and a small camera kick. No hitstop on either side, nothing connected.
+    /// </summary>
+    public void NotifyDeflected(Vector3 contactPoint, RobotController attacker)
+    {
+        DeflectCount++;
+
+        CombatRules rules = Rules;
+        if (controller.Flash != null) controller.Flash.Pop(rules.deflectFlashColor, rules.deflectFlashDuration);
+
+        if (fightingCamera != null)
+        {
+            fightingCamera.Punch(ComputeKnockbackDirection(null, attacker), rules.deflectCameraPunch);
+        }
+
+        if (HitsparkPool.Instance != null) HitsparkPool.Instance.Play(contactPoint, HitsparkKind.Deflect);
+        if (AudioManager.Instance != null) AudioManager.Instance.PlayDeflect();
     }
 
     /// <summary>
@@ -265,7 +326,7 @@ public class Hurtbox : MonoBehaviour
     private Vector3 ComputeKnockbackDirection(AttackData attack, RobotController attacker)
     {
         float horizontal = attacker != null ? Mathf.Sign(transform.position.x - attacker.transform.position.x) : 0f;
-        float vertical = attack.isLauncher ? LauncherShakeVerticalBias : 0f;
+        float vertical = attack != null && attack.isLauncher ? LauncherShakeVerticalBias : 0f;
         return new Vector3(horizontal, vertical, 0f);
     }
 

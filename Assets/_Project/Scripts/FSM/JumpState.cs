@@ -22,6 +22,9 @@ public class JumpState : RobotState
 
     public override bool AcceptsCommands => robot.IsAboveAirActionHeight;
 
+    /// <summary>Air normals and air dashes; a locked-out dash still ages here so it never lands as a ground dash.</summary>
+    public override bool CanConsume(FighterCommand command) => AcceptsCommands && (IsAttackButton(command) || IsDashCommand(command));
+
     /// <summary>Next entry leaves the ground with the given vertical speed.</summary>
     public void ConfigureTakeoff(float verticalForce)
     {

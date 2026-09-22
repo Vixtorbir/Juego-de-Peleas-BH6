@@ -33,6 +33,8 @@ public class CombatAudioLibrary : ScriptableObject
 
     [Header("System")]
     public SoundEvent counterHit;
+    [Tooltip("Strike deflected by an invulnerable or downed body. Without clips the block layer plays pitched up.")]
+    public SoundEvent deflect;
     public SoundEvent knockoutImpact;
     public SoundEvent knockoutSting;
 

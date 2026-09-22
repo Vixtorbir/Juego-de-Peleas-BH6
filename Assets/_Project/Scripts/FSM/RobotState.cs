@@ -39,11 +39,45 @@ public abstract class RobotState
     public virtual bool IsNeutral => false;
 
     /// <summary>
-    /// True while a buffered command could be consumed this frame: the neutral stances, and an
-    /// attack whose cancel window is open. The input buffer only ages during these frames, so a
-    /// press made during recovery or stun executes on the first actionable frame.
+    /// True while the state is open to buffered commands at all: the neutral stances, an attack
+    /// whose cancel window is open, a dash past its attack delay, a jump above the air-action height.
     /// </summary>
     public virtual bool AcceptsCommands => IsNeutral;
+
+    /// <summary>
+    /// True when <paramref name="command"/> belongs to this state's vocabulary right now. The input
+    /// buffer only ages while the head command is consumable, so a press the current state cannot
+    /// act on (a special during a jump, a normal during recovery) is held for the first state that
+    /// can, within the hold-through limit. Neutral stances consume everything.
+    /// </summary>
+    public virtual bool CanConsume(FighterCommand command) => AcceptsCommands;
+
+    protected static bool IsAttackButton(FighterCommand command)
+    {
+        switch (command)
+        {
+            case FighterCommand.LeftPunch:
+            case FighterCommand.RightPunch:
+            case FighterCommand.LeftKick:
+            case FighterCommand.RightKick:
+            case FighterCommand.Launcher:
+            case FighterCommand.Overhead:
+            case FighterCommand.AntiAir:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    protected static bool IsSpecialCommand(FighterCommand command)
+    {
+        return command == FighterCommand.Hadouken || command == FighterCommand.Shoryuken;
+    }
+
+    protected static bool IsDashCommand(FighterCommand command)
+    {
+        return command == FighterCommand.DashForward || command == FighterCommand.DashBackward;
+    }
 
     /// <summary>True while grounded hits pass through the body (knockdown lockout).</summary>
     public virtual bool IgnoresGroundedHits => false;
@@ -143,9 +177,11 @@ public abstract class RobotState
             for (int i = 0; i < data.comboBranches.Count; i++)
             {
                 ComboBranch branch = data.comboBranches[i];
-                if (branch.nextAttack == null || !robot.TryConsumeCommand(branch.inputCommand)) continue;
+                if (branch.nextAttack == null || robot.bufferedCommand != branch.inputCommand) continue;
+                if (branch.nextAttack == data && !robot.TryUseRapidLink()) continue;
 
-                EnterNormal(branch.nextAttack);
+                robot.TryConsumeCommand(branch.inputCommand);
+                EnterNormal(branch.nextAttack, true);
                 return true;
             }
         }
@@ -155,7 +191,7 @@ public abstract class RobotState
         AttackData next = airborne ? robot.ResolveAirNormal(command) : robot.ResolveNormal(command, crouching);
         if (next == null || next.GatlingTier <= data.GatlingTier || !robot.TryConsumeCommand(command)) return false;
 
-        EnterNormal(next);
+        EnterNormal(next, true);
         return true;
     }
 
@@ -232,7 +268,7 @@ public abstract class RobotState
         AttackData attack = robot.ResolveNormal(command, crouching);
         if (attack == null || !robot.TryConsumeCommand(command)) return false;
 
-        EnterNormal(attack);
+        EnterNormal(attack, false);
         return true;
     }
 
@@ -270,11 +306,14 @@ public abstract class RobotState
         return false;
     }
 
-    /// <summary>Crouching normals keep the capsule lowered, jumping normals keep falling; everything else stands.</summary>
-    private void EnterNormal(AttackData attack)
+    /// <summary>
+    /// Crouching normals keep the capsule lowered, jumping normals keep falling; everything else
+    /// stands. <paramref name="chained"/> marks a chain cancel so the grounded attack may micro-step.
+    /// </summary>
+    private void EnterNormal(AttackData attack, bool chained)
     {
         if (attack.isAirAttack) robot.EnterAirAttack(attack);
-        else if (robot.IsCrouchingNormal(attack)) robot.EnterCrouchAttack(attack);
-        else robot.EnterAttack(attack);
+        else if (robot.IsCrouchingNormal(attack)) robot.EnterCrouchAttack(attack, chained);
+        else robot.EnterAttack(attack, chained);
     }
 }

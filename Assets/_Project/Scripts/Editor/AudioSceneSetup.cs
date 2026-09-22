@@ -53,6 +53,7 @@ public static class AudioSceneSetup
         new EventBinding("hadoukenImpact", "hadouken_impact_", 0.9f, 0.06f),
         new EventBinding("shoryukenRise", "shoryuken_rise_", 0.85f, 0.03f),
         new EventBinding("counterHit", "counter_hit_", 0.75f, 0.04f),
+        new EventBinding("deflect", "deflect_", 0.6f, 0.06f),
         new EventBinding("knockoutImpact", "knockout_impact_", 1f, 0.02f),
         new EventBinding("knockoutSting", "knockout_sting_", 0.9f, 0f)
     };

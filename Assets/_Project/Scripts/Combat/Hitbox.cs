@@ -67,12 +67,35 @@ public class Hitbox : MonoBehaviour
         if (!other.TryGetComponent(out Hurtbox target) || target.Owner == attackerController) return;
 
         Vector3 contactPoint = ComputeContactPoint(other);
-        if (target.ReceiveHit(currentAttackData, attackerController, contactPoint, true) && attackerController != null)
+        if (target.TryReceiveHit(currentAttackData, attackerController, contactPoint, true, out HitRejection rejection))
         {
-            attackerController.NotifyAttackConnected();
+            if (attackerController != null) attackerController.NotifyAttackConnected();
+            Deactivate();
+            return;
         }
 
-        Deactivate();
+        ResolveRejection(target, rejection, contactPoint);
+    }
+
+    /// <summary>
+    /// A strike into an invulnerable or downed body is deflected: it is spent, like hitting armour,
+    /// and the defender's hurtbox plays the deflect feedback. A height whiff is a genuine miss, so the
+    /// volume stays live for the rest of its active frames and the whiff sound follows as usual.
+    /// A dead body simply absorbs the strike.
+    /// </summary>
+    private void ResolveRejection(Hurtbox target, HitRejection rejection, Vector3 contactPoint)
+    {
+        switch (rejection)
+        {
+            case HitRejection.Invulnerable:
+            case HitRejection.Down:
+                target.NotifyDeflected(contactPoint, attackerController);
+                Deactivate();
+                break;
+            case HitRejection.Dead:
+                Deactivate();
+                break;
+        }
     }
 
     /// <summary>

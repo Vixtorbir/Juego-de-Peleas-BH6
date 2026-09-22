@@ -44,3 +44,5 @@ MonoBehaviour:
   comboBranches:
   - inputCommand: 2
     nextAttack: {fileID: 11400000, guid: 54b0d6d2482a8654ea817dcbe35905c1, type: 2}
+  - inputCommand: 1
+    nextAttack: {fileID: 11400000}

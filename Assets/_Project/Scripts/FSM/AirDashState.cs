@@ -17,6 +17,8 @@ public class AirDashState : RobotState
 
     public override bool AcceptsCommands => stateTimer >= robot.Rules.airDashAttackDelay;
 
+    public override bool CanConsume(FighterCommand command) => AcceptsCommands && IsAttackButton(command);
+
     public void Configure(bool forward)
     {
         isForward = forward;

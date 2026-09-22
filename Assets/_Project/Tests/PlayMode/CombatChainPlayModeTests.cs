@@ -32,6 +32,11 @@ public class CombatChainPlayModeTests
     private const float RecoveryProbeDelay = 0.25f;
     private const float AirDashLockoutProbe = 0.15f;
     private const float AirDashProbeHeight = 1.2f;
+    private const float JumpInHeight = 2f;
+    private const float DashAttackProbeDelay = 0.06f;
+    private const float MomentumProbeDuration = 0.15f;
+    private const float MinDashAttackTravel = 0.3f;
+    private const float MinMicroStepTravel = 0.1f;
 
     private RobotController player1;
     private RobotController player2;
@@ -302,6 +307,207 @@ public class CombatChainPlayModeTests
         Assert.AreEqual(1, player2.Hurtbox.Combo.GroundBounces, "Ground bounce count must stay at one per combo.");
 
         yield return WaitUntilRealtime(() => player2.CurrentState is KnockdownState, "Spent spike should drop the defender straight into a knockdown.");
+    }
+
+    [UnityTest]
+    public IEnumerator InvulnerableOpponentDeflectsHitsWithZeroDamage()
+    {
+        float startHealth = player2.Health.CurrentHealth;
+        int deflectsBefore = player2.Hurtbox.DeflectCount;
+
+        player2.GrantInvulnerability(1f);
+        yield return null;
+        Assert.IsTrue(player2.Flash.IsFlashing, "Invulnerability should tint the body.");
+
+        Assert.IsFalse(player2.Hurtbox.TryReceiveHit(player1.leftPunchBase, player1, player2.transform.position, true, out HitRejection rejection));
+        Assert.AreEqual(HitRejection.Invulnerable, rejection, "Strike on an invulnerable body should report a deflection.");
+
+        player1.EnterAttack(player1.leftPunchBase);
+        yield return WaitUntilRealtime(() => player2.Hurtbox.DeflectCount > deflectsBefore, "Jab into the invulnerable body never deflected.");
+
+        Assert.AreEqual(startHealth, player2.Health.CurrentHealth, 0.001f, "Deflected strike dealt damage.");
+        Assert.IsFalse(player1.AttackConnected, "Deflected strike must not count as connected.");
+        Assert.IsFalse(player1.hitboxBase.IsActive, "Deflected strike should spend the hitbox.");
+        Assert.IsTrue(player2.CurrentState is IdleState, "Deflection must not move the defender out of its state.");
+
+        yield return WaitUntilRealtime(() => !player2.IsInvincible && player1.CurrentState is IdleState, "Fighters never settled after the deflection.");
+
+        player1.EnterCrouchAttack(player1.crouchSweepBase);
+        yield return WaitForState<KnockdownState>(player2);
+        float downedHealth = player2.Health.CurrentHealth;
+
+        Assert.IsFalse(player2.Hurtbox.TryReceiveHit(player1.leftPunchBase, player1, player2.transform.position, true, out rejection));
+        Assert.AreEqual(HitRejection.Down, rejection, "Strike on a downed body should report a deflection.");
+        Assert.AreEqual(downedHealth, player2.Health.CurrentHealth, 0.001f, "Downed body took damage.");
+    }
+
+    [UnityTest]
+    public IEnumerator FullGatlingStringConnectsWithoutSpacingDropDueToMicroStep()
+    {
+        FighterCommand[] route = { FighterCommand.LeftPunch, FighterCommand.RightPunch, FighterCommand.RightKick, FighterCommand.Launcher };
+        float facing = player1.GetScreenFacingSign();
+        float lastHealth = player2.Health.CurrentHealth;
+        int hitsLanded = 0;
+        int nextStep = 1;
+        bool defenderRecoveredBetweenHits = false;
+        bool launcherObserved = false;
+        float launcherEntryX = 0f;
+
+        player1.bufferedCommand = route[0];
+
+        float deadline = Time.realtimeSinceStartup + RouteTimeout;
+        while (Time.realtimeSinceStartup < deadline && hitsLanded < route.Length)
+        {
+            if (!launcherObserved && player1.CurrentState is AttackState attack && attack.Data == player1.launcherBase)
+            {
+                launcherObserved = true;
+                launcherEntryX = player1.transform.position.x;
+            }
+
+            if (player2.Health.CurrentHealth < lastHealth)
+            {
+                lastHealth = player2.Health.CurrentHealth;
+                hitsLanded++;
+                if (nextStep < route.Length) player1.bufferedCommand = route[nextStep++];
+            }
+            else if (hitsLanded > 0 && player2.CurrentState.IsNeutral)
+            {
+                defenderRecoveredBetweenHits = true;
+            }
+
+            yield return null;
+        }
+
+        Assert.AreEqual(route.Length, hitsLanded, "Jab > Cross > Roundhouse > Launcher should land four hits despite the roundhouse pushback.");
+        Assert.IsFalse(defenderRecoveredBetweenHits, "Defender regained control mid-route: the string dropped.");
+        Assert.IsTrue(launcherObserved, "Launcher never started.");
+        Assert.Greater((player1.transform.position.x - launcherEntryX) * facing, MinMicroStepTravel, "Launcher should micro-step towards the pushed-back defender.");
+        Assert.IsTrue(player2.CurrentState is AirborneHurtState, "Launcher should end the string with a juggle.");
+    }
+
+    [UnityTest]
+    public IEnumerator AirAttackOnConnectCancelsLandingRecoveryIntoGroundedChain()
+    {
+        float facing = player1.GetScreenFacingSign();
+        float startHealth = player2.Health.CurrentHealth;
+
+        player1.SetMovementInput(new Vector2(facing, 1f));
+        yield return WaitForState<JumpState>(player1);
+        player1.SetMovementInput(Vector2.zero);
+
+        yield return WaitUntilRealtime(() => player1.AirVelocity.y < 0f && player1.transform.position.y < JumpInHeight, "Fighter never came down into jump-in range.");
+        player1.bufferedCommand = FighterCommand.LeftPunch;
+        yield return WaitUntilRealtime(() => player2.Health.CurrentHealth < startHealth, "Jump-in jab never connected.");
+        float afterJumpIn = player2.Health.CurrentHealth;
+
+        player1.PressCommand(FighterCommand.Shoryuken);
+
+        int idleFrames = 0;
+        int recoveryFrames = 0;
+        bool defenderRecovered = false;
+        yield return WaitUntilRealtime(() =>
+        {
+            if (player1.CurrentState is IdleState) idleFrames++;
+            if (player1.IsGrounded && player1.CurrentState is AirAttackState) recoveryFrames++;
+            if (player2.CurrentState.IsNeutral) defenderRecovered = true;
+            return player1.CurrentState is ShoryukenState;
+        }, "Shoryuken never came out after the jump-in.");
+
+        Assert.LessOrEqual(recoveryFrames, 1, "A connected jump-in should land-cancel instead of serving landing recovery.");
+        Assert.LessOrEqual(idleFrames, 1, "Buffered Shoryuken should fire on the first grounded frame.");
+        Assert.IsFalse(defenderRecovered, "Defender recovered before the ground follow-up: the jump-in link dropped.");
+
+        yield return WaitUntilRealtime(() => player2.Health.CurrentHealth < afterJumpIn, "Shoryuken after the land-cancel never connected.");
+
+        yield return WaitUntilRealtime(() => player1.CurrentState.IsNeutral && player2.CurrentState.IsNeutral, "Fighters never returned to neutral.");
+        Teleport(player2, player1.transform.position.x + facing * WhiffDistance);
+        yield return null;
+
+        player1.SetMovementInput(new Vector2(facing, 1f));
+        yield return WaitForState<JumpState>(player1);
+        player1.SetMovementInput(Vector2.zero);
+        yield return WaitUntilRealtime(() => player1.AirVelocity.y < 0f && player1.transform.position.y < JumpInHeight, "Fighter never came down on the whiffed jump-in.");
+        player1.bufferedCommand = FighterCommand.LeftPunch;
+        yield return WaitForState<AirAttackState>(player1);
+
+        int whiffRecoveryFrames = 0;
+        yield return WaitUntilRealtime(() =>
+        {
+            if (player1.IsGrounded && player1.CurrentState is AirAttackState) whiffRecoveryFrames++;
+            return player1.CurrentState is IdleState;
+        }, "Whiffed jump-in never landed.");
+
+        Assert.GreaterOrEqual(whiffRecoveryFrames, 2, "A whiffed jump-in must still pay its landing recovery.");
+    }
+
+    [UnityTest]
+    public IEnumerator DashAttackCarriesForwardMomentum()
+    {
+        Teleport(player2, -0.5f + WhiffDistance);
+        yield return null;
+        float facing = player1.GetScreenFacingSign();
+
+        player1.bufferedCommand = FighterCommand.DashForward;
+        yield return WaitForState<DashState>(player1);
+        yield return new WaitForSeconds(DashAttackProbeDelay);
+
+        player1.bufferedCommand = FighterCommand.RightPunch;
+        yield return WaitUntilRealtime(() => player1.CurrentState is AttackState attack && attack.Data == player1.rightPunchBase, "Cross never came out of the dash.");
+        float dashAttackStartX = player1.transform.position.x;
+        yield return new WaitForSeconds(MomentumProbeDuration);
+        float dashAttackTravel = (player1.transform.position.x - dashAttackStartX) * facing;
+
+        yield return WaitForState<IdleState>(player1);
+        player1.bufferedCommand = FighterCommand.RightPunch;
+        yield return WaitUntilRealtime(() => player1.CurrentState is AttackState attack && attack.Data == player1.rightPunchBase, "Cross never came out of idle.");
+        float idleAttackStartX = player1.transform.position.x;
+        yield return new WaitForSeconds(MomentumProbeDuration);
+        float idleAttackTravel = (player1.transform.position.x - idleAttackStartX) * facing;
+
+        Assert.Greater(dashAttackTravel, MinDashAttackTravel, "A cross started from a forward dash should keep sliding forward.");
+        Assert.Greater(dashAttackTravel, idleAttackTravel + MinDashAttackTravel * 0.5f, "Dash attack travel should clearly exceed a rooted attack.");
+    }
+
+    [UnityTest]
+    public IEnumerator QueuedInputsResolveInOrder()
+    {
+        AttackData[] expected = { player1.leftPunchBase, player1.rightPunchBase, player1.rightKickBase };
+        AttackData[] observed = new AttackData[expected.Length];
+        int observedCount = 0;
+        float lastHealth = player2.Health.CurrentHealth;
+        int hitsLanded = 0;
+
+        player1.PressCommand(FighterCommand.LeftPunch);
+        yield return WaitForState<AttackState>(player1);
+        observed[observedCount++] = ((AttackState)player1.CurrentState).Data;
+
+        player1.PressCommand(FighterCommand.RightPunch);
+        player1.PressCommand(FighterCommand.RightKick);
+        Assert.AreEqual(FighterCommand.RightPunch, player1.bufferedCommand, "Second press should take the head of the buffer.");
+        Assert.AreEqual(FighterCommand.RightKick, player1.QueuedCommand, "Third press should wait in the queue.");
+
+        float deadline = Time.realtimeSinceStartup + RouteTimeout;
+        while (Time.realtimeSinceStartup < deadline && hitsLanded < expected.Length)
+        {
+            if (player1.CurrentState is AttackState attack && observedCount < observed.Length && attack.Data != observed[observedCount - 1])
+            {
+                observed[observedCount++] = attack.Data;
+            }
+
+            if (player2.Health.CurrentHealth < lastHealth)
+            {
+                lastHealth = player2.Health.CurrentHealth;
+                hitsLanded++;
+            }
+
+            yield return null;
+        }
+
+        Assert.AreEqual(expected.Length, hitsLanded, "Three queued presses should land three hits.");
+        for (int i = 0; i < expected.Length; i++)
+        {
+            Assert.AreEqual(expected[i], observed[i], $"Attack {i + 1} came out of order.");
+        }
     }
 
     [UnityTest]

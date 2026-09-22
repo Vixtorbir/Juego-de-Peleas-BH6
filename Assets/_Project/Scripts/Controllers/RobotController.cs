@@ -26,7 +26,9 @@ public enum FighterCommand
 /// animator while the rest of the scene keeps running, so each side of a hit can be held for a
 /// different number of frames. Command normals are decoded from the stick at press time, and the
 /// airborne velocity is shared between the jump, air dash and air attack states so control can
-/// pass between them mid-air without losing momentum.
+/// pass between them mid-air without losing momentum. The command buffer is two deep so a quick
+/// string of presses resolves in order, the gameplay facing snaps instantly while the model eases
+/// its turn, and the body is tinted whenever the fighter cannot be hit.
 /// </summary>
 [RequireComponent(typeof(CharacterController))]
 public class RobotController : MonoBehaviour
@@ -69,6 +71,8 @@ public class RobotController : MonoBehaviour
     private const float CommandDownThreshold = -0.5f;
     private const int ProjectilePoolCapacity = 2;
     private const string WallLayerName = "Wall";
+    private const string ModelObjectName = "Model";
+    private const float HalfTurnDegrees = 180f;
 
     [Header("Dependencies")]
     public InputReader inputReader;
@@ -113,7 +117,7 @@ public class RobotController : MonoBehaviour
     public Transform hadoukenSpawnPoint;
 
     [Header("Input Buffer")]
-    [Tooltip("Pending command. Writing it directly counts as a fresh press.")]
+    [Tooltip("Pending command at the head of the buffer. Writing it directly counts as a fresh press.")]
     public FighterCommand bufferedCommand = FighterCommand.None;
     [SerializeField] private float doubleTapWindow = 0.25f;
 
@@ -132,8 +136,21 @@ public class RobotController : MonoBehaviour
     public Hurtbox Hurtbox { get; private set; }
     public HealthComponent Health { get; private set; }
     public ProjectilePool Projectiles { get; private set; }
+    public CombatFlash Flash { get; private set; }
     public CombatRules Rules => combatRules;
     public RobotState CurrentState => currentState;
+
+    /// <summary>Second buffered command, promoted to the head once the head is consumed or expires.</summary>
+    public FighterCommand QueuedCommand => queuedCommand;
+
+    /// <summary>Capsule radius of the opponent, used to aim the combo micro-step at the body.</summary>
+    public float OpponentBodyRadius { get; private set; }
+
+    /// <summary>
+    /// Forward speed the next attack starts with. Set by a state that hands its momentum to the
+    /// attack (a dash) and consumed by the attack on entry.
+    /// </summary>
+    public float PendingAttackMomentum { get; set; }
 
     /// <summary>Set by reversal specials for their startup; wake-up invulnerability is added on top.</summary>
     public bool IsInvincible
@@ -190,9 +207,20 @@ public class RobotController : MonoBehaviour
     private float pressTime;
     private float bufferTimer;
     private bool bufferWindowOpen;
+    private FighterCommand queuedCommand;
+    private float queuedPressTime;
+    private bool lastPressWasQueued;
+    private float lastLeftKickPressTime = float.NegativeInfinity;
+    private float lastRightKickPressTime = float.NegativeInfinity;
     private float lastTapTime;
     private int lastTapDirection;
     private bool isDirectionHeld;
+    private int rapidChainLinks;
+
+    private Transform modelTransform;
+    private Quaternion modelBaseRotation;
+    private float modelYawOffset;
+    private bool wasInvincible;
 
     private float freezeRemaining;
     private float invulnerabilityTimer;
@@ -212,6 +240,12 @@ public class RobotController : MonoBehaviour
         Health = GetComponent<HealthComponent>();
         if (combatRules == null) combatRules = ScriptableObject.CreateInstance<CombatRules>();
         if (wallLayer.value == 0) wallLayer = LayerMask.GetMask(WallLayerName);
+        if (!TryGetComponent(out CombatFlash flash)) flash = gameObject.AddComponent<CombatFlash>();
+        Flash = flash;
+
+        modelTransform = transform.Find(ModelObjectName);
+        if (modelTransform != null) modelBaseRotation = modelTransform.localRotation;
+
         AllocateStates();
 
         if (hitboxBase == null) hitboxBase = GetComponentInChildren<Hitbox>(true);
@@ -242,6 +276,11 @@ public class RobotController : MonoBehaviour
             inputReader.RightKickEvent += HandleRightKick;
         }
 
+        if (opponentTarget != null && opponentTarget.TryGetComponent(out CharacterController opponentBody))
+        {
+            OpponentBodyRadius = opponentBody.radius;
+        }
+
         EnterIdle();
     }
 
@@ -258,6 +297,7 @@ public class RobotController : MonoBehaviour
 
     private void Update()
     {
+        TickTelegraphs();
         if (TickFreeze()) return;
 
         TickInvulnerability();
@@ -332,16 +372,38 @@ public class RobotController : MonoBehaviour
         TransitionTo(dashState);
     }
 
-    public void EnterAttack(AttackData data)
+    public void EnterAttack(AttackData data) => EnterAttack(data, false);
+
+    /// <summary>
+    /// Starts a standing normal. <paramref name="chained"/> marks a chain cancel, which grants the
+    /// combo micro-step and counts towards the rapid-chain limit; a fresh normal clears that count.
+    /// </summary>
+    public void EnterAttack(AttackData data, bool chained)
     {
-        attackState.Configure(data);
+        if (!chained) rapidChainLinks = 0;
+        attackState.Configure(data, chained);
         TransitionTo(attackState);
     }
 
-    public void EnterCrouchAttack(AttackData data)
+    public void EnterCrouchAttack(AttackData data) => EnterCrouchAttack(data, false);
+
+    public void EnterCrouchAttack(AttackData data, bool chained)
     {
-        crouchAttackState.Configure(data);
+        if (!chained) rapidChainLinks = 0;
+        crouchAttackState.Configure(data, chained);
         TransitionTo(crouchAttackState);
+    }
+
+    /// <summary>
+    /// Spends one link of the rapid-chain allowance (a normal chaining into itself). Returns false
+    /// once the string has used them all.
+    /// </summary>
+    public bool TryUseRapidLink()
+    {
+        if (rapidChainLinks >= combatRules.rapidChainLimit) return false;
+
+        rapidChainLinks++;
+        return true;
     }
 
     public void EnterSpecialAttack(AttackData data)
@@ -511,7 +573,9 @@ public class RobotController : MonoBehaviour
     /// <summary>
     /// Snaps the fighter to face the opponent along the combat axis only. The match is played on
     /// the world X axis, so the look direction is clamped to +X or -X and any depth offset between
-    /// the two fighters can never tilt them towards or away from the camera.
+    /// the two fighters can never tilt them towards or away from the camera. Hitboxes, pushback and
+    /// input semantics follow the snap at once; the model absorbs the half turn as a yaw offset that
+    /// eases out over the rules' turnaround time, so a cross-up never flips the body in one frame.
     /// </summary>
     public void FaceOpponent()
     {
@@ -521,7 +585,12 @@ public class RobotController : MonoBehaviour
         if (Mathf.Abs(deltaX) < FacingDeadZone) return;
 
         Vector3 facing = deltaX > 0f ? Vector3.right : Vector3.left;
+        if (Vector3.Dot(transform.forward, facing) > 0.999f) return;
+
+        float previousYaw = transform.eulerAngles.y;
         transform.rotation = Quaternion.LookRotation(facing, Vector3.up);
+        modelYawOffset = Mathf.DeltaAngle(0f, modelYawOffset + Mathf.DeltaAngle(transform.eulerAngles.y, previousYaw));
+        ApplyModelYawOffset();
     }
 
     /// <summary>
@@ -573,6 +642,7 @@ public class RobotController : MonoBehaviour
         if (Health != null) Health.ResetHealth();
         Projectiles?.RecallAll();
 
+        queuedCommand = FighterCommand.None;
         ClearBufferedCommand();
         freezeRemaining = 0f;
         invulnerabilityTimer = 0f;
@@ -580,10 +650,41 @@ public class RobotController : MonoBehaviour
         AttackConnected = false;
         AirDashesUsed = 0;
         AirVelocity = Vector2.zero;
+        PendingAttackMomentum = 0f;
+        rapidChainLinks = 0;
         animator.speed = 1f;
 
         animator.Play(FighterAnimatorParameters.LocomotionState, 0, 0f);
         EnterIdle();
+
+        modelYawOffset = 0f;
+        ApplyModelYawOffset();
+    }
+
+    /// <summary>
+    /// Visual-only work that runs even while frozen: the invulnerability tint follows the invincible
+    /// flag, and the model finishes any turn the gameplay facing already made.
+    /// </summary>
+    private void TickTelegraphs()
+    {
+        bool invincible = IsInvincible;
+        if (invincible != wasInvincible)
+        {
+            wasInvincible = invincible;
+            Flash.SetPulse(invincible, combatRules.invulnerableFlashColor, combatRules.invulnerableFlashFrequency, combatRules.invulnerableFlashMinDuration);
+        }
+
+        if (modelYawOffset == 0f) return;
+
+        float turnSpeed = HalfTurnDegrees / Mathf.Max(combatRules.turnaroundDuration, 0.0001f);
+        modelYawOffset = Mathf.MoveTowardsAngle(modelYawOffset, 0f, turnSpeed * Time.unscaledDeltaTime);
+        ApplyModelYawOffset();
+    }
+
+    private void ApplyModelYawOffset()
+    {
+        if (modelTransform == null) return;
+        modelTransform.localRotation = modelBaseRotation * Quaternion.Euler(0f, modelYawOffset, 0f);
     }
 
     /// <summary>Returns true while the fighter must stay frozen this frame.</summary>
@@ -617,18 +718,23 @@ public class RobotController : MonoBehaviour
     /// recovery, stun and hitstop; once the state accepts commands the leniency window opens and
     /// the state ticking right after this consumes it. A press older than the hold-through limit
     /// when the fighter becomes actionable is dropped, so mashing through a long stun stores nothing.
+    /// The buffer is two deep: a press made while the head is occupied waits in the queue and is
+    /// promoted when the head is consumed or expires, so a fast string resolves in press order. The
+    /// head only ages while the current state can consume that command, so a special pressed during
+    /// a jump-in is still waiting when the fighter lands.
     /// </summary>
     private void TickCommandBuffer()
     {
         if (bufferedCommand == FighterCommand.None)
         {
             trackedCommand = FighterCommand.None;
+            if (queuedCommand != FighterCommand.None) PromoteQueuedCommand();
             return;
         }
 
         if (bufferedCommand != trackedCommand) RegisterPress(bufferedCommand);
 
-        if (currentState == null || !currentState.AcceptsCommands)
+        if (currentState == null || !currentState.CanConsume(bufferedCommand))
         {
             if (Time.unscaledTime - pressTime > combatRules.holdThrough) ClearBufferedCommand();
             return;
@@ -645,8 +751,34 @@ public class RobotController : MonoBehaviour
         if (bufferTimer <= 0f) ClearBufferedCommand();
     }
 
-    private void BufferCommand(FighterCommand command)
+    /// <summary>
+    /// Registers a button press. The head takes it when free; otherwise it waits in the queue, where
+    /// a newer press replaces an older one. Public so tests and AI drivers share the reader's path.
+    /// </summary>
+    public void PressCommand(FighterCommand command)
     {
+        if (bufferedCommand == FighterCommand.None)
+        {
+            bufferedCommand = command;
+            RegisterPress(command);
+            lastPressWasQueued = false;
+            return;
+        }
+
+        queuedCommand = command;
+        queuedPressTime = Time.unscaledTime;
+        lastPressWasQueued = true;
+    }
+
+    /// <summary>Rewrites the most recent press in place, used when two buttons resolve to one macro.</summary>
+    private void ReplaceLastPress(FighterCommand command)
+    {
+        if (lastPressWasQueued && queuedCommand != FighterCommand.None)
+        {
+            queuedCommand = command;
+            return;
+        }
+
         bufferedCommand = command;
         RegisterPress(command);
     }
@@ -665,6 +797,22 @@ public class RobotController : MonoBehaviour
         trackedCommand = FighterCommand.None;
         bufferWindowOpen = false;
         bufferTimer = 0f;
+        lastPressWasQueued = false;
+        if (queuedCommand != FighterCommand.None) PromoteQueuedCommand();
+    }
+
+    /// <summary>
+    /// Moves the queued press to the head with its original press time, so the hold-through rule
+    /// still judges it by when the player actually pressed it.
+    /// </summary>
+    private void PromoteQueuedCommand()
+    {
+        bufferedCommand = queuedCommand;
+        trackedCommand = queuedCommand;
+        pressTime = queuedPressTime;
+        bufferWindowOpen = false;
+        bufferTimer = 0f;
+        queuedCommand = FighterCommand.None;
     }
 
     private bool IsHoldingForward => MovementInput.x * GetScreenFacingSign() > CommandForwardThreshold;
@@ -733,7 +881,7 @@ public class RobotController : MonoBehaviour
         if (opponentTarget == null) return;
 
         bool towardsOpponent = tapDirection == (int)GetScreenFacingSign();
-        BufferCommand(towardsOpponent ? FighterCommand.DashForward : FighterCommand.DashBackward);
+        PressCommand(towardsOpponent ? FighterCommand.DashForward : FighterCommand.DashBackward);
         lastTapDirection = 0;
     }
 
@@ -745,7 +893,7 @@ public class RobotController : MonoBehaviour
     {
         bool motionDetected = inputBuffer != null
             && (inputBuffer.CheckMotionInput(QuarterCircleForward) || inputBuffer.CheckMotionInput(QuarterCircleForwardShortcut));
-        BufferCommand(motionDetected ? FighterCommand.Hadouken : FighterCommand.LeftPunch);
+        PressCommand(motionDetected ? FighterCommand.Hadouken : FighterCommand.LeftPunch);
     }
 
     /// <summary>
@@ -758,18 +906,42 @@ public class RobotController : MonoBehaviour
         bool motionDetected = inputBuffer != null
             && (inputBuffer.CheckMotionInput(DragonPunch) || inputBuffer.CheckMotionInput(DragonPunchShortcut));
 
-        if (motionDetected) BufferCommand(FighterCommand.Shoryuken);
-        else if (IsHoldingForward && !IsHoldingDown) BufferCommand(FighterCommand.Overhead);
-        else BufferCommand(FighterCommand.RightPunch);
+        if (motionDetected) PressCommand(FighterCommand.Shoryuken);
+        else if (IsHoldingForward && !IsHoldingDown) PressCommand(FighterCommand.Overhead);
+        else PressCommand(FighterCommand.RightPunch);
     }
 
-    private void HandleLeftKick() => BufferCommand(FighterCommand.LeftKick);
+    /// <summary>
+    /// Both kicks within the macro window read as a dash (back when holding away, forward otherwise)
+    /// and the first kick's press is rewritten into it, so the macro never leaks a stray kick.
+    /// </summary>
+    private void HandleLeftKick()
+    {
+        lastLeftKickPressTime = Time.unscaledTime;
+        if (TryDashMacro(lastRightKickPressTime)) return;
+
+        PressCommand(FighterCommand.LeftKick);
+    }
 
     private void HandleRightKick()
     {
-        if (IsHoldingForward && IsHoldingDown) BufferCommand(FighterCommand.AntiAir);
-        else if (IsHoldingForward) BufferCommand(FighterCommand.Launcher);
-        else BufferCommand(FighterCommand.RightKick);
+        lastRightKickPressTime = Time.unscaledTime;
+        if (TryDashMacro(lastLeftKickPressTime)) return;
+
+        if (IsHoldingForward && IsHoldingDown) PressCommand(FighterCommand.AntiAir);
+        else if (IsHoldingForward) PressCommand(FighterCommand.Launcher);
+        else PressCommand(FighterCommand.RightKick);
+    }
+
+    private bool TryDashMacro(float otherKickPressTime)
+    {
+        if (Time.unscaledTime - otherKickPressTime > combatRules.dashMacroWindow) return false;
+
+        bool holdingBack = MovementInput.x * GetScreenFacingSign() < -CommandForwardThreshold;
+        ReplaceLastPress(holdingBack ? FighterCommand.DashBackward : FighterCommand.DashForward);
+        lastLeftKickPressTime = float.NegativeInfinity;
+        lastRightKickPressTime = float.NegativeInfinity;
+        return true;
     }
 
     /// <summary>

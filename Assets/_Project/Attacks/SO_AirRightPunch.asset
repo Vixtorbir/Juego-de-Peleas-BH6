@@ -19,8 +19,8 @@ MonoBehaviour:
   startupTime: 0.167
   activeTime: 0.1
   recoveryTime: 0.2
-  hitboxOffset: {x: 0, y: 0.6, z: 1}
-  hitboxSize: {x: 0.5, y: 1.4, z: 0.8}
+  hitboxOffset: {x: 0, y: 0.6, z: 1.1}
+  hitboxSize: {x: 0.6, y: 1.6, z: 1}
   damage: 10
   hitstunDuration: 0.4
   weight: 1
