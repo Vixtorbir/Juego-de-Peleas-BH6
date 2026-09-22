@@ -43,6 +43,9 @@ public class RenderingBudgetPlayModeTests
         player1 = fighters[0];
         player2 = fighters[1];
 
+        TrainingModeController trainingMode = Object.FindFirstObjectByType<TrainingModeController>();
+        if (trainingMode != null) trainingMode.enabled = false;
+
         Teleport(player1, -0.5f);
         Teleport(player2, -0.5f + ContactDistance);
         yield return null;

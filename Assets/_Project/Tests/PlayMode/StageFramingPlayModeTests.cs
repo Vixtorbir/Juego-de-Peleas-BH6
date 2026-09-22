@@ -38,6 +38,9 @@ public class StageFramingPlayModeTests
         System.Array.Sort(fighters, (a, b) => string.CompareOrdinal(a.name, b.name));
         player1 = fighters[0];
         player2 = fighters[1];
+
+        TrainingModeController trainingMode = Object.FindFirstObjectByType<TrainingModeController>();
+        if (trainingMode != null) trainingMode.enabled = false;
         stageCamera = Camera.main;
         Assert.IsNotNull(stageCamera, "Training stage has no main camera.");
     }

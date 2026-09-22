@@ -23,7 +23,7 @@ public class SuperArtPlayModeTests
     private const int ExpectedBeats = 5;
     private const float MinSuperDamageRatio = 0.3f;
     private const float MaxSuperDamageRatio = 0.45f;
-    private const float ShortOfFullDamage = 110f;
+    private const float ShortOfFullDamage = 35f;
     private const float FullGaugeDamage = 1000f;
 
     private RobotController player1;
@@ -40,6 +40,9 @@ public class SuperArtPlayModeTests
         System.Array.Sort(fighters, (a, b) => string.CompareOrdinal(a.name, b.name));
         player1 = fighters[0];
         player2 = fighters[1];
+
+        TrainingModeController trainingMode = Object.FindFirstObjectByType<TrainingModeController>();
+        if (trainingMode != null) trainingMode.enabled = false;
 
         Teleport(player1, -0.5f);
         Teleport(player2, -0.5f + ContactDistance);

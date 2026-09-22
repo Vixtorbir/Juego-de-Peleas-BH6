@@ -4,10 +4,10 @@ using UnityEngine;
 /// <summary>
 /// Super gauge for a fighter. Charge is awarded by the damage resolver on every registered strike:
 /// the attacker is paid more than the defender so offence builds the meter faster than turtling,
-/// and blocked chip pays both sides a fraction of the hit rate. Specials spend whatever charge is
-/// banked without gating the move, so the gauge reads as a reward for pressure rather than as a
-/// resource that can lock a fighter out of its own moveset. Changes are broadcast for UI binding
-/// in the same shape as <see cref="HealthComponent.OnHealthChanged"/>.
+/// and blocked chip pays both sides a fraction of the hit rate. Specials are free; the gauge is
+/// reserved for the super art, which drains it in full, so a single clean combo is enough to bank
+/// one. Changes are broadcast for UI binding in the same shape as
+/// <see cref="HealthComponent.OnHealthChanged"/>.
 /// </summary>
 public class SuperMeterComponent : MonoBehaviour
 {
@@ -16,15 +16,11 @@ public class SuperMeterComponent : MonoBehaviour
 
     [Header("Gain Rates")]
     [Tooltip("Charge awarded to the attacker per point of damage dealt.")]
-    [SerializeField] private float chargePerDamageDealt = 0.9f;
+    [SerializeField] private float chargePerDamageDealt = 2.8f;
     [Tooltip("Charge awarded to the defender per point of damage taken.")]
-    [SerializeField] private float chargePerDamageTaken = 0.45f;
+    [SerializeField] private float chargePerDamageTaken = 1f;
     [Tooltip("Fraction of the normal rate paid out when the strike was blocked.")]
     [SerializeField] private float blockedChargeRatio = 0.3f;
-
-    [Header("Spending")]
-    [Tooltip("Charge a special move drains when it starts.")]
-    [SerializeField] private float specialCost = 34f;
 
     private float currentCharge;
 
@@ -38,7 +34,6 @@ public class SuperMeterComponent : MonoBehaviour
     public float MaxCharge => maxCharge;
     public float NormalizedCharge => maxCharge > 0f ? currentCharge / maxCharge : 0f;
     public bool IsFull => currentCharge >= maxCharge;
-    public float SpecialCost => specialCost;
 
     /// <summary>Charge a super art drains: the whole gauge.</summary>
     public float SuperArtCost => maxCharge;
@@ -83,9 +78,10 @@ public class SuperMeterComponent : MonoBehaviour
         return true;
     }
 
-    public void SpendForSpecial()
+    /// <summary>Tops the gauge up to capacity. Used by training mode to rehearse the super art.</summary>
+    public void FillCharge()
     {
-        TrySpend(specialCost);
+        SetCharge(maxCharge);
     }
 
     public void ResetCharge()

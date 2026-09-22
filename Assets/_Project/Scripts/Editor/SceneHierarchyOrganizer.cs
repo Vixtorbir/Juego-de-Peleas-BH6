@@ -43,7 +43,8 @@ public static class SceneHierarchyOrganizer
 
     private static readonly Type[] ManagerTypes =
     {
-        typeof(MatchManager), typeof(AudioManager), typeof(CombatEffectsManager), typeof(HitsparkPool)
+        typeof(MatchManager), typeof(AudioManager), typeof(CombatEffectsManager), typeof(HitsparkPool),
+        typeof(TrainingModeController)
     };
 
     [MenuItem("Fighting Game/Organize Scene Hierarchy", priority = 50)]

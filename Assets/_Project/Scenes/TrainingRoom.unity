@@ -1139,6 +1139,56 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1236881728}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &304697527
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 304697529}
+  - component: {fileID: 304697528}
+  m_Layer: 0
+  m_Name: TrainingModeController
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &304697528
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 304697527}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ba30862af5518db40a1e621263c6d57d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TrainingModeController
+  matchManager: {fileID: 1394402753}
+  fillMeterKey: 27
+  restoreHealthKey: 65
+  regenDelay: 1.5
+  regenPerSecond: 40
+  dummyHealthFloor: 1
+--- !u!4 &304697529
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 304697527}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1374952021}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &316368032
 GameObject:
   m_ObjectHideFlags: 0
@@ -1718,6 +1768,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::InputBuffer
   inputLifeTime: 0.35
+  defaultMotionWindow: 0.35
 --- !u!114 &422962612
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1755,10 +1806,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SuperMeterComponent
   maxCharge: 100
-  chargePerDamageDealt: 0.9
-  chargePerDamageTaken: 0.45
+  chargePerDamageDealt: 2.8
+  chargePerDamageTaken: 1
   blockedChargeRatio: 0.3
-  specialCost: 34
 --- !u!1 &436280555
 GameObject:
   m_ObjectHideFlags: 0
@@ -11234,6 +11284,7 @@ Transform:
   - {fileID: 460605527}
   - {fileID: 1595249687}
   - {fileID: 912161999}
+  - {fileID: 304697529}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1394402751
@@ -12514,10 +12565,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SuperMeterComponent
   maxCharge: 100
-  chargePerDamageDealt: 0.9
-  chargePerDamageTaken: 0.45
+  chargePerDamageDealt: 2.8
+  chargePerDamageTaken: 1
   blockedChargeRatio: 0.3
-  specialCost: 34
 --- !u!1 &1841624774
 GameObject:
   m_ObjectHideFlags: 0

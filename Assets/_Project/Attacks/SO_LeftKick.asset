@@ -21,7 +21,7 @@ MonoBehaviour:
   recoveryTime: 0.2
   hitboxOffset: {x: 0, y: 1.15, z: 1.2}
   hitboxSize: {x: 0.5, y: 0.5, z: 1}
-  damage: 8
+  damage: 6
   hitstunDuration: 0.3333
   weight: 0
   impactSound: 1

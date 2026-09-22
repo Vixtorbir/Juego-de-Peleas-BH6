@@ -454,14 +454,12 @@ public class RobotController : MonoBehaviour
 
     public void EnterSpecialAttack(AttackData data)
     {
-        SuperMeter.SpendForSpecial();
         specialAttackState.Configure(data);
         TransitionTo(specialAttackState);
     }
 
     public void EnterShoryuken(AttackData data)
     {
-        SuperMeter.SpendForSpecial();
         shoryukenState.Configure(data);
         TransitionTo(shoryukenState);
     }

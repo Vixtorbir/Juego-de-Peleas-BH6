@@ -78,22 +78,22 @@ public static class CombatRulesSetup
     private static readonly AttackSpec[] AuthoredAttacks =
     {
         new AttackSpec("SO_Overhead", "Overhead", AttackWeight.Heavy, AttackImpactSound.Punch,
-            16f, 0.5f, 0.3f, 3f, 3f, new Vector3(0f, 1f, 1f), new Vector3(0.5f, 1.2f, 0.8f),
+            12f, 0.5f, 0.3f, 3f, 3f, new Vector3(0f, 1f, 1f), new Vector3(0.5f, 1.2f, 0.8f),
             false, true, false, false, false, true, HitReaction.Hitstun, HitReaction.Hitstun),
         new AttackSpec("SO_AntiAir", "AntiAir", AttackWeight.Heavy, AttackImpactSound.Punch,
-            12f, 0.4f, 0.3f, 1.5f, 3f, new Vector3(0f, 1.9f, 0.7f), new Vector3(0.5f, 1f, 0.7f),
+            9f, 0.4f, 0.3f, 1.5f, 3f, new Vector3(0f, 1.9f, 0.7f), new Vector3(0.5f, 1f, 0.7f),
             false, false, true, true, true, true, HitReaction.Launch, HitReaction.Launch),
         new AttackSpec("SO_AirLeftPunch", "AirLeftPunch", AttackWeight.Light, AttackImpactSound.Punch,
-            5f, 0.3f, 0.17f, 1f, 1.5f, new Vector3(0f, 0.6f, 1f), new Vector3(0.6f, 1.6f, 1f),
+            4f, 0.3f, 0.17f, 1f, 1.5f, new Vector3(0f, 0.6f, 1f), new Vector3(0.6f, 1.6f, 1f),
             true, true, false, false, false, false, HitReaction.Hitstun, HitReaction.Hitstun),
         new AttackSpec("SO_AirLeftKick", "AirLeftKick", AttackWeight.Light, AttackImpactSound.Kick,
-            7f, 0.33f, 0.18f, 1.5f, 2.5f, new Vector3(0f, 0.5f, 1.1f), new Vector3(0.6f, 1.6f, 1.1f),
+            5f, 0.33f, 0.18f, 1.5f, 2.5f, new Vector3(0f, 0.5f, 1.1f), new Vector3(0.6f, 1.6f, 1.1f),
             true, true, false, false, false, false, HitReaction.Hitstun, HitReaction.Hitstun),
         new AttackSpec("SO_AirRightPunch", "AirRightPunch", AttackWeight.Medium, AttackImpactSound.Punch,
-            10f, 0.4f, 0.25f, 1.2f, 3f, new Vector3(0f, 0.6f, 1.1f), new Vector3(0.6f, 1.6f, 1f),
+            8f, 0.4f, 0.25f, 1.2f, 3f, new Vector3(0f, 0.6f, 1.1f), new Vector3(0.6f, 1.6f, 1f),
             true, true, false, false, false, false, HitReaction.Hitstun, HitReaction.Hitstun),
         new AttackSpec("SO_AirRightKick", "AirRightKick", AttackWeight.Heavy, AttackImpactSound.Kick,
-            14f, 0.5f, 0.3f, 2f, 4f, new Vector3(0f, 0.5f, 1.2f), new Vector3(0.7f, 1.6f, 1.1f),
+            11f, 0.5f, 0.3f, 2f, 4f, new Vector3(0f, 0.5f, 1.2f), new Vector3(0.7f, 1.6f, 1.1f),
             true, true, false, false, false, false, HitReaction.Knockdown, HitReaction.GroundBounce)
     };
 

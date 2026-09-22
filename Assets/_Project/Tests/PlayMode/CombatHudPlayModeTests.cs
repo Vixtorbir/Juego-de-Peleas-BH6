@@ -40,6 +40,9 @@ public class CombatHudPlayModeTests
         System.Array.Sort(fighters, (a, b) => string.CompareOrdinal(a.name, b.name));
         player1 = fighters[0];
         player2 = fighters[1];
+
+        TrainingModeController trainingMode = Object.FindFirstObjectByType<TrainingModeController>();
+        if (trainingMode != null) trainingMode.enabled = false;
         match = MatchManager.Instance;
         hud = Object.FindFirstObjectByType<CombatHudController>();
 
