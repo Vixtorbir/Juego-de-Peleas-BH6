@@ -1,0 +1,45 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4ad25b836ba4f7b45b83ab449c788887, type: 3}
+  m_Name: SO_SuperArtFinisher
+  m_EditorClassIdentifier: Assembly-CSharp::AttackData
+  animationTrigger: SuperArtFinisher
+  animationClip: {fileID: -203655887218126122, guid: 51418966e37a9cc45a36007d2e26235e, type: 3}
+  animationSpeed: 1
+  strikeTiming: 2
+  animationLayer: 0
+  startupTime: 0.05
+  activeTime: 0.216
+  recoveryTime: 0.2
+  hitboxOffset: {x: 0, y: 1.1, z: 0.75}
+  hitboxSize: {x: 0.5, y: 2, z: 0.7}
+  damage: 18
+  hitstunDuration: 0.5
+  weight: 2
+  impactSound: 0
+  specialCancelable: 0
+  cancelWindowEnd: 0
+  jumpCancelable: 0
+  dashCancelable: 0
+  invincibleStartup: 0
+  attackHeight: 1
+  isOverhead: 0
+  blockstunDuration: 0.2
+  hitPushback: 2
+  blockPushback: 3
+  isLauncher: 1
+  launchForce: 16
+  isAirAttack: 0
+  groundedReaction: 1
+  airborneReaction: 1
+  bounceForce: 9
+  comboBranches: []

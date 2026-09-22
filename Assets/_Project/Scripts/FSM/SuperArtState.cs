@@ -1,0 +1,325 @@
+using UnityEngine;
+
+/// <summary>
+/// Super art, spent from a full gauge and played in four beats: a cinematic freeze, a rushing
+/// lunge, a locked multi-hit string and a launching finisher.
+/// <para>
+/// The freeze stops the whole scene through <see cref="CombatEffectsManager"/> while the camera,
+/// the body flash and this state's own timeline keep running on unscaled time, which is what makes
+/// the activation read as a beat of its own rather than as a slow frame. Only the lunge is a real
+/// attack: it projects the lunge data's hitbox and can be blocked or whiffed, and either outcome
+/// drops straight into a recovery long enough to be punished. Once it connects clean, the defender
+/// is locked in hitstun for the rest of the sequence and the remaining beats are resolved straight
+/// through the hurtbox, so each one pays the usual damage proration, hitspark and impact sound
+/// without depending on a volume that pushback could have carried out of reach. The defender is
+/// held at striking distance by a capped pull rather than by a teleport, and the finisher launches
+/// them into the juggle state, whose landing is the hard knockdown.
+/// </para>
+/// </summary>
+public class SuperArtState : RobotState
+{
+    /// <summary>
+    /// Ground the rush covers before it gives up on reaching the opponent. Authored rather than
+    /// left to fall out of the lunge speed and its startup, so the range at which the super stops
+    /// being a threat is a design value the defender can learn and space against.
+    /// </summary>
+    public const float LungeReach = 4.5f;
+
+    private const float FreezeDuration = 0.4f;
+    private const float FreezeZoomPunch = -6f;
+    private const float LungeSpeed = 11f;
+    private const float BeatInterval = 0.12f;
+    private const float CinematicRange = 1.3f;
+    private const float AnchorSpeed = 12f;
+    private const float LockMargin = 0.4f;
+    private const float FinisherShakeDuration = 0.35f;
+    private const float FinisherShakeMagnitude = 0.4f;
+    private const float FinisherZoomPunch = -3.5f;
+    private const float FinisherCameraPunch = 0.14f;
+    private const float FinisherFlashDuration = 0.18f;
+
+    private static readonly Color ActivationFlashColor = new Color(1f, 0.85f, 0.35f);
+    private static readonly Color FinisherFlashColor = new Color(0.45f, 0.95f, 1f);
+
+    private enum Phase
+    {
+        Freeze,
+        Lunge,
+        Cinematic,
+        Recovery
+    }
+
+    private AttackData lungeData;
+    private AttackData[] beats;
+
+    private Phase phase;
+    private float phaseTimer;
+    private float beatTimer;
+    private int beatIndex;
+    private float lungeSign;
+    private float lungeTravelled;
+    private bool hitboxActive;
+
+    public SuperArtState(RobotController robot) : base(robot) { }
+
+    /// <summary>Beats resolved so far, exposed for tests and telemetry.</summary>
+    public int BeatsResolved => beatIndex;
+
+    /// <summary>True once the lunge connected clean and the defender is locked in the string.</summary>
+    public bool IsCinematic => phase == Phase.Cinematic;
+
+    public void Configure(AttackData lunge, AttackData[] cinematicBeats)
+    {
+        lungeData = lunge;
+        beats = cinematicBeats;
+    }
+
+    public override void Enter()
+    {
+        phase = Phase.Freeze;
+        phaseTimer = 0f;
+        beatTimer = 0f;
+        beatIndex = 0;
+        lungeTravelled = 0f;
+        hitboxActive = false;
+
+        robot.AttackConnected = false;
+        robot.IsInvincible = true;
+        robot.FaceOpponent();
+        lungeSign = robot.transform.forward.x < 0f ? -1f : 1f;
+        robot.animator.speed = 0f;
+
+        RobotController opponent = robot.Opponent;
+        if (opponent != null) opponent.FreezeFor(FreezeDuration);
+        if (CombatEffectsManager.Instance != null) CombatEffectsManager.Instance.TriggerSlowMotion(0f, FreezeDuration);
+        if (robot.CombatCamera != null) robot.CombatCamera.PunchZoom(FreezeZoomPunch);
+        if (robot.Flash != null) robot.Flash.Pop(ActivationFlashColor, FreezeDuration);
+        if (AudioManager.Instance != null) AudioManager.Instance.PlayShoryukenRise();
+    }
+
+    public override void Tick()
+    {
+        switch (phase)
+        {
+            case Phase.Freeze:
+                TickFreeze();
+                return;
+            case Phase.Lunge:
+                TickLunge();
+                return;
+            case Phase.Cinematic:
+                TickCinematic();
+                return;
+            default:
+                TickRecovery();
+                return;
+        }
+    }
+
+    public override void Exit()
+    {
+        robot.IsInvincible = false;
+        robot.animator.speed = 1f;
+        DeactivateHitbox();
+    }
+
+    /// <summary>
+    /// The activation beat. Gameplay time is stopped, so the timeline runs unscaled and the pose the
+    /// fighter was holding stays on screen until the lunge takes over.
+    /// </summary>
+    private void TickFreeze()
+    {
+        phaseTimer += Time.unscaledDeltaTime;
+        if (phaseTimer < FreezeDuration) return;
+
+        phase = Phase.Lunge;
+        phaseTimer = 0f;
+        robot.animator.speed = 1f;
+        PlayAttackAnimation(lungeData);
+    }
+
+    /// <summary>
+    /// The only punishable part of the move. The fighter drives forward through the lunge's active
+    /// frames; a block or a whiff ends the super in recovery, a clean hit opens the cinematic.
+    /// </summary>
+    private void TickLunge()
+    {
+        phaseTimer += Time.deltaTime;
+
+        if (lungeData == null)
+        {
+            EnterRecovery();
+            return;
+        }
+
+        if (robot.IsInvincible && phaseTimer >= lungeData.startupTime) robot.IsInvincible = false;
+
+        UpdateLungeHitbox();
+        Move();
+
+        if (robot.AttackConnected)
+        {
+            DeactivateHitbox();
+            if (ConnectedClean()) EnterCinematic();
+            else EnterRecovery();
+            return;
+        }
+
+        if (phaseTimer >= lungeData.ActiveEndTime) EnterRecovery();
+    }
+
+    /// <summary>
+    /// A blocked lunge registers as connected just like a hit, so the defender's reaction state is
+    /// what separates the two: only a guard puts them in blockstun.
+    /// </summary>
+    private bool ConnectedClean()
+    {
+        RobotController opponent = robot.Opponent;
+        return opponent != null && opponent.CurrentState is not BlockstunState;
+    }
+
+    private void UpdateLungeHitbox()
+    {
+        if (!hitboxActive && phaseTimer >= lungeData.startupTime && phaseTimer < lungeData.ActiveEndTime)
+        {
+            robot.hitboxBase.Activate(lungeData);
+            hitboxActive = true;
+        }
+        else if (hitboxActive && phaseTimer >= lungeData.ActiveEndTime)
+        {
+            DeactivateHitbox();
+        }
+    }
+
+    /// <summary>
+    /// Drives the rush forward. It stops at striking distance rather than running the fighter into
+    /// the opponent's pushbox, and never covers more than <see cref="LungeReach"/>, so a super
+    /// thrown from outside that range falls short instead of chasing across the stage.
+    /// </summary>
+    private void Move()
+    {
+        float forward = Mathf.Min(LungeSpeed * Time.deltaTime, LungeReach - lungeTravelled);
+
+        RobotController opponent = robot.Opponent;
+        if (opponent != null)
+        {
+            float gap = Mathf.Abs(opponent.transform.position.x - robot.transform.position.x) - CinematicRange;
+            forward = Mathf.Min(forward, gap);
+        }
+
+        forward = Mathf.Max(forward, 0f);
+        lungeTravelled += forward;
+
+        Vector3 velocity = new Vector3(lungeSign * forward, GroundingVelocity * Time.deltaTime, 0f);
+        robot.characterController.Move(velocity);
+    }
+
+    /// <summary>
+    /// Locks the defender for the whole string before the first beat lands, so a body the lunge
+    /// caught in the air is brought back down into hitstun and every beat resolves the same way.
+    /// </summary>
+    private void EnterCinematic()
+    {
+        if (beats == null || beats.Length == 0)
+        {
+            EnterRecovery();
+            return;
+        }
+
+        phase = Phase.Cinematic;
+        beatTimer = 0f;
+        beatIndex = 0;
+
+        RobotController opponent = robot.Opponent;
+        if (opponent != null) opponent.EnterHitstun(beats.Length * BeatInterval + LockMargin, 0f, robot);
+    }
+
+    private void EnterRecovery()
+    {
+        phase = Phase.Recovery;
+        phaseTimer = 0f;
+        DeactivateHitbox();
+        robot.IsInvincible = false;
+    }
+
+    private void TickCinematic()
+    {
+        RobotController opponent = robot.Opponent;
+        if (opponent == null || (opponent.Health != null && opponent.Health.IsDead))
+        {
+            EnterRecovery();
+            return;
+        }
+
+        ApplyGroundingForce();
+        HoldDefenderInReach(opponent);
+
+        beatTimer -= Time.deltaTime;
+        if (beatTimer > 0f) return;
+
+        bool finisher = beatIndex == beats.Length - 1;
+        ResolveBeat(opponent, beats[beatIndex], finisher);
+        beatIndex++;
+
+        if (beatIndex >= beats.Length) EnterRecovery();
+        else beatTimer = BeatInterval;
+    }
+
+    /// <summary>
+    /// Pulls the defender back to striking distance at a capped speed. The anchor sits just outside
+    /// the pushbox radius, so the separation solver never works against it, and the body is moved
+    /// through its own controller rather than by writing a transform, keeping the capsule authoritative.
+    /// </summary>
+    private void HoldDefenderInReach(RobotController opponent)
+    {
+        float anchorX = robot.transform.position.x + lungeSign * CinematicRange;
+        float currentX = opponent.transform.position.x;
+        float step = Mathf.MoveTowards(currentX, anchorX, AnchorSpeed * Time.deltaTime) - currentX;
+        if (step == 0f) return;
+
+        opponent.characterController.Move(new Vector3(step, 0f, 0f));
+    }
+
+    /// <summary>
+    /// Resolves one beat straight through the defender's hurtbox. The defender is locked out of
+    /// guarding, so the strike always registers, and routing it this way keeps the damage scaling,
+    /// meter gain, hitspark and impact sound identical to any other hit. The attacker is never
+    /// frozen, so the string keeps its rhythm while each impact still holds the defender.
+    /// </summary>
+    private void ResolveBeat(RobotController opponent, AttackData beat, bool finisher)
+    {
+        if (beat == null || opponent.Hurtbox == null) return;
+
+        Vector3 contactPoint = opponent.characterController.bounds.center;
+        opponent.Hurtbox.ReceiveHit(beat, robot, contactPoint, false);
+
+        if (!finisher) return;
+
+        if (robot.Flash != null) robot.Flash.Pop(FinisherFlashColor, FinisherFlashDuration);
+
+        FightingCamera camera = robot.CombatCamera;
+        if (camera == null) return;
+
+        Vector3 impactDirection = new Vector3(lungeSign, 1f, 0f);
+        camera.ShakeCamera(FinisherShakeDuration, FinisherShakeMagnitude, impactDirection);
+        camera.Punch(impactDirection, FinisherCameraPunch);
+        camera.PunchZoom(FinisherZoomPunch);
+    }
+
+    private void TickRecovery()
+    {
+        phaseTimer += Time.deltaTime;
+        ApplyGroundingForce();
+
+        float recovery = lungeData != null ? lungeData.recoveryTime : 0f;
+        if (phaseTimer >= recovery) robot.EnterIdle();
+    }
+
+    private void DeactivateHitbox()
+    {
+        if (!hitboxActive) return;
+
+        robot.hitboxBase.Deactivate();
+        hitboxActive = false;
+    }
+}

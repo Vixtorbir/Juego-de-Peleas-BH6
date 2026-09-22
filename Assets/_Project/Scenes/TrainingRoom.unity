@@ -1590,6 +1590,12 @@ MonoBehaviour:
   overheadBase: {fileID: 11400000, guid: 76e392da402253e469d6ed2f7b0794b0, type: 2}
   antiAirBase: {fileID: 11400000, guid: 6f2008e976c94774aac32e86e5c46805, type: 2}
   shoryukenData: {fileID: 11400000, guid: edc5be205f5efcd40b39b173a9842145, type: 2}
+  superArtLunge: {fileID: 11400000, guid: b1f4c0d7a2e34f14b9c0d3e5f6a7b801, type: 2}
+  superArtBeats:
+  - {fileID: 11400000, guid: b1f4c0d7a2e34f14b9c0d3e5f6a7b802, type: 2}
+  - {fileID: 11400000, guid: b1f4c0d7a2e34f14b9c0d3e5f6a7b803, type: 2}
+  - {fileID: 11400000, guid: b1f4c0d7a2e34f14b9c0d3e5f6a7b804, type: 2}
+  - {fileID: 11400000, guid: b1f4c0d7a2e34f14b9c0d3e5f6a7b805, type: 2}
   airLeftPunchBase: {fileID: 11400000, guid: 98c2997313b144f4a83a53a91dcfd2f5, type: 2}
   airRightPunchBase: {fileID: 11400000, guid: 8a36c6c2508737043b46e104672bc249, type: 2}
   airLeftKickBase: {fileID: 11400000, guid: 0dd0f9ce7060ed24d96051f276307f43, type: 2}
@@ -12403,6 +12409,12 @@ MonoBehaviour:
   overheadBase: {fileID: 11400000, guid: 76e392da402253e469d6ed2f7b0794b0, type: 2}
   antiAirBase: {fileID: 11400000, guid: 6f2008e976c94774aac32e86e5c46805, type: 2}
   shoryukenData: {fileID: 11400000, guid: edc5be205f5efcd40b39b173a9842145, type: 2}
+  superArtLunge: {fileID: 11400000, guid: b1f4c0d7a2e34f14b9c0d3e5f6a7b801, type: 2}
+  superArtBeats:
+  - {fileID: 11400000, guid: b1f4c0d7a2e34f14b9c0d3e5f6a7b802, type: 2}
+  - {fileID: 11400000, guid: b1f4c0d7a2e34f14b9c0d3e5f6a7b803, type: 2}
+  - {fileID: 11400000, guid: b1f4c0d7a2e34f14b9c0d3e5f6a7b804, type: 2}
+  - {fileID: 11400000, guid: b1f4c0d7a2e34f14b9c0d3e5f6a7b805, type: 2}
   airLeftPunchBase: {fileID: 11400000, guid: 98c2997313b144f4a83a53a91dcfd2f5, type: 2}
   airRightPunchBase: {fileID: 11400000, guid: 8a36c6c2508737043b46e104672bc249, type: 2}
   airLeftKickBase: {fileID: 11400000, guid: 0dd0f9ce7060ed24d96051f276307f43, type: 2}

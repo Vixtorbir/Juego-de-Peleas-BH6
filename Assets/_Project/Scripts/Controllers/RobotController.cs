@@ -13,7 +13,8 @@ public enum FighterCommand
     Shoryuken,
     Launcher,
     Overhead,
-    AntiAir
+    AntiAir,
+    SuperArt
 }
 
 /// <summary>
@@ -46,6 +47,24 @@ public class RobotController : MonoBehaviour
         CombatDirection.Forward
     };
 
+    private static readonly CombatDirection[] DoubleQuarterCircleForward =
+    {
+        CombatDirection.Down,
+        CombatDirection.DownForward,
+        CombatDirection.Forward,
+        CombatDirection.Down,
+        CombatDirection.DownForward,
+        CombatDirection.Forward
+    };
+
+    private static readonly CombatDirection[] DoubleQuarterCircleForwardShortcut =
+    {
+        CombatDirection.Down,
+        CombatDirection.Forward,
+        CombatDirection.Down,
+        CombatDirection.Forward
+    };
+
     private static readonly CombatDirection[] DragonPunch =
     {
         CombatDirection.Forward,
@@ -73,6 +92,7 @@ public class RobotController : MonoBehaviour
     private const string WallLayerName = "Wall";
     private const string ModelObjectName = "Model";
     private const float HalfTurnDegrees = 180f;
+    private const float SuperMotionWindow = 0.6f;
 
     [Header("Dependencies")]
     public InputReader inputReader;
@@ -103,6 +123,12 @@ public class RobotController : MonoBehaviour
     public AttackData overheadBase;
     public AttackData antiAirBase;
     public AttackData shoryukenData;
+
+    [Header("Super Art Attack Data Assets")]
+    [Tooltip("Rushing strike that opens the super art. Whiffed or blocked, it is the only part the opponent ever sees.")]
+    public AttackData superArtLunge;
+    [Tooltip("Cinematic beats fired in order once the lunge connects. The last entry is the finisher that launches.")]
+    public AttackData[] superArtBeats;
 
     [Header("Aerial Attack Data Assets")]
     public AttackData airLeftPunchBase;
@@ -138,6 +164,9 @@ public class RobotController : MonoBehaviour
     public SuperMeterComponent SuperMeter { get; private set; }
     public ProjectilePool Projectiles { get; private set; }
     public CombatFlash Flash { get; private set; }
+
+    /// <summary>Combat camera, resolved once at startup so states never query the main camera at runtime.</summary>
+    public FightingCamera CombatCamera { get; private set; }
     public CombatRules Rules => combatRules;
     public RobotState CurrentState => currentState;
 
@@ -146,6 +175,13 @@ public class RobotController : MonoBehaviour
 
     /// <summary>Capsule radius of the opponent, used to aim the combo micro-step at the body.</summary>
     public float OpponentBodyRadius { get; private set; }
+
+    /// <summary>
+    /// Controller driving <see cref="opponentTarget"/>, resolved once at startup. States that must
+    /// read or write the other fighter directly (the super art's cinematic lock) use it instead of
+    /// searching the hierarchy while the match is running.
+    /// </summary>
+    public RobotController Opponent { get; private set; }
 
     /// <summary>
     /// Forward speed the next attack starts with. Set by a state that hands its momentum to the
@@ -198,6 +234,7 @@ public class RobotController : MonoBehaviour
     private AirAttackState airAttackState;
     private SpecialAttackState specialAttackState;
     private ShoryukenState shoryukenState;
+    private SuperArtState superArtState;
     private HitstunState hitstunState;
     private BlockstunState blockstunState;
     private AirborneHurtState airborneHurtState;
@@ -246,6 +283,9 @@ public class RobotController : MonoBehaviour
         if (!TryGetComponent(out CombatFlash flash)) flash = gameObject.AddComponent<CombatFlash>();
         Flash = flash;
 
+        Camera mainCamera = Camera.main;
+        if (mainCamera != null) CombatCamera = mainCamera.GetComponent<FightingCamera>();
+
         modelTransform = transform.Find(ModelObjectName);
         if (modelTransform != null) modelBaseRotation = modelTransform.localRotation;
 
@@ -283,6 +323,8 @@ public class RobotController : MonoBehaviour
         {
             OpponentBodyRadius = opponentBody.radius;
         }
+
+        if (opponentTarget != null) Opponent = opponentTarget.GetComponent<RobotController>();
 
         EnterIdle();
     }
@@ -325,6 +367,7 @@ public class RobotController : MonoBehaviour
         airAttackState = new AirAttackState(this);
         specialAttackState = new SpecialAttackState(this);
         shoryukenState = new ShoryukenState(this);
+        superArtState = new SuperArtState(this);
         hitstunState = new HitstunState(this);
         blockstunState = new BlockstunState(this);
         airborneHurtState = new AirborneHurtState(this);
@@ -421,6 +464,21 @@ public class RobotController : MonoBehaviour
         SuperMeter.SpendForSpecial();
         shoryukenState.Configure(data);
         TransitionTo(shoryukenState);
+    }
+
+    /// <summary>
+    /// Starts the super art if the gauge covers it in full. The charge is spent atomically, so a
+    /// refused activation never leaves the player short of meter, and the caller can fall back to
+    /// another move. Returns false when the gauge is short or the move has no data assigned.
+    /// </summary>
+    public bool TryEnterSuperArt()
+    {
+        if (superArtLunge == null || SuperMeter == null) return false;
+        if (!SuperMeter.TrySpendExact(SuperMeter.SuperArtCost)) return false;
+
+        superArtState.Configure(superArtLunge, superArtBeats);
+        TransitionTo(superArtState);
+        return true;
     }
 
     public void EnterHitstun(float duration, float pushbackForce, RobotController attacker)
@@ -897,9 +955,32 @@ public class RobotController : MonoBehaviour
     /// </summary>
     private void HandleLeftPunch()
     {
-        bool motionDetected = inputBuffer != null
-            && (inputBuffer.CheckMotionInput(QuarterCircleForward) || inputBuffer.CheckMotionInput(QuarterCircleForwardShortcut));
+        if (inputBuffer == null)
+        {
+            PressCommand(FighterCommand.LeftPunch);
+            return;
+        }
+
+        if (IsSuperArtReady && MatchesDoubleQuarterCircle())
+        {
+            PressCommand(FighterCommand.SuperArt);
+            return;
+        }
+
+        bool motionDetected = inputBuffer.CheckMotionInput(QuarterCircleForward) || inputBuffer.CheckMotionInput(QuarterCircleForwardShortcut);
         PressCommand(motionDetected ? FighterCommand.Hadouken : FighterCommand.LeftPunch);
+    }
+
+    /// <summary>
+    /// The super motion is only read while the gauge can pay for it, so a double quarter-circle on a
+    /// short gauge degrades to the fireball its first half already describes instead of being eaten.
+    /// </summary>
+    private bool IsSuperArtReady => superArtLunge != null && SuperMeter != null && SuperMeter.IsFull;
+
+    private bool MatchesDoubleQuarterCircle()
+    {
+        return inputBuffer.CheckMotionInput(DoubleQuarterCircleForward, SuperMotionWindow)
+            || inputBuffer.CheckMotionInput(DoubleQuarterCircleForwardShortcut, SuperMotionWindow);
     }
 
     /// <summary>

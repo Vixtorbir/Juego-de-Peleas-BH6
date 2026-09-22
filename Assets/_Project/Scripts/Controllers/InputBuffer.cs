@@ -3,8 +3,11 @@ using UnityEngine;
 
 /// <summary>
 /// Records discrete directional inputs relative to the opponent and matches them against
-/// motion sequences (quarter-circle, dragon punch) using reverse sequence matching.
-/// Inputs older than <see cref="inputLifeTime"/> are pruned every frame without allocating.
+/// motion sequences (quarter-circle, dragon punch, double quarter-circle) using reverse sequence
+/// matching. Inputs older than <see cref="inputLifeTime"/> are pruned every frame without
+/// allocating. The history spans the longest motion in the game, while each lookup applies its own
+/// age limit, so a six-step super motion gets the window it needs without making every single
+/// quarter-circle that lenient.
 /// </summary>
 [RequireComponent(typeof(RobotController))]
 public class InputBuffer : MonoBehaviour
@@ -13,7 +16,10 @@ public class InputBuffer : MonoBehaviour
     private const float HorizontalDeadzone = 0.4f;
 
     [Header("Buffer Settings")]
-    [SerializeField] private float inputLifeTime = 0.35f;
+    [Tooltip("Seconds an input stays in the history. Sized for the longest motion; shorter motions apply their own limit per lookup.")]
+    [SerializeField] private float inputLifeTime = 0.6f;
+    [Tooltip("Age limit applied to a lookup that does not ask for one, covering the single-motion specials.")]
+    [SerializeField] private float defaultMotionWindow = 0.35f;
 
     private readonly List<BufferedDirection> directionHistory = new List<BufferedDirection>(16);
     private CombatDirection lastDiscreteDirection = CombatDirection.Neutral;
@@ -32,17 +38,28 @@ public class InputBuffer : MonoBehaviour
 
     /// <summary>
     /// Returns true if the most recent inputs contain <paramref name="sequence"/> in order,
-    /// allowing intermediate noise between steps. On success the history is cleared so the
-    /// same motion cannot trigger twice.
+    /// allowing intermediate noise between steps, within the default motion window.
     /// </summary>
     public bool CheckMotionInput(CombatDirection[] sequence)
     {
+        return CheckMotionInput(sequence, defaultMotionWindow);
+    }
+
+    /// <summary>
+    /// Reverse sequence match bounded by <paramref name="motionWindow"/>: only inputs made within
+    /// that many seconds count, so the whole motion must have been drawn in one go. On success the
+    /// history is cleared so the same motion cannot trigger twice.
+    /// </summary>
+    public bool CheckMotionInput(CombatDirection[] sequence, float motionWindow)
+    {
         if (directionHistory.Count < sequence.Length) return false;
 
+        float oldestAccepted = Time.time - motionWindow;
         int sequenceIndex = sequence.Length - 1;
 
         for (int i = directionHistory.Count - 1; i >= 0; i--)
         {
+            if (directionHistory[i].Timestamp < oldestAccepted) return false;
             if (directionHistory[i].Direction != sequence[sequenceIndex]) continue;
 
             sequenceIndex--;

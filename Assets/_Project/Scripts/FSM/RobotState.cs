@@ -74,7 +74,9 @@ public abstract class RobotState
 
     protected static bool IsSpecialCommand(FighterCommand command)
     {
-        return command == FighterCommand.Hadouken || command == FighterCommand.Shoryuken;
+        return command == FighterCommand.Hadouken
+            || command == FighterCommand.Shoryuken
+            || command == FighterCommand.SuperArt;
     }
 
     protected static bool IsDashCommand(FighterCommand command)
@@ -230,6 +232,8 @@ public abstract class RobotState
     /// </summary>
     protected bool TryConsumeSpecialCommands()
     {
+        if (TryConsumeSuperArtCommand()) return true;
+
         if (robot.TryConsumeCommand(FighterCommand.Hadouken))
         {
             robot.EnterSpecialAttack(robot.hadoukenData);
@@ -243,6 +247,20 @@ public abstract class RobotState
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Super art, the only move gated on its cost. The gauge is checked and spent in one atomic
+    /// step, so a press on a short gauge neither transitions nor drains: it stays buffered and
+    /// expires with the leniency window like any other input the current state cannot serve.
+    /// </summary>
+    private bool TryConsumeSuperArtCommand()
+    {
+        if (robot.bufferedCommand != FighterCommand.SuperArt) return false;
+        if (!robot.TryEnterSuperArt()) return false;
+
+        robot.TryConsumeCommand(FighterCommand.SuperArt);
+        return true;
     }
 
     protected bool TryConsumeDashCommands()

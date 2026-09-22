@@ -40,6 +40,9 @@ public class SuperMeterComponent : MonoBehaviour
     public bool IsFull => currentCharge >= maxCharge;
     public float SpecialCost => specialCost;
 
+    /// <summary>Charge a super art drains: the whole gauge.</summary>
+    public float SuperArtCost => maxCharge;
+
     private void Start()
     {
         OnChargeChanged?.Invoke(currentCharge, maxCharge);
@@ -66,6 +69,18 @@ public class SuperMeterComponent : MonoBehaviour
         bool covered = currentCharge >= cost;
         SetCharge(currentCharge - Mathf.Min(cost, currentCharge));
         return covered;
+    }
+
+    /// <summary>
+    /// Atomic spend: the gauge is drained only when it covers <paramref name="cost"/> in full, so a
+    /// move gated on its own cost never leaves the player paying for an activation that was refused.
+    /// </summary>
+    public bool TrySpendExact(float cost)
+    {
+        if (cost > currentCharge) return false;
+
+        SetCharge(currentCharge - cost);
+        return true;
     }
 
     public void SpendForSpecial()

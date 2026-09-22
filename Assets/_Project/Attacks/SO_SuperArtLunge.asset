@@ -1,0 +1,45 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4ad25b836ba4f7b45b83ab449c788887, type: 3}
+  m_Name: SO_SuperArtLunge
+  m_EditorClassIdentifier: Assembly-CSharp::AttackData
+  animationTrigger: SuperArtLunge
+  animationClip: {fileID: -203655887218126122, guid: 24c8492d23d3fa246a14ad5226911b06, type: 3}
+  animationSpeed: 1
+  strikeTiming: 0
+  animationLayer: 0
+  startupTime: 0.35
+  activeTime: 0.1
+  recoveryTime: 0.42
+  hitboxOffset: {x: 0, y: 1.3, z: 1}
+  hitboxSize: {x: 0.6, y: 0.8, z: 1.1}
+  damage: 7.5
+  hitstunDuration: 0.5
+  weight: 2
+  impactSound: 0
+  specialCancelable: 0
+  cancelWindowEnd: 0
+  jumpCancelable: 0
+  dashCancelable: 0
+  invincibleStartup: 0
+  attackHeight: 1
+  isOverhead: 0
+  blockstunDuration: 0.35
+  hitPushback: 2
+  blockPushback: 7
+  isLauncher: 0
+  launchForce: 0
+  isAirAttack: 0
+  groundedReaction: 0
+  airborneReaction: 0
+  bounceForce: 9
+  comboBranches: []
