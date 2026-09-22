@@ -15,6 +15,19 @@ public enum HitRejection
 }
 
 /// <summary>
+/// What a single registered strike did to this body, for presentation. Hit numbers count from 1,
+/// so the HUD can show a per-hit readout on the very first contact and promote to a combo counter
+/// from the second. Chip damage arrives with <see cref="Blocked"/> set and <see cref="HitNumber"/> 0.
+/// </summary>
+public struct HitFeedback
+{
+    public int HitNumber;
+    public float Damage;
+    public bool CounterHit;
+    public bool Blocked;
+}
+
+/// <summary>
 /// Running state of the combo being landed on a fighter. A plain struct on the hurtbox so combo
 /// tracking, bounce limits and route proration never touch the heap.
 /// </summary>
@@ -63,6 +76,9 @@ public class Hurtbox : MonoBehaviour
 
     /// <summary>Raised after every clean hit of a combo with the running hit count and scaled damage total.</summary>
     public event Action<int, float> OnComboHit;
+
+    /// <summary>Raised for every strike that registered on this body, hits and blocked chip alike, before the reaction state changes.</summary>
+    public event Action<HitFeedback> OnHitRegistered;
 
     /// <summary>Raised once when a combo in progress ends because the defender regained control.</summary>
     public event Action OnComboEnd;
@@ -138,7 +154,7 @@ public class Hurtbox : MonoBehaviour
         if (!controller.IsGrounded)
         {
             PlayImpactFeedback(attack, attacker, counterHit, false, contactPoint, freezeAttacker);
-            ApplyDamage(attack.damage, attacker);
+            ApplyDamage(attack.damage, attacker, counterHit);
             ApplyAirborneReaction(attack, counterHit, attacker);
             return true;
         }
@@ -167,13 +183,13 @@ public class Hurtbox : MonoBehaviour
 
             case GuardResult.GuardBroken:
                 PlayImpactFeedback(attack, attacker, false, false, contactPoint, freezeAttacker);
-                ApplyDamage(attack.damage, attacker);
+                ApplyDamage(attack.damage, attacker, false);
                 ApplyGroundedReaction(attack, false, attacker);
                 return true;
 
             default:
                 PlayImpactFeedback(attack, attacker, counterHit, false, contactPoint, freezeAttacker);
-                ApplyDamage(attack.damage, attacker);
+                ApplyDamage(attack.damage, attacker, counterHit);
                 ApplyGroundedReaction(attack, counterHit, attacker);
                 return true;
         }
@@ -357,7 +373,7 @@ public class Hurtbox : MonoBehaviour
     /// Damage is scaled by the combo position and by the route proration paid on launchers and
     /// bounces, so a long juggle route deals less than a short grounded string of the same hits.
     /// </summary>
-    private void ApplyDamage(float rawDamage, RobotController attacker)
+    private void ApplyDamage(float rawDamage, RobotController attacker, bool counterHit)
     {
         if (health == null) return;
 
@@ -366,6 +382,7 @@ public class Hurtbox : MonoBehaviour
         float scaledDamage = rawDamage * Rules.ComboScaling(combo.Hits) * combo.Proration;
         combo.Damage += scaledDamage;
         health.TakeDamage(scaledDamage);
+        OnHitRegistered?.Invoke(new HitFeedback { HitNumber = combo.Hits, Damage = scaledDamage, CounterHit = counterHit, Blocked = false });
         OnComboHit?.Invoke(combo.Hits, combo.Damage);
 
         if (health.IsDead)
@@ -392,6 +409,7 @@ public class Hurtbox : MonoBehaviour
         if (chipDamage > 0f)
         {
             health.TakeDamage(chipDamage);
+            OnHitRegistered?.Invoke(new HitFeedback { HitNumber = 0, Damage = chipDamage, CounterHit = false, Blocked = true });
         }
     }
 

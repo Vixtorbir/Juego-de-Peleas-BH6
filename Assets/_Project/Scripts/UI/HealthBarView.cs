@@ -4,15 +4,21 @@ using UnityEngine.UI;
 /// <summary>
 /// Life bar for one fighter: a foreground fill that snaps to the current health, a ghost fill
 /// that lingers on the previous value before draining down so the size of a hit stays readable
-/// through hitstop, and the round-win pips. Fill direction is authored on the foreground image in
-/// the scene (Player 1 drains towards the left edge, Player 2 towards the right), so the view only
-/// writes fill amounts and never touches layout.
+/// through hitstop, a white impact flash over the lost segment, and the round-win pips. Fill
+/// direction and the angled silhouette are authored on the images in the scene (Player 1 drains
+/// towards the left edge, Player 2 towards the right), so the view only writes fill amounts,
+/// colours and alphas and never touches layout. Every animation runs on unscaled time.
 /// </summary>
 public class HealthBarView : MonoBehaviour
 {
+    private const float LowHealthRatio = 0.25f;
+    private const float LowHealthPulseFrequency = 3f;
+    private const float LowHealthPulseDepth = 0.35f;
+
     [Header("Bars")]
     [SerializeField] private Image foregroundHealthBar;
     [SerializeField] private Image ghostHealthBar;
+    [SerializeField] private Image damageFlash;
 
     [Header("Identity")]
     [SerializeField] private TMPro.TMP_Text playerNameLabel;
@@ -24,16 +30,24 @@ public class HealthBarView : MonoBehaviour
 
     [Header("Ghost Bar")]
     [Tooltip("Seconds the ghost fill holds its position after a hit before draining.")]
-    [SerializeField] private float ghostDelay = 0.4f;
+    [SerializeField] private float ghostDelay = 0.5f;
     [Tooltip("Fill units per second the ghost drains at, on unscaled time.")]
     [SerializeField] private float ghostDrainSpeed = 1.2f;
 
+    [Header("Impact Flash")]
+    [SerializeField] private float flashDuration = 0.12f;
+    [SerializeField] private Color lowHealthColor = new Color(1f, 0.25f, 0.2f);
+
     private HealthComponent boundHealth;
     private float ghostHoldTimer;
+    private float flashTimer;
+    private Color foregroundColor;
 
     public HealthComponent BoundHealth => boundHealth;
     public float ForegroundFill => foregroundHealthBar != null ? foregroundHealthBar.fillAmount : 0f;
     public float GhostFill => ghostHealthBar != null ? ghostHealthBar.fillAmount : 0f;
+    public float FlashAlpha => damageFlash != null ? damageFlash.color.a : 0f;
+    public float GhostDelay => ghostDelay;
 
     /// <summary>
     /// Subscribes to the fighter's health and mirrors its current value at once, so the bar is
@@ -72,12 +86,26 @@ public class HealthBarView : MonoBehaviour
         }
     }
 
+    private void Awake()
+    {
+        if (foregroundHealthBar != null) foregroundColor = foregroundHealthBar.color;
+        SetFlashAlpha(0f);
+    }
+
     private void OnDisable()
     {
         Unbind();
     }
 
     private void Update()
+    {
+        float deltaTime = Time.unscaledDeltaTime;
+        TickFlash(deltaTime);
+        TickLowHealthPulse();
+        TickGhost(deltaTime);
+    }
+
+    private void TickGhost(float deltaTime)
     {
         if (ghostHealthBar == null || foregroundHealthBar == null) return;
 
@@ -86,11 +114,37 @@ public class HealthBarView : MonoBehaviour
 
         if (ghostHoldTimer > 0f)
         {
-            ghostHoldTimer -= Time.unscaledDeltaTime;
+            ghostHoldTimer -= deltaTime;
             return;
         }
 
-        ghostHealthBar.fillAmount = Mathf.MoveTowards(ghostHealthBar.fillAmount, target, ghostDrainSpeed * Time.unscaledDeltaTime);
+        ghostHealthBar.fillAmount = Mathf.MoveTowards(ghostHealthBar.fillAmount, target, ghostDrainSpeed * deltaTime);
+    }
+
+    private void TickFlash(float deltaTime)
+    {
+        if (flashTimer <= 0f) return;
+
+        flashTimer = Mathf.Max(0f, flashTimer - deltaTime);
+        SetFlashAlpha(flashDuration > 0f ? flashTimer / flashDuration : 0f);
+    }
+
+    /// <summary>
+    /// Below a quarter of the life bar the foreground breathes towards the low-health colour so the
+    /// danger reads without a separate warning element.
+    /// </summary>
+    private void TickLowHealthPulse()
+    {
+        if (foregroundHealthBar == null) return;
+
+        if (foregroundHealthBar.fillAmount > LowHealthRatio)
+        {
+            if (foregroundHealthBar.color != foregroundColor) foregroundHealthBar.color = foregroundColor;
+            return;
+        }
+
+        float wave = 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * LowHealthPulseFrequency * Mathf.PI * 2f);
+        foregroundHealthBar.color = Color.Lerp(foregroundColor, lowHealthColor, wave * LowHealthPulseDepth + (1f - LowHealthPulseDepth) * 0.5f);
     }
 
     private void HandleHealthChanged(float current, float max)
@@ -101,22 +155,44 @@ public class HealthBarView : MonoBehaviour
     }
 
     /// <summary>
-    /// Damage leaves the ghost where it was and starts the hold; healing (round reset) snaps
-    /// both fills so a fresh round never opens with a draining bar.
+    /// Damage leaves the ghost where it was, starts the hold and flashes the bar; healing (round
+    /// reset) snaps both fills so a fresh round never opens with a draining bar.
     /// </summary>
     private void SetFill(float fill, bool snapGhost)
     {
         if (foregroundHealthBar != null) foregroundHealthBar.fillAmount = fill;
-        if (ghostHealthBar == null) return;
+
+        if (ghostHealthBar != null)
+        {
+            if (snapGhost)
+            {
+                ghostHealthBar.fillAmount = fill;
+                ghostHoldTimer = 0f;
+            }
+            else
+            {
+                ghostHoldTimer = ghostDelay;
+            }
+        }
 
         if (snapGhost)
         {
-            ghostHealthBar.fillAmount = fill;
-            ghostHoldTimer = 0f;
+            flashTimer = 0f;
+            SetFlashAlpha(0f);
+            return;
         }
-        else
-        {
-            ghostHoldTimer = ghostDelay;
-        }
+
+        if (damageFlash != null) damageFlash.fillAmount = ghostHealthBar != null ? ghostHealthBar.fillAmount : fill;
+        flashTimer = flashDuration;
+        SetFlashAlpha(1f);
+    }
+
+    private void SetFlashAlpha(float alpha)
+    {
+        if (damageFlash == null) return;
+
+        Color color = damageFlash.color;
+        color.a = alpha;
+        damageFlash.color = color;
     }
 }

@@ -48,7 +48,9 @@ public static class SceneScreenshotTool
         var renderTexture = new RenderTexture(Width, Height, 24, RenderTextureFormat.ARGB32);
         RenderTexture previousTarget = camera.targetTexture;
         camera.targetTexture = renderTexture;
+        Canvas[] overlays = AttachOverlayCanvases(camera);
         camera.Render();
+        RestoreOverlayCanvases(overlays);
         camera.targetTexture = previousTarget;
 
         RenderTexture.active = renderTexture;
@@ -65,6 +67,39 @@ public static class SceneScreenshotTool
         Object.DestroyImmediate(texture);
         Object.DestroyImmediate(renderTexture);
         Debug.Log($"[SceneScreenshotTool] Saved '{outputPath}'.");
+    }
+
+    /// <summary>
+    /// Screen-space overlay canvases are not part of a camera render, so the HUD is switched to
+    /// camera space on the capturing camera for the duration of the render and switched back after,
+    /// which lets a capture double as a layout check of the HUD.
+    /// </summary>
+    private static Canvas[] AttachOverlayCanvases(Camera camera)
+    {
+        Canvas[] canvases = Object.FindObjectsByType<Canvas>(FindObjectsSortMode.None);
+        var attached = new System.Collections.Generic.List<Canvas>(canvases.Length);
+
+        foreach (Canvas canvas in canvases)
+        {
+            if (!canvas.isRootCanvas || canvas.renderMode != RenderMode.ScreenSpaceOverlay) continue;
+
+            canvas.renderMode = RenderMode.ScreenSpaceCamera;
+            canvas.worldCamera = camera;
+            canvas.planeDistance = 1f;
+            attached.Add(canvas);
+        }
+
+        Canvas.ForceUpdateCanvases();
+        return attached.ToArray();
+    }
+
+    private static void RestoreOverlayCanvases(Canvas[] canvases)
+    {
+        foreach (Canvas canvas in canvases)
+        {
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.worldCamera = null;
+        }
     }
 
     /// <summary>

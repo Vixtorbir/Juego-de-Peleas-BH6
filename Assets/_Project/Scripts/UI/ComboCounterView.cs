@@ -1,43 +1,69 @@
 using UnityEngine;
 
 /// <summary>
-/// Combo readout for the hits one fighter lands on the other. Hidden until a combo reaches two
-/// hits, then every hit re-fires a scale punch and updates the hit and damage labels from
-/// pre-built string tables, and the panel fades out when the defender regains control. All motion
-/// runs on unscaled time so the counter keeps animating through hitstop.
+/// Impact readout for the hits one fighter lands on the other. Every registered strike, from the
+/// very first, pops a per-hit damage number with an optional COUNTER or CHIP tag so no contact ever
+/// goes unacknowledged; from the second clean hit the panel is promoted to the combo counter, whose
+/// hit and damage labels re-fire an elastic scale punch on each hit and fade out when the defender
+/// regains control. All text comes from string tables built once, and all motion runs on unscaled
+/// time on RectTransforms, so the readout keeps animating through hitstop without allocating.
 /// </summary>
 public class ComboCounterView : MonoBehaviour
 {
     private const int MinDisplayedHits = 2;
     private const int MaxHits = 99;
     private const int MaxDamage = 999;
+    private const string CounterTag = "COUNTER";
+    private const string ChipTag = "CHIP";
 
-    private static readonly string[] HitsLookup = BuildHitsLookup();
-    private static readonly string[] DamageLookup = BuildDamageLookup();
+    private static readonly string[] HitsLookup = BuildLookup(MaxHits, "", " HITS");
+    private static readonly string[] DamageLookup = BuildLookup(MaxDamage, "", " DMG");
+    private static readonly string[] ReadoutLookup = BuildLookup(MaxDamage, "-", "");
 
-    [Header("References")]
+    [Header("Combo Counter")]
     [SerializeField] private CanvasGroup canvasGroup;
     [SerializeField] private TMPro.TMP_Text hitsLabel;
     [SerializeField] private TMPro.TMP_Text damageLabel;
     [SerializeField] private RectTransform punchTransform;
 
+    [Header("Hit Readout")]
+    [SerializeField] private CanvasGroup readoutGroup;
+    [SerializeField] private RectTransform readoutTransform;
+    [SerializeField] private TMPro.TMP_Text hitTagLabel;
+    [SerializeField] private TMPro.TMP_Text hitDamageLabel;
+    [SerializeField] private Color hitColor = Color.white;
+    [SerializeField] private Color counterHitColor = new Color(1f, 0.55f, 0.2f);
+    [SerializeField] private Color chipColor = new Color(0.6f, 0.75f, 0.9f);
+
     [Header("Motion")]
     [SerializeField] private float punchScale = 1.35f;
     [SerializeField] private float punchDuration = 0.15f;
     [SerializeField] private float fadeDuration = 0.3f;
+    [SerializeField] private float readoutPunchScale = 1.5f;
+    [SerializeField] private float readoutPunchDuration = 0.25f;
+    [SerializeField] private float readoutHold = 0.6f;
+    [SerializeField] private float readoutFadeDuration = 0.2f;
 
     private Hurtbox boundHurtbox;
     private float punchTimer;
     private float fadeTimer;
     private bool visible;
+    private float readoutPunchTimer;
+    private float readoutHoldTimer;
+    private float readoutFadeTimer;
+    private bool readoutVisible;
 
     public Hurtbox BoundHurtbox => boundHurtbox;
     public bool IsVisible => visible;
     public float Alpha => canvasGroup != null ? canvasGroup.alpha : 0f;
     public float FadeDuration => fadeDuration;
+    public bool IsReadoutVisible => readoutVisible;
+    public float ReadoutAlpha => readoutGroup != null ? readoutGroup.alpha : 0f;
+    public string ReadoutText => hitDamageLabel != null ? hitDamageLabel.text : string.Empty;
+    public string ReadoutTag => hitTagLabel != null ? hitTagLabel.text : string.Empty;
 
     /// <summary>
-    /// Listens to the hurtbox of the fighter being hit; the counter therefore belongs to the
+    /// Listens to the hurtbox of the fighter being hit; the readout therefore belongs to the
     /// attacker, which is why the HUD binds each view to the opposite fighter's hurtbox.
     /// </summary>
     public void Bind(Hurtbox hurtbox)
@@ -46,6 +72,7 @@ public class ComboCounterView : MonoBehaviour
         boundHurtbox = hurtbox;
         if (boundHurtbox == null) return;
 
+        boundHurtbox.OnHitRegistered += HandleHitRegistered;
         boundHurtbox.OnComboHit += HandleComboHit;
         boundHurtbox.OnComboEnd += HandleComboEnd;
     }
@@ -54,6 +81,7 @@ public class ComboCounterView : MonoBehaviour
     {
         if (boundHurtbox == null) return;
 
+        boundHurtbox.OnHitRegistered -= HandleHitRegistered;
         boundHurtbox.OnComboHit -= HandleComboHit;
         boundHurtbox.OnComboEnd -= HandleComboEnd;
         boundHurtbox = null;
@@ -62,7 +90,9 @@ public class ComboCounterView : MonoBehaviour
     private void Awake()
     {
         if (canvasGroup != null) canvasGroup.alpha = 0f;
+        if (readoutGroup != null) readoutGroup.alpha = 0f;
         visible = false;
+        readoutVisible = false;
     }
 
     private void OnDisable()
@@ -73,7 +103,12 @@ public class ComboCounterView : MonoBehaviour
     private void Update()
     {
         float deltaTime = Time.unscaledDeltaTime;
+        TickCounter(deltaTime);
+        TickReadout(deltaTime);
+    }
 
+    private void TickCounter(float deltaTime)
+    {
         if (punchTimer > 0f && punchTransform != null)
         {
             punchTimer = Mathf.Max(0f, punchTimer - deltaTime);
@@ -87,6 +122,59 @@ public class ComboCounterView : MonoBehaviour
             fadeTimer = Mathf.Max(0f, fadeTimer - deltaTime);
             canvasGroup.alpha = fadeTimer / fadeDuration;
         }
+    }
+
+    private void TickReadout(float deltaTime)
+    {
+        if (readoutPunchTimer > 0f && readoutTransform != null)
+        {
+            readoutPunchTimer = Mathf.Max(0f, readoutPunchTimer - deltaTime);
+            float progress = 1f - readoutPunchTimer / readoutPunchDuration;
+            float scale = Mathf.LerpUnclamped(readoutPunchScale, 1f, EaseOutBack(progress));
+            readoutTransform.localScale = new Vector3(scale, scale, 1f);
+        }
+
+        if (readoutHoldTimer > 0f)
+        {
+            readoutHoldTimer -= deltaTime;
+            if (readoutHoldTimer <= 0f) readoutFadeTimer = readoutFadeDuration;
+            return;
+        }
+
+        if (readoutFadeTimer > 0f && readoutGroup != null)
+        {
+            readoutFadeTimer = Mathf.Max(0f, readoutFadeTimer - deltaTime);
+            readoutGroup.alpha = readoutFadeTimer / readoutFadeDuration;
+            if (readoutFadeTimer <= 0f) readoutVisible = false;
+        }
+    }
+
+    /// <summary>
+    /// Hit confirm: the per-hit number pops on every registered strike, tagged and tinted for
+    /// counter hits and chip so the cause of the damage reads at a glance.
+    /// </summary>
+    private void HandleHitRegistered(HitFeedback feedback)
+    {
+        int damage = Mathf.Clamp(Mathf.RoundToInt(feedback.Damage), 0, MaxDamage);
+        Color tint = feedback.Blocked ? chipColor : feedback.CounterHit ? counterHitColor : hitColor;
+
+        if (hitDamageLabel != null)
+        {
+            hitDamageLabel.text = ReadoutLookup[damage];
+            hitDamageLabel.color = tint;
+        }
+
+        if (hitTagLabel != null)
+        {
+            hitTagLabel.text = feedback.Blocked ? ChipTag : feedback.CounterHit ? CounterTag : string.Empty;
+            hitTagLabel.color = tint;
+        }
+
+        readoutVisible = true;
+        readoutPunchTimer = readoutPunchDuration;
+        readoutHoldTimer = readoutHold;
+        readoutFadeTimer = 0f;
+        if (readoutGroup != null) readoutGroup.alpha = 1f;
     }
 
     private void HandleComboHit(int hitCount, float totalDamage)
@@ -117,17 +205,10 @@ public class ComboCounterView : MonoBehaviour
         return 1f + inverse * inverse * ((overshoot + 1f) * inverse + overshoot);
     }
 
-    private static string[] BuildHitsLookup()
+    private static string[] BuildLookup(int max, string prefix, string suffix)
     {
-        var lookup = new string[MaxHits + 1];
-        for (int i = 0; i < lookup.Length; i++) lookup[i] = i + " HITS";
-        return lookup;
-    }
-
-    private static string[] BuildDamageLookup()
-    {
-        var lookup = new string[MaxDamage + 1];
-        for (int i = 0; i < lookup.Length; i++) lookup[i] = i + " DMG";
+        var lookup = new string[max + 1];
+        for (int i = 0; i < lookup.Length; i++) lookup[i] = prefix + i + suffix;
         return lookup;
     }
 }

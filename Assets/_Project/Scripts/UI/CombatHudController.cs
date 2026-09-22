@@ -30,12 +30,24 @@ public class CombatHudController : MonoBehaviour
     [SerializeField] private MatchBannerView bannerView;
     [SerializeField] private TMPro.TMP_Text timerLabel;
 
+    [Header("Round Clock")]
+    [SerializeField] private RectTransform timerTransform;
+    [Tooltip("Seconds left at which the clock turns critical: recoloured and pulsing.")]
+    [SerializeField] private int criticalSeconds = 10;
+    [SerializeField] private Color timerColor = Color.white;
+    [SerializeField] private Color criticalTimerColor = new Color(1f, 0.23f, 0.23f);
+    [SerializeField] private float criticalPulseFrequency = 2f;
+    [SerializeField] private float criticalPulseScale = 0.08f;
+
     public HealthBarView Player1HealthBar => p1HealthBar;
     public HealthBarView Player2HealthBar => p2HealthBar;
     public ComboCounterView Player1Combo => p1Combo;
     public ComboCounterView Player2Combo => p2Combo;
     public MatchBannerView Banner => bannerView;
     public string TimerText => timerLabel != null ? timerLabel.text : string.Empty;
+    public bool IsClockCritical => critical;
+
+    private bool critical;
 
     private void OnEnable()
     {
@@ -100,10 +112,35 @@ public class CombatHudController : MonoBehaviour
         RefreshRoundWins();
     }
 
+    private void Update()
+    {
+        if (timerTransform == null) return;
+
+        float scale = 1f;
+        if (critical)
+        {
+            float wave = 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * criticalPulseFrequency * Mathf.PI * 2f);
+            scale += criticalPulseScale * wave;
+        }
+
+        timerTransform.localScale = new Vector3(scale, scale, 1f);
+    }
+
+    /// <summary>
+    /// The label text comes from the prebuilt table; the colour swaps between two cached values
+    /// when the clock crosses the critical threshold, so the tick never allocates.
+    /// </summary>
     private void HandleTimerTick(int seconds)
     {
         if (timerLabel == null) return;
+
         timerLabel.text = TimerLookup[Mathf.Clamp(seconds, 0, MaxTimerSeconds)];
+
+        bool nowCritical = seconds <= criticalSeconds && seconds >= 0;
+        if (nowCritical == critical && timerLabel.color == (critical ? criticalTimerColor : timerColor)) return;
+
+        critical = nowCritical;
+        timerLabel.color = critical ? criticalTimerColor : timerColor;
     }
 
     private void RefreshRoundWins()

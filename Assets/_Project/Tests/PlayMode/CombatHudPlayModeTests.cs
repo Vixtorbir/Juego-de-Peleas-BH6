@@ -6,9 +6,10 @@ using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 
 /// <summary>
-/// Play-mode coverage of the combat HUD in the training room: life bars snap on damage while the
-/// ghost fill holds and then drains, the combo counter appears from the second hit and fades when
-/// the defender recovers, the round clock counts down and resolves time over by remaining life,
+/// Play-mode coverage of the combat HUD in the training room: life bars snap on damage, flash,
+/// and let the ghost fill hold before it drains; every hit pops a per-hit damage readout from the
+/// first contact and the combo counter takes over from the second hit and fades when the defender
+/// recovers; the round clock counts down, turns critical and resolves time over by remaining life;
 /// and game code with an active HUD allocates nothing measurable inside the player loop.
 /// </summary>
 public class CombatHudPlayModeTests
@@ -18,7 +19,6 @@ public class CombatHudPlayModeTests
     private const float ContactDistance = 1.25f;
     private const float StepTimeout = 4f;
     private const float FillTolerance = 0.01f;
-    private const float GhostDelay = 0.4f;
     private const int SamplePairs = 3;
     private const float SegmentSeconds = 1.5f;
     private const float SecondsBetweenAttacks = 0.7f;
@@ -52,36 +52,53 @@ public class CombatHudPlayModeTests
     }
 
     [UnityTest]
-    public IEnumerator HealthBarSnapsOnDamageAndGhostCatchesUpAfterDelay()
+    public IEnumerator GhostHealthBarHoldsThenDrains()
     {
         HealthBarView bar = hud.Player2HealthBar;
+        float ghostDelay = bar.GhostDelay;
         Assert.AreSame(player2.Health, bar.BoundHealth, "Player 2 bar is not bound to Player 2's health.");
         Assert.AreEqual(1f, bar.ForegroundFill, FillTolerance);
+        Assert.GreaterOrEqual(ghostDelay, 0.5f, "Ghost hold should retain the previous value for at least half a second.");
 
         player2.Health.TakeDamage(30f);
         yield return null;
 
         Assert.AreEqual(0.7f, bar.ForegroundFill, FillTolerance, "Foreground fill should snap to the new health at once.");
         Assert.AreEqual(1f, bar.GhostFill, FillTolerance, "Ghost fill must hold its previous value right after the hit.");
+        Assert.Greater(bar.FlashAlpha, 0.5f, "Damage should flash the lost segment.");
 
-        yield return new WaitForSecondsRealtime(GhostDelay * 0.5f);
+        yield return new WaitForSecondsRealtime(ghostDelay * 0.5f);
         Assert.AreEqual(1f, bar.GhostFill, FillTolerance, "Ghost fill drained before the hold delay elapsed.");
 
         yield return WaitUntilRealtime(() => bar.GhostFill < 0.99f, "Ghost fill never started draining.");
-        yield return WaitUntilRealtime(() => Mathf.Abs(bar.GhostFill - bar.ForegroundFill) < FillTolerance, "Ghost fill never caught up with the foreground.");
+        float previous = bar.GhostFill;
+        while (Mathf.Abs(bar.GhostFill - bar.ForegroundFill) >= FillTolerance)
+        {
+            Assert.LessOrEqual(bar.GhostFill, previous + FillTolerance, "Ghost fill must drain monotonically.");
+            previous = bar.GhostFill;
+            yield return null;
+        }
+
+        Assert.LessOrEqual(bar.FlashAlpha, FillTolerance, "Impact flash should have faded by the time the ghost catches up.");
     }
 
     [UnityTest]
-    public IEnumerator ComboCounterShowsFromSecondHitAndFadesWhenComboEnds()
+    public IEnumerator FirstHitShowsHitConfirmReadout()
     {
         ComboCounterView counter = hud.Player1Combo;
         Assert.AreSame(player2.Hurtbox, counter.BoundHurtbox, "Player 1's counter must listen to Player 2's hurtbox.");
         Assert.AreEqual(0f, counter.Alpha, FillTolerance, "Counter should start hidden.");
+        Assert.AreEqual(0f, counter.ReadoutAlpha, FillTolerance, "Readout should start hidden.");
 
         player1.bufferedCommand = FighterCommand.LeftPunch;
         yield return WaitForState<AttackState>(player1);
         yield return WaitUntilRealtime(() => player2.Hurtbox.ComboHitCount == 1, "First hit never landed.");
-        Assert.AreEqual(0f, counter.Alpha, FillTolerance, "A single hit must not show the counter.");
+
+        Assert.IsTrue(counter.IsReadoutVisible, "The very first hit must register on the HUD.");
+        Assert.AreEqual(1f, counter.ReadoutAlpha, FillTolerance, "Hit readout should pop at full alpha.");
+        Assert.AreEqual("-" + Mathf.RoundToInt(player1.leftPunchBase.damage), counter.ReadoutText, "Readout should show the damage of the first hit.");
+        Assert.AreEqual(string.Empty, counter.ReadoutTag, "A plain hit carries no tag.");
+        Assert.IsFalse(counter.IsVisible, "The combo counter waits for the second hit.");
 
         player1.bufferedCommand = FighterCommand.RightPunch;
         yield return WaitUntilRealtime(() => player2.Hurtbox.ComboHitCount == 2, "Chain into the second hit never landed.");
@@ -89,6 +106,7 @@ public class CombatHudPlayModeTests
 
         Assert.IsTrue(counter.IsVisible, "Counter should be visible on the second hit.");
         Assert.AreEqual(1f, counter.Alpha, FillTolerance);
+        Assert.IsTrue(counter.IsReadoutVisible, "Second hit should refresh the readout as well.");
 
         yield return WaitUntilRealtime(() => !counter.IsVisible, "Counter never received the combo end.");
         yield return WaitUntilRealtime(() => counter.Alpha <= FillTolerance, "Counter never faded out after the combo ended.");
@@ -99,6 +117,7 @@ public class CombatHudPlayModeTests
     {
         int startSeconds = match.SecondsRemaining;
         Assert.AreEqual(match.SecondsRemaining.ToString("00"), hud.TimerText, "Timer label does not mirror the match clock.");
+        Assert.IsFalse(hud.IsClockCritical, "Clock should not be critical with plenty of time left.");
 
         yield return new WaitForSecondsRealtime(1.2f);
         Assert.Less(match.SecondsRemaining, startSeconds, "Round clock did not count down while fighting.");
@@ -112,6 +131,7 @@ public class CombatHudPlayModeTests
         yield return WaitUntilRealtime(() => timeOverRaised, "Time over never fired after the clock ran out.");
 
         Assert.AreEqual("00", hud.TimerText, "Timer label should read zero at time over.");
+        Assert.IsTrue(hud.IsClockCritical, "Clock should read critical in its final seconds.");
         Assert.AreEqual(MatchManager.MatchState.RoundEnd, match.CurrentState);
         Assert.AreEqual(1, match.Player1RoundsWon, "Player 1 had more life and should take the round.");
         Assert.AreEqual(0, match.Player2RoundsWon);
