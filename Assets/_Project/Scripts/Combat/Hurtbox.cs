@@ -177,7 +177,7 @@ public class Hurtbox : MonoBehaviour
 
             case GuardResult.Blocked:
                 PlayImpactFeedback(attack, attacker, false, true, contactPoint, freezeAttacker);
-                ApplyChipDamage(attack.damage);
+                ApplyChipDamage(attack.damage, attacker);
                 controller.EnterBlockstun(attack.blockstunDuration, crouching, attack.blockPushback, attacker);
                 return true;
 
@@ -382,6 +382,7 @@ public class Hurtbox : MonoBehaviour
         float scaledDamage = rawDamage * Rules.ComboScaling(combo.Hits) * combo.Proration;
         combo.Damage += scaledDamage;
         health.TakeDamage(scaledDamage);
+        AwardSuperMeter(scaledDamage, attacker, false);
         OnHitRegistered?.Invoke(new HitFeedback { HitNumber = combo.Hits, Damage = scaledDamage, CounterHit = counterHit, Blocked = false });
         OnComboHit?.Invoke(combo.Hits, combo.Damage);
 
@@ -395,7 +396,7 @@ public class Hurtbox : MonoBehaviour
     /// <summary>
     /// Blocked attacks still deal a fraction of their damage, but chip can never finish a round.
     /// </summary>
-    private void ApplyChipDamage(float rawDamage)
+    private void ApplyChipDamage(float rawDamage, RobotController attacker)
     {
         if (health == null || health.IsDead) return;
 
@@ -409,8 +410,19 @@ public class Hurtbox : MonoBehaviour
         if (chipDamage > 0f)
         {
             health.TakeDamage(chipDamage);
+            AwardSuperMeter(chipDamage, attacker, true);
             OnHitRegistered?.Invoke(new HitFeedback { HitNumber = 0, Damage = chipDamage, CounterHit = false, Blocked = true });
         }
+    }
+
+    /// <summary>
+    /// Both fighters bank charge from the same strike, the attacker at the higher rate, so meter
+    /// tracks who is applying pressure rather than who is absorbing it.
+    /// </summary>
+    private void AwardSuperMeter(float damage, RobotController attacker, bool blocked)
+    {
+        if (controller != null && controller.SuperMeter != null) controller.SuperMeter.AwardForDamageTaken(damage, blocked);
+        if (attacker != null && attacker.SuperMeter != null) attacker.SuperMeter.AwardForDamageDealt(damage, blocked);
     }
 
     private void ApplyGroundedReaction(AttackData attack, bool counterHit, RobotController attacker)

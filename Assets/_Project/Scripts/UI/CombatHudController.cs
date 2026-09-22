@@ -25,6 +25,8 @@ public class CombatHudController : MonoBehaviour
     [Header("Views")]
     [SerializeField] private HealthBarView p1HealthBar;
     [SerializeField] private HealthBarView p2HealthBar;
+    [SerializeField] private SuperGaugeView p1SuperGauge;
+    [SerializeField] private SuperGaugeView p2SuperGauge;
     [SerializeField] private ComboCounterView p1Combo;
     [SerializeField] private ComboCounterView p2Combo;
     [SerializeField] private MatchBannerView bannerView;
@@ -41,6 +43,8 @@ public class CombatHudController : MonoBehaviour
 
     public HealthBarView Player1HealthBar => p1HealthBar;
     public HealthBarView Player2HealthBar => p2HealthBar;
+    public SuperGaugeView Player1SuperGauge => p1SuperGauge;
+    public SuperGaugeView Player2SuperGauge => p2SuperGauge;
     public ComboCounterView Player1Combo => p1Combo;
     public ComboCounterView Player2Combo => p2Combo;
     public MatchBannerView Banner => bannerView;
@@ -79,6 +83,8 @@ public class CombatHudController : MonoBehaviour
         if (bannerView != null) bannerView.Unbind();
         if (p1HealthBar != null) p1HealthBar.Unbind();
         if (p2HealthBar != null) p2HealthBar.Unbind();
+        if (p1SuperGauge != null) p1SuperGauge.Unbind();
+        if (p2SuperGauge != null) p2SuperGauge.Unbind();
         if (p1Combo != null) p1Combo.Unbind();
         if (p2Combo != null) p2Combo.Unbind();
     }
@@ -90,6 +96,8 @@ public class CombatHudController : MonoBehaviour
     {
         if (p1HealthBar != null && player1 != null) p1HealthBar.Bind(player1.Health);
         if (p2HealthBar != null && player2 != null) p2HealthBar.Bind(player2.Health);
+        if (p1SuperGauge != null && player1 != null) p1SuperGauge.Bind(player1.SuperMeter);
+        if (p2SuperGauge != null && player2 != null) p2SuperGauge.Bind(player2.SuperMeter);
         if (p1Combo != null && player2 != null) p1Combo.Bind(player2.Hurtbox);
         if (p2Combo != null && player1 != null) p2Combo.Bind(player1.Hurtbox);
     }

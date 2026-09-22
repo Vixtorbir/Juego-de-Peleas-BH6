@@ -7,12 +7,13 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 /// <summary>
-/// Builds the arcade combat HUD from code: generates the angled bar, diamond pip, gloss and banner
-/// slab sprites it needs under Art/UI, derives outlined TextMeshPro material presets from the
-/// project font, and rebuilds the canvas hierarchy in place, rebinding every serialized reference on
-/// <see cref="CombatHudController"/> and the four views so gameplay bindings survive a rebuild.
-/// Layout targets a 1920x1080 reference: mirrored life bars in the top corners around a central
-/// round clock, per-player impact readouts under each bar, and a centre banner.
+/// Builds the arcade combat HUD from code: generates every sprite it needs under Art/UI, derives
+/// outlined TextMeshPro material presets from the project font, and rebuilds the canvas hierarchy
+/// in place, rebinding every serialized reference on <see cref="CombatHudController"/> and the
+/// views so gameplay bindings survive a rebuild. Layout targets a 1920x1080 reference: a bevelled
+/// portrait frame and integrated name plate in each top corner, a sheared life bar whose gold to
+/// crimson gradient is baked into the sprite so it stays anchored to the bar as the fill drains,
+/// a heat gauge beneath it, and a central clock flanked by the round pips of both fighters.
 /// </summary>
 public static class CombatHudSceneSetup
 {
@@ -21,33 +22,64 @@ public static class CombatHudSceneSetup
     private const string FontAssetPath = "Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF.asset";
     private const string HudRootName = "CombatHUD";
 
-    private const int BarWidth = 720;
-    private const int BarHeight = 40;
-    private const int FrameInset = 4;
-    private const float BarShearDegrees = 12f;
-    private const int PipSize = 22;
-    private const int PipSpacing = 30;
+    private const float BarShearDegrees = 14f;
+
+    private const int PortraitSize = 128;
+    private const int BarWidth = 700;
+    private const int BarHeight = 34;
+    private const int GaugeWidth = 620;
+    private const int GaugeHeight = 13;
+    private const int NamePlateWidth = 340;
+    private const int NamePlateHeight = 34;
+    private const int PipWidth = 30;
+    private const int PipHeight = 12;
     private const int BannerWidth = 1200;
     private const int BannerHeight = 150;
-    private const float EdgeMargin = 56f;
-    private const float BarTop = -58f;
+
+    private const int BevelThickness = 3;
+    private const int RoundsPerPlayer = 2;
+    private const float EdgeMargin = 42f;
+    private const float PanelTop = -30f;
+    private const float PortraitToBarGap = 14f;
+    private const float BarTopOffset = -6f;
 
     private static readonly Vector2 ReferenceResolution = new Vector2(1920f, 1080f);
-    private static readonly Color FrameColor = new Color(0.02f, 0.02f, 0.03f, 0.95f);
-    private static readonly Color BackingColor = new Color(0.07f, 0.08f, 0.1f, 0.92f);
-    private static readonly Color GhostColor = new Color(1f, 0.69f, 0f, 1f);
-    private static readonly Color Player1Color = new Color(0.12f, 0.85f, 1f, 1f);
-    private static readonly Color Player2Color = new Color(1f, 0.3f, 0.32f, 1f);
-    private static readonly Color GlossColor = new Color(1f, 1f, 1f, 0.22f);
-    private static readonly Color PipInactiveColor = new Color(0.16f, 0.18f, 0.22f, 1f);
+    private static readonly Color BevelColor = new Color(0.82f, 0.86f, 0.92f, 1f);
+    private static readonly Color BackingColor = new Color(0.05f, 0.06f, 0.08f, 0.94f);
+    private static readonly Color PortraitPlateColor = new Color(0.09f, 0.1f, 0.13f, 0.96f);
+    private static readonly Color GhostColor = new Color(0.72f, 0.06f, 0.12f, 1f);
+    private static readonly Color NamePlateColor = new Color(0.04f, 0.045f, 0.06f, 0.9f);
+    private static readonly Color GlossColor = new Color(1f, 1f, 1f, 0.18f);
+    private static readonly Color PipInactiveColor = new Color(0.18f, 0.2f, 0.24f, 1f);
+    private static readonly Color PipActiveColor = new Color(1f, 0.85f, 0.18f, 1f);
     private static readonly Color SlabColor = new Color(0.03f, 0.035f, 0.045f, 0.82f);
     private static readonly Color LabelColor = new Color(0.94f, 0.95f, 0.97f, 1f);
     private static readonly Color DimLabelColor = new Color(0.75f, 0.78f, 0.84f, 1f);
+    private static readonly Color TimerColor = new Color(0.86f, 0.95f, 1f, 1f);
+    private static readonly Color Player1BustColor = new Color(0.36f, 0.62f, 0.86f, 1f);
+    private static readonly Color Player2BustColor = new Color(0.86f, 0.42f, 0.38f, 1f);
+    private static readonly Color GaugeLeadColor = new Color(0.85f, 0.98f, 1f, 1f);
+    private static readonly Color GaugeFullColor = new Color(0.7f, 0.98f, 1f, 1f);
+
+    private static readonly Color LifeHigh = new Color(1f, 0.85f, 0.18f, 1f);
+    private static readonly Color LifeMid = new Color(1f, 0.44f, 0.06f, 1f);
+    private static readonly Color LifeLow = new Color(0.86f, 0.08f, 0.13f, 1f);
+    private static readonly Color HeatLow = new Color(0.05f, 0.28f, 0.95f, 1f);
+    private static readonly Color HeatHigh = new Color(0.45f, 0.95f, 1f, 1f);
 
     private struct HudSprites
     {
         public Sprite Bar;
-        public Sprite Diamond;
+        public Sprite BarLife;
+        public Sprite BarBevel;
+        public Sprite Gauge;
+        public Sprite GaugeCharge;
+        public Sprite GaugeBevel;
+        public Sprite PortraitPlate;
+        public Sprite PortraitFrame;
+        public Sprite PortraitBust;
+        public Sprite NamePlate;
+        public Sprite Pip;
         public Sprite Gloss;
         public Sprite Slab;
     }
@@ -68,14 +100,15 @@ public static class CombatHudSceneSetup
 
         HudSprites sprites = GenerateSprites();
         HudFonts fonts = CreateFontPresets();
+        EnsureSuperMeters();
 
         CombatHudController hud = EnsureCanvas();
         Transform root = hud.transform;
         ClearChildren(root);
 
-        HealthBarView p1Bar = BuildHealthBar(root, sprites, fonts, false);
-        HealthBarView p2Bar = BuildHealthBar(root, sprites, fonts, true);
-        TMP_Text timer = BuildTimer(root, sprites, fonts, out RectTransform timerTransform);
+        TMP_Text timer = BuildRoundClock(root, sprites, fonts, out RectTransform timerTransform, out Image[] p1Pips, out Image[] p2Pips);
+        HealthBarView p1Bar = BuildFighterPanel(root, sprites, fonts, false, p1Pips, out SuperGaugeView p1Gauge);
+        HealthBarView p2Bar = BuildFighterPanel(root, sprites, fonts, true, p2Pips, out SuperGaugeView p2Gauge);
         ComboCounterView p1Combo = BuildComboPanel(root, fonts, false);
         ComboCounterView p2Combo = BuildComboPanel(root, fonts, true);
         MatchBannerView banner = BuildBanner(root, sprites, fonts);
@@ -84,17 +117,36 @@ public static class CombatHudSceneSetup
         serialized.FindProperty("matchManager").objectReferenceValue = Object.FindFirstObjectByType<MatchManager>();
         serialized.FindProperty("p1HealthBar").objectReferenceValue = p1Bar;
         serialized.FindProperty("p2HealthBar").objectReferenceValue = p2Bar;
+        serialized.FindProperty("p1SuperGauge").objectReferenceValue = p1Gauge;
+        serialized.FindProperty("p2SuperGauge").objectReferenceValue = p2Gauge;
         serialized.FindProperty("p1Combo").objectReferenceValue = p1Combo;
         serialized.FindProperty("p2Combo").objectReferenceValue = p2Combo;
         serialized.FindProperty("bannerView").objectReferenceValue = banner;
         serialized.FindProperty("timerLabel").objectReferenceValue = timer;
         serialized.FindProperty("timerTransform").objectReferenceValue = timerTransform;
+        serialized.FindProperty("timerColor").colorValue = TimerColor;
         serialized.ApplyModifiedPropertiesWithoutUndo();
 
         EditorSceneManager.MarkSceneDirty(scene);
         EditorSceneManager.SaveScene(scene);
         AssetDatabase.SaveAssets();
-        Debug.Log("[CombatHudSceneSetup] Combat HUD rebuilt with angled life bars, hit readouts and outlined type.");
+        Debug.Log("[CombatHudSceneSetup] Combat HUD rebuilt with bevelled portraits, gradient life bars and heat gauges.");
+    }
+
+    /// <summary>
+    /// Serialises a <see cref="SuperMeterComponent"/> onto every fighter in the scene so the heat
+    /// gauges bind to an inspector-tunable meter rather than to one the controller adds at runtime.
+    /// </summary>
+    private static void EnsureSuperMeters()
+    {
+        RobotController[] fighters = Object.FindObjectsByType<RobotController>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (RobotController fighter in fighters)
+        {
+            if (fighter.TryGetComponent(out SuperMeterComponent _)) continue;
+
+            fighter.gameObject.AddComponent<SuperMeterComponent>();
+            EditorUtility.SetDirty(fighter.gameObject);
+        }
     }
 
     // ------------------------------------------------------------------ canvas
@@ -143,54 +195,54 @@ public static class CombatHudSceneSetup
         }
     }
 
-    // ------------------------------------------------------------------ life bars
+    // ------------------------------------------------------------------ fighter panel
 
     /// <summary>
-    /// Panel per player: name above, angled bar (frame, backing, ghost, fill, impact flash, gloss)
-    /// and round pips below. Player 2's bar container is mirrored on X about its inner edge so the
-    /// same sprite and the same left fill origin drain towards the screen edge; labels sit outside
-    /// the mirrored node.
+    /// One corner of the HUD: portrait, name plate, life bar and heat gauge. Every graphic lives
+    /// under a mirror node scaled by -1 on X for Player 2, so both sides share one set of sprites,
+    /// one left fill origin and one gradient direction while draining towards their own screen
+    /// edge. Text sits outside the mirror node so it never reads backwards.
     /// </summary>
-    private static HealthBarView BuildHealthBar(Transform root, HudSprites sprites, HudFonts fonts, bool rightSide)
+    private static HealthBarView BuildFighterPanel(Transform root, HudSprites sprites, HudFonts fonts, bool rightSide, Image[] pips, out SuperGaugeView gauge)
     {
         float side = rightSide ? -1f : 1f;
         Vector2 anchor = rightSide ? new Vector2(1f, 1f) : new Vector2(0f, 1f);
-        Color playerColor = rightSide ? Player2Color : Player1Color;
+        Vector2 topLeft = new Vector2(0f, 1f);
 
-        RectTransform panel = CreateRect(rightSide ? "Player2Panel" : "Player1Panel", root, anchor, anchor, anchor, new Vector2(side * EdgeMargin, BarTop), new Vector2(BarWidth, BarHeight));
+        RectTransform panel = CreateRect(rightSide ? "Player2Panel" : "Player1Panel", root, anchor, anchor, anchor, new Vector2(side * EdgeMargin, PanelTop), new Vector2(PortraitSize + PortraitToBarGap + BarWidth, PortraitSize));
         HealthBarView view = panel.gameObject.AddComponent<HealthBarView>();
 
-        Vector2 barPivot = rightSide ? new Vector2(0f, 1f) : anchor;
-        RectTransform bar = CreateRect("Bar", panel, anchor, anchor, barPivot, Vector2.zero, new Vector2(BarWidth, BarHeight));
-        bar.localScale = new Vector3(side, 1f, 1f);
+        RectTransform mirror = CreateRect("Mirror", panel, anchor, anchor, topLeft, Vector2.zero, panel.sizeDelta);
+        mirror.localScale = new Vector3(side, 1f, 1f);
 
-        CreateImage("Frame", bar, sprites.Bar, FrameColor, new Vector2(BarWidth + FrameInset * 2f, BarHeight + FrameInset * 2f));
+        BuildPortrait(mirror, sprites, rightSide);
+
+        float barLeft = PortraitSize + PortraitToBarGap;
+        RectTransform bar = CreateRect("LifeBar", mirror, topLeft, topLeft, topLeft, new Vector2(barLeft, BarTopOffset), new Vector2(BarWidth, BarHeight));
+        CreateImage("Bevel", bar, sprites.BarBevel, BevelColor, new Vector2(BarWidth + BevelThickness * 2f, BarHeight + BevelThickness * 2f));
         CreateImage("Backing", bar, sprites.Bar, BackingColor, new Vector2(BarWidth, BarHeight));
         Image ghost = CreateFilledImage("GhostBar", bar, sprites.Bar, GhostColor, new Vector2(BarWidth, BarHeight));
-        Image fill = CreateFilledImage("ForegroundBar", bar, sprites.Bar, playerColor, new Vector2(BarWidth, BarHeight));
+        Image fill = CreateFilledImage("ForegroundBar", bar, sprites.BarLife, Color.white, new Vector2(BarWidth, BarHeight));
         Image flash = CreateFilledImage("DamageFlash", bar, sprites.Bar, new Color(1f, 1f, 1f, 0f), new Vector2(BarWidth, BarHeight));
-        CreateImage("Gloss", bar, sprites.Gloss, GlossColor, new Vector2(BarWidth - FrameInset * 2f, BarHeight * 0.5f))
-            .rectTransform.anchoredPosition = new Vector2(0f, -FrameInset);
+        CreateImage("Gloss", bar, sprites.Gloss, GlossColor, new Vector2(BarWidth - BevelThickness * 2f, BarHeight * 0.45f))
+            .rectTransform.anchoredPosition = new Vector2(0f, BarHeight * 0.24f);
 
-        TMP_Text name = CreateLabel("NameLabel", panel, rightSide ? "PLAYER 2" : "PLAYER 1", 24f, fonts.Body, rightSide ? TextAlignmentOptions.Right : TextAlignmentOptions.Left, LabelColor, anchor, new Vector2(side * 10f, 30f), new Vector2(420f, 28f));
+        gauge = BuildSuperGauge(mirror, panel, sprites, fonts, rightSide, barLeft);
 
-        Image[] pips = new Image[2];
-        for (int i = 0; i < pips.Length; i++)
-        {
-            Image pip = CreateImage("Pip" + i, panel, sprites.Diamond, PipInactiveColor, new Vector2(PipSize, PipSize));
-            pip.rectTransform.anchorMin = anchor;
-            pip.rectTransform.anchorMax = anchor;
-            pip.rectTransform.pivot = anchor;
-            pip.rectTransform.anchoredPosition = new Vector2(side * (14f + i * PipSpacing), -(BarHeight + 10f));
-            pips[i] = pip;
-        }
+        RectTransform plate = CreateRect("NamePlate", mirror, topLeft, topLeft, topLeft, new Vector2(PortraitSize * 0.55f, -(PortraitSize - NamePlateHeight)), new Vector2(NamePlateWidth, NamePlateHeight));
+        CreateImage("Slab", plate, sprites.NamePlate, NamePlateColor, new Vector2(NamePlateWidth, NamePlateHeight));
+
+        TMP_Text name = CreateLabel("NameLabel", panel, rightSide ? "PLAYER 2" : "PLAYER 1", 25f, fonts.Body,
+            rightSide ? TextAlignmentOptions.Right : TextAlignmentOptions.Left, LabelColor, anchor,
+            new Vector2(side * (PortraitSize * 0.55f + 26f), -(PortraitSize - NamePlateHeight) - 4f), new Vector2(NamePlateWidth - 48f, NamePlateHeight));
+        name.fontStyle |= FontStyles.Italic;
 
         var serialized = new SerializedObject(view);
         serialized.FindProperty("foregroundHealthBar").objectReferenceValue = fill;
         serialized.FindProperty("ghostHealthBar").objectReferenceValue = ghost;
         serialized.FindProperty("damageFlash").objectReferenceValue = flash;
         serialized.FindProperty("playerNameLabel").objectReferenceValue = name;
-        serialized.FindProperty("activePipColor").colorValue = playerColor;
+        serialized.FindProperty("activePipColor").colorValue = PipActiveColor;
         serialized.FindProperty("inactivePipColor").colorValue = PipInactiveColor;
         serialized.FindProperty("ghostDelay").floatValue = 0.5f;
         SerializedProperty pipArray = serialized.FindProperty("winPips");
@@ -201,16 +253,85 @@ public static class CombatHudSceneSetup
         return view;
     }
 
+    private static void BuildPortrait(RectTransform mirror, HudSprites sprites, bool rightSide)
+    {
+        Vector2 topLeft = new Vector2(0f, 1f);
+        RectTransform portrait = CreateRect("Portrait", mirror, topLeft, topLeft, topLeft, Vector2.zero, new Vector2(PortraitSize, PortraitSize));
+        CreateImage("Plate", portrait, sprites.PortraitPlate, PortraitPlateColor, new Vector2(PortraitSize, PortraitSize));
+        CreateImage("Bust", portrait, sprites.PortraitBust, rightSide ? Player2BustColor : Player1BustColor, new Vector2(PortraitSize, PortraitSize));
+        CreateImage("Frame", portrait, sprites.PortraitFrame, BevelColor, new Vector2(PortraitSize + BevelThickness * 2f, PortraitSize + BevelThickness * 2f));
+    }
+
+    /// <summary>
+    /// Heat gauge under the life bar: the charge fill carries a baked blue to cyan gradient and a
+    /// brighter lead segment rides its leading edge while the gauge sweeps up. The percentage
+    /// readout sits outside the mirror node so it reads forwards on both sides.
+    /// </summary>
+    private static SuperGaugeView BuildSuperGauge(RectTransform mirror, RectTransform panel, HudSprites sprites, HudFonts fonts, bool rightSide, float barLeft)
+    {
+        Vector2 topLeft = new Vector2(0f, 1f);
+        float gaugeLeft = barLeft + (BarWidth - GaugeWidth) * 0.5f;
+        float gaugeTop = BarTopOffset - BarHeight - 9f;
+
+        RectTransform gaugeRect = CreateRect("HeatGauge", mirror, topLeft, topLeft, topLeft, new Vector2(gaugeLeft, gaugeTop), new Vector2(GaugeWidth, GaugeHeight));
+        SuperGaugeView gauge = gaugeRect.gameObject.AddComponent<SuperGaugeView>();
+
+        CreateImage("Bevel", gaugeRect, sprites.GaugeBevel, BevelColor, new Vector2(GaugeWidth + BevelThickness * 2f, GaugeHeight + BevelThickness * 2f));
+        CreateImage("Backing", gaugeRect, sprites.Gauge, BackingColor, new Vector2(GaugeWidth, GaugeHeight));
+        Image lead = CreateFilledImage("LeadEdge", gaugeRect, sprites.Gauge, GaugeLeadColor, new Vector2(GaugeWidth, GaugeHeight));
+        Image charge = CreateFilledImage("ChargeFill", gaugeRect, sprites.GaugeCharge, Color.white, new Vector2(GaugeWidth, GaugeHeight));
+        charge.fillAmount = 0f;
+        lead.fillAmount = 0f;
+
+        Vector2 labelAnchor = rightSide ? new Vector2(1f, 1f) : new Vector2(0f, 1f);
+        TMP_Text chargeLabel = CreateLabel("ChargeLabel", panel, "0", 19f, fonts.Body,
+            rightSide ? TextAlignmentOptions.Left : TextAlignmentOptions.Right, DimLabelColor, labelAnchor,
+            new Vector2((rightSide ? -1f : 1f) * (gaugeLeft + GaugeWidth + 16f), gaugeTop + 4f), new Vector2(64f, 24f));
+
+        var serialized = new SerializedObject(gauge);
+        serialized.FindProperty("chargeFill").objectReferenceValue = charge;
+        serialized.FindProperty("leadFill").objectReferenceValue = lead;
+        serialized.FindProperty("chargeLabel").objectReferenceValue = chargeLabel;
+        serialized.FindProperty("chargeColor").colorValue = Color.white;
+        serialized.FindProperty("fullColor").colorValue = GaugeFullColor;
+        serialized.ApplyModifiedPropertiesWithoutUndo();
+
+        return gauge;
+    }
+
     // ------------------------------------------------------------------ clock
 
-    private static TMP_Text BuildTimer(Transform root, HudSprites sprites, HudFonts fonts, out RectTransform timerTransform)
+    /// <summary>
+    /// Central clock with each fighter's round pips flanking the numerals, so a player reads the
+    /// score at the same point they read the time instead of tracking two separate corners.
+    /// </summary>
+    private static TMP_Text BuildRoundClock(Transform root, HudSprites sprites, HudFonts fonts, out RectTransform timerTransform, out Image[] p1Pips, out Image[] p2Pips)
     {
         Vector2 anchor = new Vector2(0.5f, 1f);
-        timerTransform = CreateRect("RoundClock", root, anchor, anchor, anchor, new Vector2(0f, -26f), new Vector2(260f, 110f));
+        timerTransform = CreateRect("RoundClock", root, anchor, anchor, anchor, new Vector2(0f, -18f), new Vector2(300f, 130f));
 
-        CreateImage("Slab", timerTransform, sprites.Slab, SlabColor, new Vector2(260f, 96f)).rectTransform.anchoredPosition = new Vector2(0f, -6f);
-        TMP_Text timer = CreateLabel("TimerLabel", timerTransform, "99", 96f, fonts.Heavy, TextAlignmentOptions.Center, LabelColor, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(260f, 110f));
+        TMP_Text timer = CreateLabel("TimerLabel", timerTransform, "99", 104f, fonts.Heavy, TextAlignmentOptions.Center, TimerColor, new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(300f, 130f));
+        timer.characterSpacing = 0f;
+
+        p1Pips = CreatePipRow(timerTransform, sprites, false);
+        p2Pips = CreatePipRow(timerTransform, sprites, true);
         return timer;
+    }
+
+    private static Image[] CreatePipRow(RectTransform clock, HudSprites sprites, bool rightSide)
+    {
+        float side = rightSide ? 1f : -1f;
+        var pips = new Image[RoundsPerPlayer];
+
+        for (int i = 0; i < pips.Length; i++)
+        {
+            Image pip = CreateImage((rightSide ? "P2Pip" : "P1Pip") + i, clock, sprites.Pip, PipInactiveColor, new Vector2(PipWidth, PipHeight));
+            pip.rectTransform.anchoredPosition = new Vector2(side * (88f + i * (PipWidth + 8f)), -20f);
+            pip.rectTransform.localScale = new Vector3(side, 1f, 1f);
+            pips[i] = pip;
+        }
+
+        return pips;
     }
 
     // ------------------------------------------------------------------ readouts
@@ -227,7 +348,7 @@ public static class CombatHudSceneSetup
         Vector2 pivot = rightSide ? new Vector2(1f, 0.5f) : new Vector2(0f, 0.5f);
         TextAlignmentOptions alignment = rightSide ? TextAlignmentOptions.Right : TextAlignmentOptions.Left;
 
-        RectTransform panel = CreateRect(rightSide ? "Player2Impact" : "Player1Impact", root, anchor, anchor, anchor, new Vector2(side * (EdgeMargin + 16f), -150f), new Vector2(420f, 260f));
+        RectTransform panel = CreateRect(rightSide ? "Player2Impact" : "Player1Impact", root, anchor, anchor, anchor, new Vector2(side * (EdgeMargin + 16f), -200f), new Vector2(420f, 260f));
         ComboCounterView view = panel.gameObject.AddComponent<ComboCounterView>();
 
         RectTransform readout = CreateRect("HitReadout", panel, anchor, anchor, pivot, new Vector2(0f, -40f), new Vector2(420f, 90f));
@@ -360,7 +481,7 @@ public static class CombatHudSceneSetup
         {
             Font = font,
             Body = CreateFontPreset(font, "LiberationSans SDF - HUD Body", 0.16f, 0.35f),
-            Heavy = CreateFontPreset(font, "LiberationSans SDF - HUD Heavy", 0.24f, 0.5f)
+            Heavy = CreateFontPreset(font, "LiberationSans SDF - HUD Heavy", 0.3f, 0.5f)
         };
     }
 
@@ -378,7 +499,7 @@ public static class CombatHudSceneSetup
         preset.SetTexture(ShaderUtilities.ID_MainTex, font.material.GetTexture(ShaderUtilities.ID_MainTex));
         preset.SetFloat(ShaderUtilities.ID_FaceDilate, 0.06f);
         preset.SetFloat(ShaderUtilities.ID_OutlineWidth, outlineWidth);
-        preset.SetFloat(ShaderUtilities.ID_OutlineSoftness, 0.05f);
+        preset.SetFloat(ShaderUtilities.ID_OutlineSoftness, 0.04f);
         preset.SetColor(ShaderUtilities.ID_OutlineColor, new Color(0.02f, 0.02f, 0.03f, 1f));
         preset.EnableKeyword(ShaderUtilities.Keyword_Underlay);
         preset.SetColor(ShaderUtilities.ID_UnderlayColor, new Color(0f, 0f, 0f, underlayAlpha));
@@ -398,50 +519,156 @@ public static class CombatHudSceneSetup
 
         return new HudSprites
         {
-            Bar = WriteSprite("T_UIBarAngled", BarWidth, BarHeight, ParallelogramAlpha),
-            Diamond = WriteSprite("T_UIDiamond", 64, 64, DiamondAlpha),
-            Gloss = WriteSprite("T_UIGloss", 4, 64, GlossAlpha),
-            Slab = WriteSprite("T_UISlab", BannerWidth, BannerHeight, SlabAlpha)
+            Bar = WriteSprite("T_UIBarAngled", BarWidth, BarHeight, ShearedMask),
+            BarLife = WriteSprite("T_UIBarLife", BarWidth, BarHeight, LifeGradient),
+            BarBevel = WriteSprite("T_UIBarBevel", BarWidth + BevelThickness * 2, BarHeight + BevelThickness * 2, ShearedBevel),
+            Gauge = WriteSprite("T_UIGaugeAngled", GaugeWidth, GaugeHeight, ShearedMask),
+            GaugeCharge = WriteSprite("T_UIGaugeCharge", GaugeWidth, GaugeHeight, HeatGradient),
+            GaugeBevel = WriteSprite("T_UIGaugeBevel", GaugeWidth + BevelThickness * 2, GaugeHeight + BevelThickness * 2, ShearedBevel),
+            PortraitPlate = WriteSprite("T_UIPortraitPlate", PortraitSize, PortraitSize, PortraitPlateMask),
+            PortraitFrame = WriteSprite("T_UIPortraitFrame", PortraitSize + BevelThickness * 2, PortraitSize + BevelThickness * 2, PortraitFrameBevel),
+            PortraitBust = WriteSprite("T_UIPortraitBust", PortraitSize, PortraitSize, PortraitBustSilhouette),
+            NamePlate = WriteSprite("T_UINamePlate", NamePlateWidth, NamePlateHeight, NamePlateMask),
+            Pip = WriteSprite("T_UIPipChevron", PipWidth, PipHeight, ShearedMask),
+            Gloss = WriteSprite("T_UIGloss", 4, 64, GlossMask),
+            Slab = WriteSprite("T_UISlab", BannerWidth, BannerHeight, SlabMask)
         };
     }
 
-    private delegate float AlphaAt(int x, int y, int width, int height);
+    private delegate Color PixelAt(float x, float y, int width, int height);
 
-    private static float ParallelogramAlpha(int x, int y, int width, int height)
+    /// <summary>
+    /// Coverage of a sheared parallelogram at a pixel, inset from every edge by
+    /// <paramref name="inset"/> pixels. Returned as coverage rather than a hard test so the
+    /// diagonals antialias instead of stepping.
+    /// </summary>
+    private static float ParallelogramCoverage(float x, float y, int width, int height, float inset)
     {
         float shear = height * Mathf.Tan(BarShearDegrees * Mathf.Deg2Rad);
-        float t = (y + 0.5f) / height;
-        float left = t * shear;
-        float right = width - shear + t * shear;
-        return Mathf.Clamp01(x + 0.5f - left) * Mathf.Clamp01(right - (x + 0.5f));
+        float t = y / height;
+        float left = t * shear + inset;
+        float right = width - shear + t * shear - inset;
+        float horizontal = Mathf.Clamp01(x - left) * Mathf.Clamp01(right - x);
+        float vertical = Mathf.Clamp01(y - inset) * Mathf.Clamp01(height - inset - y);
+        return horizontal * vertical;
     }
 
-    private static float DiamondAlpha(int x, int y, int width, int height)
+    private static Color ShearedMask(float x, float y, int width, int height)
     {
-        float dx = Mathf.Abs(x + 0.5f - width * 0.5f);
-        float dy = Mathf.Abs(y + 0.5f - height * 0.5f);
-        float radius = width * 0.5f - 1f;
-        return Mathf.Clamp01(radius - (dx + dy) + 0.5f);
+        return new Color(1f, 1f, 1f, ParallelogramCoverage(x, y, width, height, 0f));
     }
 
-    private static float GlossAlpha(int x, int y, int width, int height)
+    /// <summary>
+    /// Hollow bevel ring around the bar silhouette, brightened along the top edge so the frame
+    /// reads as brushed metal catching light from above rather than as a flat stroke.
+    /// </summary>
+    private static Color ShearedBevel(float x, float y, int width, int height)
     {
-        float t = (y + 0.5f) / height;
-        return Mathf.SmoothStep(0f, 1f, t) * t;
+        float outer = ParallelogramCoverage(x, y, width, height, 0f);
+        float inner = ParallelogramCoverage(x, y, width, height, BevelThickness);
+        float lift = Mathf.Lerp(0.55f, 1f, y / height);
+        return new Color(lift, lift, lift, Mathf.Clamp01(outer - inner));
     }
 
-    private static float SlabAlpha(int x, int y, int width, int height)
+    /// <summary>
+    /// Gold through amber to crimson along the length of the bar, with a vertical sheen. Baking the
+    /// ramp into the sprite keeps it anchored to the bar: a vertex ramp would compress towards the
+    /// remaining fill as the Filled image shrinks.
+    /// </summary>
+    private static Color LifeGradient(float x, float y, int width, int height)
     {
-        float shear = height * Mathf.Tan(BarShearDegrees * Mathf.Deg2Rad);
-        float t = (y + 0.5f) / height;
-        float left = t * shear;
-        float right = width - shear + t * shear;
-        float edge = Mathf.Clamp01(x + 0.5f - left) * Mathf.Clamp01(right - (x + 0.5f));
-        float fade = Mathf.Min(1f, Mathf.Min(x, width - 1 - x) / (width * 0.08f));
-        return edge * Mathf.SmoothStep(0f, 1f, fade);
+        float t = x / width;
+        Color tone = t < 0.5f ? Color.Lerp(LifeHigh, LifeMid, t * 2f) : Color.Lerp(LifeMid, LifeLow, (t - 0.5f) * 2f);
+        float sheen = 1f + 0.18f * Mathf.Sin(y / height * Mathf.PI);
+        tone *= sheen;
+        tone.a = ParallelogramCoverage(x, y, width, height, 0f);
+        return tone;
     }
 
-    private static Sprite WriteSprite(string name, int width, int height, AlphaAt alpha)
+    private static Color HeatGradient(float x, float y, int width, int height)
+    {
+        Color tone = Color.Lerp(HeatLow, HeatHigh, x / width);
+        tone.a = ParallelogramCoverage(x, y, width, height, 0f);
+        return tone;
+    }
+
+    /// <summary>
+    /// Portrait silhouette: a square plate whose inner edge is cut back at the HUD's shear angle so
+    /// the frame, the name plate and the life bar all share one diagonal.
+    /// </summary>
+    private static float PortraitCoverage(float x, float y, int width, int height, float inset)
+    {
+        float cut = width * 0.22f;
+        float right = width - inset - cut * (1f - y / height);
+        float horizontal = Mathf.Clamp01(x - inset) * Mathf.Clamp01(right - x);
+        float vertical = Mathf.Clamp01(y - inset) * Mathf.Clamp01(height - inset - y);
+        return horizontal * vertical;
+    }
+
+    private static Color PortraitPlateMask(float x, float y, int width, int height)
+    {
+        float shade = Mathf.Lerp(1f, 0.55f, y / height);
+        return new Color(shade, shade, shade, PortraitCoverage(x, y, width, height, 0f));
+    }
+
+    private static Color PortraitFrameBevel(float x, float y, int width, int height)
+    {
+        float outer = PortraitCoverage(x, y, width, height, 0f);
+        float inner = PortraitCoverage(x, y, width, height, BevelThickness);
+        float lift = Mathf.Lerp(0.5f, 1f, y / height);
+        return new Color(lift, lift, lift, Mathf.Clamp01(outer - inner));
+    }
+
+    /// <summary>
+    /// Stylised bust: a head disc over a shoulder arc, both clipped to the portrait plate, standing
+    /// in for a rendered character portrait without a second camera or a render texture.
+    /// </summary>
+    private static Color PortraitBustSilhouette(float x, float y, int width, int height)
+    {
+        float u = x / width;
+        float v = y / height;
+
+        float headDistance = new Vector2((u - 0.46f) * 1.35f, v - 0.66f).magnitude;
+        float head = Mathf.Clamp01((0.19f - headDistance) * height * 0.25f);
+
+        float shoulderDistance = new Vector2((u - 0.46f) * 0.75f, (v - 0.04f) * 1.6f).magnitude;
+        float shoulders = Mathf.Clamp01((0.38f - shoulderDistance) * height * 0.25f);
+
+        float body = Mathf.Max(head, shoulders) * PortraitCoverage(x, y, width, height, BevelThickness);
+        float shade = Mathf.Lerp(0.45f, 1f, v);
+        return new Color(shade, shade, shade, body * 0.85f);
+    }
+
+    /// <summary>
+    /// Name plate slab: sheared like the bars and faded out along its inner edge so the label
+    /// dissolves into the scene instead of ending on a hard rectangle.
+    /// </summary>
+    private static Color NamePlateMask(float x, float y, int width, int height)
+    {
+        float coverage = ParallelogramCoverage(x, y, width, height, 0f);
+        float fade = 1f - Mathf.SmoothStep(0.55f, 1f, x / width);
+        return new Color(1f, 1f, 1f, coverage * fade);
+    }
+
+    private static Color GlossMask(float x, float y, int width, int height)
+    {
+        float t = y / height;
+        return new Color(1f, 1f, 1f, Mathf.SmoothStep(0f, 1f, t) * t);
+    }
+
+    private static Color SlabMask(float x, float y, int width, int height)
+    {
+        float coverage = ParallelogramCoverage(x, y, width, height, 0f);
+        float fade = Mathf.Min(1f, Mathf.Min(x, width - x) / (width * 0.08f));
+        return new Color(1f, 1f, 1f, coverage * Mathf.SmoothStep(0f, 1f, fade));
+    }
+
+    /// <summary>
+    /// Writes a generated texture to Art/UI and reimports it as an uncompressed sprite. Colours are
+    /// written straight rather than premultiplied so UGUI's standard alpha blend reproduces the
+    /// baked gradients unchanged.
+    /// </summary>
+    private static Sprite WriteSprite(string name, int width, int height, PixelAt pixelShader)
     {
         string path = $"{UiRoot}/{name}.png";
         var texture = new Texture2D(width, height, TextureFormat.RGBA32, false);
@@ -451,8 +678,8 @@ public static class CombatHudSceneSetup
         {
             for (int x = 0; x < width; x++)
             {
-                byte a = (byte)Mathf.RoundToInt(Mathf.Clamp01(alpha(x, y, width, height)) * 255f);
-                pixels[y * width + x] = new Color32(255, 255, 255, a);
+                Color color = pixelShader(x + 0.5f, y + 0.5f, width, height);
+                pixels[y * width + x] = new Color32(ToByte(color.r), ToByte(color.g), ToByte(color.b), ToByte(color.a));
             }
         }
 
@@ -475,6 +702,11 @@ public static class CombatHudSceneSetup
         }
 
         return AssetDatabase.LoadAssetAtPath<Sprite>(path);
+    }
+
+    private static byte ToByte(float channel)
+    {
+        return (byte)Mathf.RoundToInt(Mathf.Clamp01(channel) * 255f);
     }
 
     private static void EnsureFolder(string path)

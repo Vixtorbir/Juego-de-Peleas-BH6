@@ -135,6 +135,7 @@ public class RobotController : MonoBehaviour
     public Vector2 MovementInput { get; private set; }
     public Hurtbox Hurtbox { get; private set; }
     public HealthComponent Health { get; private set; }
+    public SuperMeterComponent SuperMeter { get; private set; }
     public ProjectilePool Projectiles { get; private set; }
     public CombatFlash Flash { get; private set; }
     public CombatRules Rules => combatRules;
@@ -238,6 +239,8 @@ public class RobotController : MonoBehaviour
         inputBuffer = GetComponent<InputBuffer>();
         Hurtbox = GetComponentInChildren<Hurtbox>();
         Health = GetComponent<HealthComponent>();
+        if (!TryGetComponent(out SuperMeterComponent meter)) meter = gameObject.AddComponent<SuperMeterComponent>();
+        SuperMeter = meter;
         if (combatRules == null) combatRules = ScriptableObject.CreateInstance<CombatRules>();
         if (wallLayer.value == 0) wallLayer = LayerMask.GetMask(WallLayerName);
         if (!TryGetComponent(out CombatFlash flash)) flash = gameObject.AddComponent<CombatFlash>();
@@ -408,12 +411,14 @@ public class RobotController : MonoBehaviour
 
     public void EnterSpecialAttack(AttackData data)
     {
+        SuperMeter.SpendForSpecial();
         specialAttackState.Configure(data);
         TransitionTo(specialAttackState);
     }
 
     public void EnterShoryuken(AttackData data)
     {
+        SuperMeter.SpendForSpecial();
         shoryukenState.Configure(data);
         TransitionTo(shoryukenState);
     }
@@ -640,6 +645,7 @@ public class RobotController : MonoBehaviour
         characterController.enabled = true;
 
         if (Health != null) Health.ResetHealth();
+        if (SuperMeter != null) SuperMeter.ResetCharge();
         Projectiles?.RecallAll();
 
         queuedCommand = FighterCommand.None;
