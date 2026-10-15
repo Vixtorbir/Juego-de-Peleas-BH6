@@ -184,8 +184,6 @@ public class RobotController : MonoBehaviour
 
     public bool IsSimulationPaused { get; private set; }
 
-    public int TransitionCount { get; private set; }
-
     private RobotState currentState;
     private InputBuffer inputBuffer;
 
@@ -465,7 +463,6 @@ public class RobotController : MonoBehaviour
     {
         currentState?.Exit();
         currentState = nextState;
-        TransitionCount++;
         if (nextState.IsNeutral)
         {
             AirDashesUsed = 0;
